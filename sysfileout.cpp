@@ -1,0 +1,24 @@
+#include "sysfileout.h"
+
+SysFileOut::SysFileOut(const std::string& name, const std::vector<const ParamModel*>& models)
+    : _models(models), _name(name)
+{
+}
+
+void SysFileOut::Save()
+{
+    _out.open(_name);
+
+    _out << "DynaSys 0.0.0" << std::endl;
+    _out << _models.size() << std::endl;
+    for (auto it : _models)
+    {
+        const int num_pars = it->NumPars();
+        _out << it->Name() << "\t" << num_pars << std::endl;
+        for (int i=0; i<num_pars; ++i)
+            _out << it->Key(i) << "\t" << it->Value(i) << std::endl;
+        _out << std::endl;
+    }
+
+    _out.close();
+}
