@@ -43,9 +43,10 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 
     _conditions = new ConditionModel(this);
-    _conditions->AddCondition("v>30", {"v = 10", "u = 20"});
+    _conditions->AddCondition("v>30", {"v = 1", "u = 2"});
+//    _conditions->AddCondition("u>30", {"v = 100", "u = 200"});
     ui->clmConditions->setModel(_conditions);
-    connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
@@ -188,7 +189,10 @@ void MainWindow::Draw()
     //Get all of the information from the parameter fields, introducing new variables as needed.
     int num_pars = _parameters->NumPars(),
             num_vars = _variables->NumPars(),
-            num_diffs = _differentials->NumPars();
+            num_diffs = _differentials->NumPars(),
+            num_conds = _conditions->rowCount();
+    for (int i=0; i<num_conds; ++i)
+        _parserConds.push_back( mu::Parser() );
     std::unique_ptr<double[]> pars( new double[num_pars] ),
                                 vars( new double[num_vars] ), //This is purely for muParser
                                 diffs( new double[num_diffs] );
@@ -227,16 +231,18 @@ void MainWindow::Draw()
                             & value = _parameters->Value(i);
                     pars[i] = atof(value.c_str());
                     _parser.DefineVar(key, &pars[i]);
-                    _parserConds.DefineVar(key, &pars[i]);
+                    for (auto& it : _parserConds)
+                        it.DefineVar(key, &pars[i]);
                 }
 
                 for (int i=0; i<num_vars; ++i)
                 {
                     const std::string& key = _variables->Key(i),
                             & value = _variables->Value(i);
-                    _parser.DefineVar(key, &pars[i]); //So the expression which assigns a value
+                    _parser.DefineVar(key, &vars[i]); //So the expression which assigns a value
                         //to this variable must get called before the variable is used!
-                    _parserConds.DefineVar(key, &pars[i]);
+                    for (auto& it : _parserConds)
+                        it.DefineVar(key, &vars[i]);
                     expressions.push_back(key + " = " + value);
                 }
 
@@ -247,7 +253,8 @@ void MainWindow::Draw()
                             init_value = _initConds->Value(i);
                     _parser.DefineVar(key, &diffs[i]); //So the expression which assigns a value
                         //to this variable must get called before the variable is used!
-                    _parserConds.DefineVar(key, &diffs[i]);
+                    for (auto& it : _parserConds)
+                        it.DefineVar(key, &diffs[i]);
 
                     if (!is_initialized) initializations.push_back(key + " = " + init_value);
                     expressions.push_back(key + " = " + key + " + " +_differentials->Value(i));
@@ -282,7 +289,6 @@ void MainWindow::Draw()
                 is_initialized = true;
             }
 
-            int num_conds = _conditions->columnCount();
             if (_needGetParams)
             {
                 std::string expr = expressions.front();
@@ -293,16 +299,12 @@ void MainWindow::Draw()
                 });
                 _parser.SetExpr(expr);
 
-                if (num_conds==0) goto EndNeedGetParams;
-                expr = _conditions->Condition(0);
-                for (int k=1; k<num_conds; ++k)
+                for (int k=0; k<num_conds; ++k)
                 {
-                    const std::string& cond = _conditions->Condition(k);
-                    expr += ", " + cond;
+                    expr = _conditions->Condition(k);
+                    _parserConds[k].SetExpr(expr);
                 }
-                _parserConds.SetExpr(expr);
             }
-            EndNeedGetParams:
             _needGetParams = false;
 
             for (int k=0; k<num_steps; ++k)
@@ -314,14 +316,15 @@ void MainWindow::Draw()
 
             for (int k=0; k<num_conds; ++k)
             {
-                if (_parserConds.Eval())
+                if (_parserConds.at(k).Eval())
                 {
                     VecStr cond_exprns = _conditions->Expressions(k);
                     for (const auto& it : cond_exprns)
                     {
-                        _parserConds.SetExpr(it);
-                        _parserConds.Eval();
+                        _parserConds[k].SetExpr(it);
+                        _parserConds[k].Eval();
                     }
+                    _parserConds[k].SetExpr( _conditions->Condition(k) );
                 }
             }
         }

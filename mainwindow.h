@@ -73,7 +73,8 @@ class MainWindow : public QMainWindow
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needGetParams;
-        mu::Parser _parser, _parserConds;
+        mu::Parser _parser;
+        std::vector<mu::Parser> _parserConds;
         std::thread* _thread;
 };
 
