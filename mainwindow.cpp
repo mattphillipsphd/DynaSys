@@ -3,6 +3,8 @@
 
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 10;
+const int MainWindow::IP_SAMPLES_SHOWN = 100;
+
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -43,7 +45,10 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 
     _conditions = new ConditionModel(this);
-    _conditions->AddCondition("v>30", {"v = 1", "u = 2"});
+    VecStr vs;
+    vs.push_back("v = 1"); vs.push_back("u = 2");
+    _conditions->AddCondition("v>30", vs);
+//    _conditions->AddCondition("v>30", {"v = 1", "u = 2"});
 //    _conditions->AddCondition("u>30", {"v = 100", "u = 200"});
     ui->clmConditions->setModel(_conditions);
     connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
@@ -186,6 +191,18 @@ void MainWindow::Draw()
     curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
     curve->attach(ui->qwtPlot);
 
+    //The inner-product plot
+    QwtPlotCurve* curve_ip = new QwtPlotCurve();
+    curve_ip->setPen( Qt::black, 1 ),
+    curve_ip->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+    curve_ip->attach(ui->qwtInnerProduct);
+
+    //Create input vector(s)
+    std::vector< std::vector<double> > inputs(1);
+    inputs[0] = std::vector<double>(1024);
+    for (int i=0; i<1024; ++i)
+        inputs[0][i] = (double)rand() / (double)RAND_MAX;
+
     //Get all of the information from the parameter fields, introducing new variables as needed.
     int num_pars = _parameters->NumPars(),
             num_vars = _variables->NumPars(),
@@ -200,6 +217,7 @@ void MainWindow::Draw()
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
     std::vector< std::deque<double> > pts(num_diffs);
+    std::deque<double> ip;
     bool is_initialized = false;
     while (_isDrawing)
     {
@@ -269,12 +287,14 @@ void MainWindow::Draw()
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
         int num_steps = (double)ui->spnStepsPerSec->value() / (double)SLEEP_MS + 0.5;
-        if (num_steps>0) num_steps = 1;
+        if (num_steps==0) num_steps = 1;
 
             //Shrink the buffer if need be
         while (pts.at(0).size() + num_steps > MAX_BUF_SIZE)
             for (int i=0; i<num_diffs; ++i)
                 pts[i].pop_front();
+        while (ip.size() > IP_SAMPLES_SHOWN)
+            ip.pop_front();
 
             //Go through each expression and evaluate them
         try
@@ -309,9 +329,16 @@ void MainWindow::Draw()
 
             for (int k=0; k<num_steps; ++k)
             {
+                vars[0] = inputs.at(0).at(k);
+
                 _parser.Eval();
+                double ip_k = 0;
                 for (int i=0; i<num_diffs; ++i)
+                {
                     pts[i].push_back(diffs[i]);
+                    ip_k += diffs[i] * diffs[i];
+                }
+                ip.push_back(ip_k);
             }
 
             for (int k=0; k<num_conds; ++k)
@@ -335,7 +362,9 @@ void MainWindow::Draw()
         }
 
         //A blowup will crash QwtPlot
-        if (std::isinf(diffs[0]) || std::isinf(diffs[1]) || std::isnan(diffs[0]) || std::isnan(diffs[1]))
+//        if (std::isinf(diffs[0]) || std::isinf(diffs[1]) || std::isnan(diffs[0]) || std::isnan(diffs[1]))
+        const double DMAX = std::numeric_limits<double>::max();
+        if (diffs[0]>DMAX || diffs[1]>DMAX)
         {
             on_btnStart_clicked();
             return;
@@ -343,8 +372,8 @@ void MainWindow::Draw()
 
         //Plot the current state vector
         marker->setValue(diffs[0], diffs[1]);
-        std::cout << diffs[0] << ", " << diffs[1] << std::endl;
-        int num_saved_pts = pts[0].size(),
+        std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
+        int num_saved_pts = (int)pts[0].size(),
             tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;
         QPolygonF points(tail_len);
@@ -352,6 +381,19 @@ void MainWindow::Draw()
         for (int k=0, ct=ct_begin; k<tail_len; ++k, ++ct)
             points[k] = QPointF(pts[0][ct], pts[1][ct]);
         curve->setSamples(points);
+
+        //Plot points for the inner-product graph
+        const int NUM_IP_POINTS = ip.size();
+        QPolygonF points_ip(NUM_IP_POINTS);
+        for (int k=0; k<NUM_IP_POINTS; ++k)
+            points_ip[k] = QPointF(k, ip[k]);
+        curve_ip->setSamples(points_ip);
+
+            //Get axis limits for inner-product plot
+        auto xlims_ip = std::make_pair((const double)0, (const double)(ip.size()-1));
+        auto ylims_ip = std::minmax_element(ip.cbegin(), ip.cend());
+        ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, xlims_ip.first, xlims_ip.second );
+        ui->qwtInnerProduct->setAxisScale( QwtPlot::yLeft, *ylims_ip.first, *ylims_ip.second );
 
             //Get axis limits
         auto xlims = std::minmax_element(pts[0].cbegin(), pts[0].cend()),
@@ -375,4 +417,5 @@ void MainWindow::ParamsChanged(QModelIndex, QModelIndex) //slot
 void MainWindow::Replot() //slot
 {
     ui->qwtPlot->replot();
+    ui->qwtInnerProduct->replot();
 }

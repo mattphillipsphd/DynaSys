@@ -6,12 +6,12 @@
 #include <QInputDialog>
 #include <QMainWindow>
 
-#include "qwt_plot.h"
-#include "qwt_plot_curve.h"
-#include "qwt_plot_marker.h"
-#include "qwt_symbol.h"
+#include <qwt_plot.h>
+#include <qwt_plot_curve.h>
+#include <qwt_plot_marker.h>
+#include <qwt_symbol.h>
 
-#include "muParser.h"
+#include <muParser.h>
 
 #include "conditionmodel.h"
 #include "parammodel.h"
@@ -20,10 +20,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <deque>
 #include <iostream>
 #include <memory>
+#include <random>
 #include <thread>
-#include <deque>
 
 namespace Ui {
 class MainWindow;
@@ -35,7 +36,8 @@ class MainWindow : public QMainWindow
     
     public:
         static const int MAX_BUF_SIZE,
-                        SLEEP_MS;
+                        SLEEP_MS,
+                        IP_SAMPLES_SHOWN;
 
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();

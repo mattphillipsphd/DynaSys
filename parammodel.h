@@ -14,8 +14,8 @@ class ParamModel : public QAbstractTableModel
     Q_OBJECT
     public:
         explicit ParamModel(QObject* parent, const std::string& name);
-        ParamModel(const ParamModel&) = delete;
-        ParamModel& operator=(const ParamModel&) = delete;
+//        ParamModel(const ParamModel&) = delete;
+//        ParamModel& operator=(const ParamModel&) = delete;
         virtual ~ParamModel();
 
         virtual void SetPar(const std::string& key, const std::string& value);

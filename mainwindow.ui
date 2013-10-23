@@ -6,84 +6,188 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1218</width>
-    <height>710</height>
+    <width>1250</width>
+    <height>874</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,0,0">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="3,1">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QwtPlot" name="qwtPlot" native="true"/>
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0">
+        <item>
+         <widget class="QwtPlot" name="qwtPlot" native="true"/>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QPushButton" name="btnStart">
+            <property name="font">
+             <font>
+              <pointsize>14</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>Start</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>Steps/sec:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spnStepsPerSec">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>1000000</number>
+            </property>
+            <property name="value">
+             <number>10</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string># of samples in tail:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="spnTailLength">
+            <property name="minimum">
+             <number>-1</number>
+            </property>
+            <property name="maximum">
+             <number>1024</number>
+            </property>
+            <property name="value">
+             <number>10</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout">
-        <item>
-         <widget class="QPushButton" name="btnStart">
-          <property name="font">
-           <font>
-            <pointsize>14</pointsize>
-           </font>
-          </property>
+       <layout class="QGridLayout" name="gridLayout" rowstretch="2,0,1,0">
+        <item row="1" column="1">
+         <widget class="QPushButton" name="btnRemoveParameter">
           <property name="text">
-           <string>Start</string>
+           <string>Remove Parameter</string>
           </property>
          </widget>
         </item>
-        <item>
-         <widget class="QLabel" name="label">
+        <item row="1" column="0">
+         <widget class="QPushButton" name="btnAddParameter">
           <property name="text">
-           <string>Steps/sec:</string>
+           <string>Add Parameter</string>
           </property>
          </widget>
         </item>
-        <item>
-         <widget class="QSpinBox" name="spnStepsPerSec">
-          <property name="minimum">
-           <number>1</number>
-          </property>
-          <property name="maximum">
-           <number>1000000</number>
-          </property>
-          <property name="value">
-           <number>10</number>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <widget class="QLabel" name="label_2">
+        <item row="3" column="1">
+         <widget class="QPushButton" name="btnRemoveVariable">
           <property name="text">
-           <string># of samples in tail:</string>
+           <string>Remove Variable</string>
           </property>
          </widget>
         </item>
-        <item>
-         <widget class="QSpinBox" name="spnTailLength">
-          <property name="minimum">
-           <number>-1</number>
+        <item row="2" column="0" colspan="2">
+         <widget class="QTableView" name="tblVariables"/>
+        </item>
+        <item row="3" column="0">
+         <widget class="QPushButton" name="btnAddVariable">
+          <property name="text">
+           <string>Add Variable</string>
           </property>
-          <property name="maximum">
-           <number>1024</number>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="2">
+         <widget class="QTableView" name="tblParameters"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QGridLayout" name="gridLayout_2">
+        <item row="4" column="3">
+         <widget class="QPushButton" name="btnRemoveExpression">
+          <property name="text">
+           <string>Remove Exprn</string>
           </property>
-          <property name="value">
-           <number>10</number>
+         </widget>
+        </item>
+        <item row="3" column="0" colspan="4">
+         <widget class="QColumnView" name="clmConditions">
+          <property name="defaultDropAction">
+           <enum>Qt::IgnoreAction</enum>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="2">
+         <widget class="QPushButton" name="btnAddExpression">
+          <property name="text">
+           <string>Add Exprn</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QPushButton" name="btnAddCondition">
+          <property name="text">
+           <string>Add Cond</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="4">
+         <widget class="QTableView" name="tblDifferentials"/>
+        </item>
+        <item row="1" column="0" colspan="4">
+         <widget class="QTableView" name="tblInitConds"/>
+        </item>
+        <item row="2" column="2" colspan="2">
+         <widget class="QPushButton" name="btnRemoveDiff">
+          <property name="text">
+           <string>Remove Differential</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QPushButton" name="btnRemoveCondition">
+          <property name="text">
+           <string>Remove Cond</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0" colspan="2">
+         <widget class="QPushButton" name="btnAddDiff">
+          <property name="text">
+           <string>Add Differential</string>
           </property>
          </widget>
         </item>
@@ -92,104 +196,7 @@
      </layout>
     </item>
     <item>
-     <layout class="QGridLayout" name="gridLayout" rowstretch="2,0,1,0">
-      <item row="1" column="1">
-       <widget class="QPushButton" name="btnRemoveParameter">
-        <property name="text">
-         <string>Remove Parameter</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QPushButton" name="btnAddParameter">
-        <property name="text">
-         <string>Add Parameter</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="btnRemoveVariable">
-        <property name="text">
-         <string>Remove Variable</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" colspan="2">
-       <widget class="QTableView" name="tblVariables"/>
-      </item>
-      <item row="3" column="0">
-       <widget class="QPushButton" name="btnAddVariable">
-        <property name="text">
-         <string>Add Variable</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0" colspan="2">
-       <widget class="QTableView" name="tblParameters"/>
-      </item>
-     </layout>
-    </item>
-    <item>
-     <layout class="QGridLayout" name="gridLayout_2">
-      <item row="4" column="3">
-       <widget class="QPushButton" name="btnRemoveExpression">
-        <property name="text">
-         <string>Remove Exprn</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0" colspan="4">
-       <widget class="QColumnView" name="clmConditions">
-        <property name="defaultDropAction">
-         <enum>Qt::IgnoreAction</enum>
-        </property>
-        <property name="alternatingRowColors">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="2">
-       <widget class="QPushButton" name="btnAddExpression">
-        <property name="text">
-         <string>Add Exprn</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QPushButton" name="btnAddCondition">
-        <property name="text">
-         <string>Add Cond</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0" colspan="4">
-       <widget class="QTableView" name="tblDifferentials"/>
-      </item>
-      <item row="1" column="0" colspan="4">
-       <widget class="QTableView" name="tblInitConds"/>
-      </item>
-      <item row="2" column="2" colspan="2">
-       <widget class="QPushButton" name="btnRemoveDiff">
-        <property name="text">
-         <string>Remove Differential</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="QPushButton" name="btnRemoveCondition">
-        <property name="text">
-         <string>Remove Cond</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" colspan="2">
-       <widget class="QPushButton" name="btnAddDiff">
-        <property name="text">
-         <string>Add Differential</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+     <widget class="QwtPlot" name="qwtInnerProduct" native="true"/>
     </item>
    </layout>
   </widget>
@@ -198,8 +205,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1218</width>
-     <height>20</height>
+     <width>1250</width>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
