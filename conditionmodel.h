@@ -1,6 +1,7 @@
 #ifndef CONDITIONMODEL_H
 #define CONDITIONMODEL_H
 
+#include <QVector>
 #include <QAbstractItemModel>
 //#include <QStandardItemModel>
 

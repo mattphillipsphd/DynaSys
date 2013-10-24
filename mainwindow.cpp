@@ -177,6 +177,7 @@ void MainWindow::on_btnStart_clicked()
 void MainWindow::Draw()
 {
     ui->qwtPlot->detachItems();
+    ui->qwtInnerProduct->detachItems();
 
     //The point indicating current value
     QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
@@ -197,12 +198,6 @@ void MainWindow::Draw()
     curve_ip->setRenderHint( QwtPlotItem::RenderAntialiased, true );
     curve_ip->attach(ui->qwtInnerProduct);
 
-    //Create input vector(s)
-    std::vector< std::vector<double> > inputs(1);
-    inputs[0] = std::vector<double>(1024);
-    for (int i=0; i<1024; ++i)
-        inputs[0][i] = (double)rand() / (double)RAND_MAX;
-
     //Get all of the information from the parameter fields, introducing new variables as needed.
     int num_pars = _parameters->NumPars(),
             num_vars = _variables->NumPars(),
@@ -218,6 +213,17 @@ void MainWindow::Draw()
         //values
     std::vector< std::deque<double> > pts(num_diffs);
     std::deque<double> ip;
+
+    //Create input vector(s)
+    std::vector< std::vector<double> > inputs(num_vars);
+    for (int i=0; i<num_vars; ++i)
+    {
+        inputs[i] = std::vector<double>(MAX_BUF_SIZE);
+        for (int k=0; k<MAX_BUF_SIZE; ++k)
+            inputs[i][k] = (double)rand() / (double)RAND_MAX;
+    } // ###
+    int input_ct = 0;
+
     bool is_initialized = false;
     while (_isDrawing)
     {
@@ -329,7 +335,10 @@ void MainWindow::Draw()
 
             for (int k=0; k<num_steps; ++k)
             {
-                vars[0] = inputs.at(0).at(k);
+                for (int i=0; i<num_vars; ++i)
+                    vars[i] = inputs.at(i).at(input_ct);
+                ++input_ct;
+                input_ct %= MAX_BUF_SIZE;
 
                 _parser.Eval();
                 double ip_k = 0;
