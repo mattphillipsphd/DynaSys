@@ -81,7 +81,18 @@ void MainWindow::on_actionLoad_triggered()
     delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
     delete _initConds;      _initConds = models[3];     ui->tblInitConds->setModel(_initConds);
 }
-void MainWindow::on_actionSave_triggered()
+void MainWindow::on_actionSave_Data_triggered()
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    if ( !QFile(".temp.txt").exists() ) return;
+    QString file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Save generated data",
+                                                         "");
+    if (file_name.isEmpty()) return;
+    QFile::rename(".temp.txt", file_name);
+}
+void MainWindow::on_actionSave_Model_triggered()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
@@ -224,6 +235,9 @@ void MainWindow::Draw()
     } // ###
     int input_ct = 0;
 
+    QFile temp(".temp.txt");
+    temp.open(QFile::WriteOnly | QFile::Text);
+
     bool is_initialized = false;
     while (_isDrawing)
     {
@@ -333,6 +347,7 @@ void MainWindow::Draw()
             }
             _needGetParams = false;
 
+            std::string output;
             for (int k=0; k<num_steps; ++k)
             {
                 for (int i=0; i<num_vars; ++i)
@@ -345,8 +360,14 @@ void MainWindow::Draw()
                 for (int i=0; i<num_diffs; ++i)
                 {
                     pts[i].push_back(diffs[i]);
+                    output += std::to_string(diffs[i]) + "\t";
+
                     ip_k += diffs[i] * diffs[i];
                 }
+                output += "\n";
+                temp.write(output.c_str());
+                temp.flush();
+
                 ip.push_back(ip_k);
             }
 
@@ -416,6 +437,7 @@ void MainWindow::Draw()
         std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
     }
 
+    temp.close();
     _isDrawing = false;
 }
 

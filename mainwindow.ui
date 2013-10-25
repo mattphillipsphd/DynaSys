@@ -206,7 +206,7 @@
      <x>0</x>
      <y>0</y>
      <width>1250</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -214,7 +214,8 @@
      <string>File</string>
     </property>
     <addaction name="actionLoad"/>
-    <addaction name="actionSave"/>
+    <addaction name="actionSave_Model"/>
+    <addaction name="actionSave_Data"/>
    </widget>
    <addaction name="menuFile"/>
   </widget>
@@ -232,9 +233,14 @@
     <string>Load</string>
    </property>
   </action>
-  <action name="actionSave">
+  <action name="actionSave_Model">
    <property name="text">
-    <string>Save</string>
+    <string>Save Model</string>
+   </property>
+  </action>
+  <action name="actionSave_Data">
+   <property name="text">
+    <string>Save Data</string>
    </property>
   </action>
  </widget>

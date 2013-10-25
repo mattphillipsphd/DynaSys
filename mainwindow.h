@@ -3,6 +3,7 @@
 
 #include <QDebug>
 #include <QFileDialog>
+#include <QFile>
 #include <QInputDialog>
 #include <QMainWindow>
 
@@ -47,7 +48,8 @@ class MainWindow : public QMainWindow
 
     private slots:
         void on_actionLoad_triggered();
-        void on_actionSave_triggered();
+        void on_actionSave_Data_triggered();
+        void on_actionSave_Model_triggered();
 
         void on_btnAddDiff_clicked();
         void on_btnAddParameter_clicked();
