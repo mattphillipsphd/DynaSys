@@ -5,6 +5,7 @@
 #include <QAbstractItemModel>
 //#include <QStandardItemModel>
 
+#include <fstream>
 #include <map>
 #include <vector>
 #include <string>
@@ -23,6 +24,8 @@ class ConditionModel : public QAbstractItemModel
 
         const std::string& Condition(int i) const;
         const VecStr& Expressions(int i) const;
+        void Read(std::ifstream& in);
+        void Write(std::ofstream& out) const;
 
         int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override;

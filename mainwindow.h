@@ -14,6 +14,7 @@
 
 #include <muParser.h>
 
+#include "comboboxdelegate.h"
 #include "conditionmodel.h"
 #include "parammodel.h"
 #include "sysfilein.h"
@@ -43,6 +44,8 @@ class MainWindow : public QMainWindow
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();
 
+    public slots:
+
     signals:
         void DoReplot();
 
@@ -54,17 +57,20 @@ class MainWindow : public QMainWindow
         void on_btnAddDiff_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
+        void on_btnRemoveCondition_clicked();
         void on_btnRemoveDiff_clicked();
         void on_btnRemoveParameter_clicked();
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
+        void ComboBoxChanged(const QString& text);
         void ParamsChanged(QModelIndex, QModelIndex);
         void Replot();
 
     private:
         Ui::MainWindow *ui;
 
+        void AddVarDelegate(int row, ComboBoxDelegate::TYPE type);
         void Draw();
 
         ConditionModel* _conditions;
@@ -74,6 +80,7 @@ class MainWindow : public QMainWindow
                 * _variables;   //Can invoke other expressions
 
 //        QWidget* _guiVariable, * _guiDifferential;
+        std::vector<ComboBoxDelegate*> _cmbDelegates;
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needGetParams;

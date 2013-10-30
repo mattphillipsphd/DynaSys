@@ -21,14 +21,16 @@ SOURCES += main.cpp\
     variablegui.cpp \
     sysfileout.cpp \
     sysfilein.cpp \
-    conditionmodel.cpp
+    conditionmodel.cpp \
+    comboboxdelegate.cpp
 
 HEADERS  += mainwindow.h \
     parammodel.h \
     variablegui.h \
     sysfileout.h \
     sysfilein.h \
-    conditionmodel.h
+    conditionmodel.h \
+    comboboxdelegate.h
 
 FORMS    += mainwindow.ui \
     variablegui.ui

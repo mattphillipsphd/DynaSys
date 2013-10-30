@@ -1,7 +1,8 @@
 #include "sysfilein.h"
 
-SysFileIn::SysFileIn(const std::string& name, std::vector<ParamModel*>& models)
-    : _models(models), _name(name)
+SysFileIn::SysFileIn(const std::string& name,
+                     std::vector<ParamModel*>& models, ConditionModel* conditions)
+    : _conditions(conditions), _models(models), _name(name)
 {
 }
 
@@ -35,6 +36,8 @@ void SysFileIn::Load()
 
         std::getline(_in, line);
     }
+
+    _conditions->Read(_in);
 
     _in.close();
 }

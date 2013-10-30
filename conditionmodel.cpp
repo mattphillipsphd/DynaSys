@@ -33,6 +33,40 @@ const VecStr& ConditionModel::Expressions(int i) const
 {
     return _conditions.at(i).second;
 }
+void ConditionModel::Read(std::ifstream& in)
+{
+    _conditions.clear();
+    std::string line;
+    while (line.empty())
+        std::getline(in, line);
+    int tab = line.find_first_of('\t');
+    int num_conds = std::stoi( line.substr(tab+1) );
+    for (int i=0; i<num_conds; ++i)
+    {
+        std::getline(in, line);
+        tab = line.find_first_of('\t');
+        std::string cond = line.substr(0,tab);
+        int num_results = std::stoi( line.substr(tab+1) );
+        VecStr results(num_results);
+        for (int j=0; j<num_results; ++j)
+        {
+            std::getline(in, line);
+            results[j] = line.substr(1); //The first character is a tab
+        }
+        _conditions.push_back( std::make_pair(cond, results) );
+    }
+}
+void ConditionModel::Write(std::ofstream& out) const
+{
+    out << "Conditions\t" << _conditions.size() << std::endl;
+    for (const auto& it : _conditions)
+    {
+        out << it.first << "\t" << it.second.size() << std::endl;
+        for (const auto& itr : it.second)
+            out << "\t" << itr << std::endl;
+    }
+    out << std::endl;
+}
 
 int ConditionModel::columnCount() const
 {

@@ -1,7 +1,8 @@
 #include "sysfileout.h"
 
-SysFileOut::SysFileOut(const std::string& name, const std::vector<const ParamModel*>& models)
-    : _models(models), _name(name)
+SysFileOut::SysFileOut(const std::string& name,
+                       const std::vector<const ParamModel*>& models, const ConditionModel* conditions)
+    : _conditions(conditions), _models(models), _name(name)
 {
 }
 
@@ -19,6 +20,8 @@ void SysFileOut::Save()
             _out << it->Key(i) << "\t" << it->Value(i) << std::endl;
         _out << std::endl;
     }
+
+    _conditions->Write(_out);
 
     _out.close();
 }

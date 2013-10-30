@@ -23,7 +23,11 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 
     _variables = new ParamModel(this, "Variables");
+    _variables->AddParameter("q", "normrand");
+    _variables->AddParameter("r", "u*v");
     ui->tblVariables->setModel(_variables);
+    AddVarDelegate(0, ComboBoxDelegate::NORM_RAND);
+    AddVarDelegate(1, ComboBoxDelegate::USER);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
@@ -73,13 +77,15 @@ void MainWindow::on_actionLoad_triggered()
     if (file_name.empty()) return;
 
     std::vector<ParamModel*> models;
-    SysFileIn in(file_name, models);
+    ConditionModel* conditions = new ConditionModel(this);
+    SysFileIn in(file_name, models, conditions);
     in.Load();
 
     delete _parameters;     _parameters = models[0];    ui->tblParameters->setModel(_parameters);
     delete _variables;      _variables = models[1];     ui->tblVariables->setModel(_variables);
     delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
     delete _initConds;      _initConds = models[3];     ui->tblInitConds->setModel(_initConds);
+    delete _conditions;     _conditions = conditions;   ui->clmConditions->setModel(_conditions);
 }
 void MainWindow::on_actionSave_Data_triggered()
 {
@@ -106,7 +112,7 @@ void MainWindow::on_actionSave_Model_triggered()
     models.push_back(_variables);
     models.push_back(_differentials);
     models.push_back(_initConds);
-    SysFileOut out(file_name, models);
+    SysFileOut out(file_name, models, _conditions);
     out.Save();
 }
 
@@ -138,7 +144,17 @@ void MainWindow::on_btnAddVariable_clicked()
                                                  "Variable Name:",
                                                  QLineEdit::Normal).toStdString();
     if (!var.empty())
+    {
         _variables->AddParameter(var, "0");
+        AddVarDelegate(_variables->NumPars()-1, ComboBoxDelegate::USER);
+    }
+}
+void MainWindow::on_btnRemoveCondition_clicked()
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    QModelIndexList rows = ui->clmConditions->selectionModel()->selectedRows();
+    if (rows.isEmpty()) return;
+    ui->clmConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
 }
 void MainWindow::on_btnRemoveDiff_clicked()
 {
@@ -154,6 +170,12 @@ void MainWindow::on_btnRemoveParameter_clicked()
     QModelIndexList rows = ui->tblParameters->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblParameters->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    for (auto it : rows)
+    {
+        delete _cmbDelegates[ it.row() ];
+        _cmbDelegates[ it.row() ] = nullptr;
+    }
+    std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
 }
 void MainWindow::on_btnRemoveVariable_clicked()
 {
@@ -184,6 +206,18 @@ void MainWindow::on_btnStart_clicked()
         }
         ui->btnStart->setText("Start");
     }
+}
+void MainWindow::AddVarDelegate(int row, ComboBoxDelegate::TYPE type)
+{
+    VecStr vstr;// = {"unirand", "normrand"};
+    vstr.push_back("gammarand");
+    vstr.push_back("normrand");
+    vstr.push_back("unirand");
+    ComboBoxDelegate* cbd = new ComboBoxDelegate(vstr);
+    ui->tblVariables->setItemDelegateForRow(row, cbd);
+    connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
+    _cmbDelegates.push_back(cbd);
+    cbd->SetType(type);
 }
 void MainWindow::Draw()
 {
@@ -225,19 +259,11 @@ void MainWindow::Draw()
     std::vector< std::deque<double> > pts(num_diffs);
     std::deque<double> ip;
 
-    //Create input vector(s)
-    std::vector< std::vector<double> > inputs(num_vars);
-    for (int i=0; i<num_vars; ++i)
-    {
-        inputs[i] = std::vector<double>(MAX_BUF_SIZE);
-        for (int k=0; k<MAX_BUF_SIZE; ++k)
-            inputs[i][k] = (double)rand() / (double)RAND_MAX;
-    } // ###
-    int input_ct = 0;
-
     QFile temp(".temp.txt");
     temp.open(QFile::WriteOnly | QFile::Text);
 
+    std::vector< std::vector<double> > inputs;
+    int input_ct = 0;
     bool is_initialized = false;
     while (_isDrawing)
     {
@@ -260,9 +286,11 @@ void MainWindow::Draw()
             pars.reset( new double[num_pars] );
             vars.reset( new double[num_vars] );
             diffs.reset( new double[num_diffs] );
+            expressions.clear();
 
             try
             {
+                //Parameters
                 for (int i=0; i<num_pars; ++i)
                 {
                     const std::string& key = _parameters->Key(i),
@@ -273,6 +301,7 @@ void MainWindow::Draw()
                         it.DefineVar(key, &pars[i]);
                 }
 
+                //Variables (includes input signals)
                 for (int i=0; i<num_vars; ++i)
                 {
                     const std::string& key = _variables->Key(i),
@@ -281,10 +310,50 @@ void MainWindow::Draw()
                         //to this variable must get called before the variable is used!
                     for (auto& it : _parserConds)
                         it.DefineVar(key, &vars[i]);
-                    expressions.push_back(key + " = " + value);
+
+                    //Create input vector(s)
+                    const ComboBoxDelegate* cbd = _cmbDelegates.at(i);
+                    std::mt19937_64 mte;
+                    switch (cbd->Type())
+                    {
+                        case ComboBoxDelegate::UNKNOWN:
+                            throw("Unknown Variable Type");
+                        case ComboBoxDelegate::UNI_RAND:
+                        {
+                            inputs.push_back( std::vector<double>(MAX_BUF_SIZE) );
+                            std::uniform_real_distribution<double> uni_rand;
+                            for (int k=0; k<MAX_BUF_SIZE; ++k)
+                                inputs[i][k] = uni_rand(mte);
+                            std::cerr << "UNI_RAND" << std::endl;
+                            break;
+                        }
+                        case ComboBoxDelegate::GAMMA_RAND:
+                        {
+                            inputs.push_back( std::vector<double>(MAX_BUF_SIZE) );
+                            std::gamma_distribution<double> gamma_rand;
+                            for (int k=0; k<MAX_BUF_SIZE; ++k)
+                                inputs[i][k] = gamma_rand(mte);
+                            std::cerr << "GAMMA_RAND" << std::endl;
+                            break;
+                        }
+                        case ComboBoxDelegate::NORM_RAND:
+                        {
+                            inputs.push_back( std::vector<double>(MAX_BUF_SIZE) );
+                            std::normal_distribution<double> norm_rand;
+                            for (int k=0; k<MAX_BUF_SIZE; ++k)
+                                inputs[i][k] = norm_rand(mte);
+                            std::cerr << "NORM_RAND" << std::endl;
+                            break;
+                        }
+                        case ComboBoxDelegate::USER:
+                            inputs.push_back( std::vector<double>() );
+                            expressions.push_back(key + " = " + value);
+                            std::cerr << "USER, " << value << std::endl;
+                            break;
+                    }
                 }
 
-                expressions.clear();
+                //Differentials
                 for (int i=0; i<num_diffs; ++i)
                 {
                     std::string key = _differentials->Key(i).substr(0,1),
@@ -351,7 +420,8 @@ void MainWindow::Draw()
             for (int k=0; k<num_steps; ++k)
             {
                 for (int i=0; i<num_vars; ++i)
-                    vars[i] = inputs.at(i).at(input_ct);
+                    if (!inputs.at(i).empty()) //It's a variable
+                        vars[i] = inputs.at(i).at(input_ct);
                 ++input_ct;
                 input_ct %= MAX_BUF_SIZE;
 
@@ -402,7 +472,8 @@ void MainWindow::Draw()
 
         //Plot the current state vector
         marker->setValue(diffs[0], diffs[1]);
-        std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
+        if (num_steps<100)
+            std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
         int num_saved_pts = (int)pts[0].size(),
             tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;
@@ -413,7 +484,7 @@ void MainWindow::Draw()
         curve->setSamples(points);
 
         //Plot points for the inner-product graph
-        const int NUM_IP_POINTS = ip.size();
+        const int NUM_IP_POINTS = (int)ip.size();
         QPolygonF points_ip(NUM_IP_POINTS);
         for (int k=0; k<NUM_IP_POINTS; ++k)
             points_ip[k] = QPointF(k, ip[k]);
@@ -441,6 +512,12 @@ void MainWindow::Draw()
     _isDrawing = false;
 }
 
+void MainWindow::ComboBoxChanged(const QString& text)
+{
+    ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
+//    int row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
+    cbd->SetType(text.toStdString());
+}
 void MainWindow::ParamsChanged(QModelIndex, QModelIndex) //slot
 {
     _needGetParams = true;
