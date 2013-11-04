@@ -22,6 +22,7 @@ class ComboBoxDelegate : public QStyledItemDelegate
             UNI_RAND,
             USER
         };
+        static TYPE Type(const std::string& text);
 
         explicit ComboBoxDelegate(VecStr items, QObject *parent = 0);
 

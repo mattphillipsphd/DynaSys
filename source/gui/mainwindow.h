@@ -74,6 +74,7 @@ class MainWindow : public QMainWindow
         Ui::MainWindow *ui;
 
         void AddVarDelegate(int row, ComboBoxDelegate::TYPE type);
+        void AddVarDelegate(int row, const std::string& type);
         void Draw();
 
         ConditionModel* _conditions;

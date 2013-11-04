@@ -88,6 +88,13 @@ void MainWindow::on_actionLoad_triggered()
     delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
     delete _initConds;      _initConds = models[3];     ui->tblInitConds->setModel(_initConds);
     delete _conditions;     _conditions = conditions;   ui->clmConditions->setModel(_conditions);
+
+    for (auto it : _cmbDelegates)
+        delete it;
+    _cmbDelegates.clear();
+    const size_t num_vars = _variables->NumPars();
+    for (size_t i=0; i<num_vars; ++i)
+        AddVarDelegate(i, _variables->Value(i));
     }
     catch (std::exception& e)
     {
@@ -244,6 +251,10 @@ void MainWindow::on_btnStart_clicked()
         }
         ui->btnStart->setText("Start");
     }
+}
+void MainWindow::AddVarDelegate(int row, const std::string& type)
+{
+    AddVarDelegate(row, ComboBoxDelegate::Type(type));
 }
 void MainWindow::AddVarDelegate(int row, ComboBoxDelegate::TYPE type)
 {

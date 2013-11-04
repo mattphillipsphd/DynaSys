@@ -64,15 +64,19 @@ void ComboBoxDelegate::updateEditorGeometry(QWidget* editor,
 {
     editor->setGeometry(option.rect);
 }
+ComboBoxDelegate::TYPE ComboBoxDelegate::Type(const std::string& text)
+{
+    if (text=="gammarand")
+        return GAMMA_RAND;
+    if (text=="normrand")
+        return NORM_RAND;
+    if (text=="unirand")
+        return UNI_RAND;
+
+    return USER;
+}
 
 void ComboBoxDelegate::SetType(const std::string& text)
 {
-    if (text=="gammarand")
-        _type = GAMMA_RAND;
-    else if (text=="normrand")
-        _type = NORM_RAND;
-    else if (text=="unirand")
-        _type = UNI_RAND;
-    else
-        _type = USER;
+    _type = Type(text);
 }
