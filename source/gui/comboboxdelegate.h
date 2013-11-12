@@ -8,21 +8,14 @@
 #include <vector>
 #include <string>
 
+#include "../memrep/input.h"
+
 typedef std::vector<std::string> VecStr;
 class ComboBoxDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
 
     public:
-        enum TYPE
-        {
-            UNKNOWN = -1,
-            GAMMA_RAND,
-            NORM_RAND,
-            UNI_RAND,
-            USER
-        };
-        static TYPE Type(const std::string& text);
 
         explicit ComboBoxDelegate(VecStr items, QObject *parent = 0);
 
@@ -37,11 +30,6 @@ class ComboBoxDelegate : public QStyledItemDelegate
         virtual void updateEditorGeometry(QWidget* editor,
             const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
-        void SetType(const std::string& text);
-        void SetType(TYPE type) { _type = type; }
-
-        TYPE Type() const { return _type; }
-
     signals:
         void ComboBoxChanged(int value);
         void ComboBoxChanged(const QString& text);
@@ -49,7 +37,6 @@ class ComboBoxDelegate : public QStyledItemDelegate
     private:
         const VecStr _items;
         std::string _text;
-        TYPE _type;
 };
 
 #endif // COMBOBOXDELEGATE_H

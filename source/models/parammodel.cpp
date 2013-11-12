@@ -8,6 +8,19 @@ ParamModel::~ParamModel()
 {
 }
 
+const std::string& ParamModel::Key(size_t i) const
+{
+    return _parameters.at(i).first;
+}
+const std::string& ParamModel::Value(const std::string& key) const
+{
+    return Value( Index(key) );
+}
+const std::string& ParamModel::Value(size_t i) const
+{
+    return _parameters.at(i).second;
+}
+
 void ParamModel::AddParameter(const std::string& key, const std::string& value)
 {
     int row = _parameters.size();
@@ -26,18 +39,6 @@ void ParamModel::SetPar(int i, const std::string& value)
     setData( createIndex(i,0), value.c_str(), Qt::EditRole );
 }
 
-const std::string& ParamModel::Key(int i) const
-{
-    return _parameters.at(i).first;
-}
-const std::string& ParamModel::Value(const std::string& key) const
-{
-    return Value( Index(key) );
-}
-const std::string& ParamModel::Value(int i) const
-{
-    return _parameters.at(i).second;
-}
 int ParamModel::columnCount() const
 {
     return columnCount( QModelIndex() );

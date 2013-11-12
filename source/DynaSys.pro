@@ -14,6 +14,9 @@ TEMPLATE = app
 QMAKE_CXXFLAGS += -std=c++11
 QMAKE_CXXFLAGS += -gdwarf-3
 
+OBJECTS_DIR = obj
+MOC_DIR = moc
+UI_DIR = ui
 
 SOURCES += main.cpp\
         gui/mainwindow.cpp \
@@ -22,7 +25,14 @@ SOURCES += main.cpp\
     file/sysfileout.cpp \
     file/sysfilein.cpp \
     models/conditionmodel.cpp \
-    gui/comboboxdelegate.cpp
+    gui/comboboxdelegate.cpp \
+    gui/aboutgui.cpp \
+    memrep/parsermgr.cpp \
+    gui/columnview.cpp \
+    memrep/input.cpp \
+    models/variablemodel.cpp \
+    models/differentialmodel.cpp \
+    models/initialcondmodel.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -30,9 +40,17 @@ HEADERS  += gui/mainwindow.h \
     file/sysfileout.h \
     file/sysfilein.h \
     models/conditionmodel.h \
-    gui/comboboxdelegate.h
+    gui/comboboxdelegate.h \
+    gui/aboutgui.h \
+    memrep/parsermgr.h \
+    gui/columnview.h \
+    memrep/input.h \
+    models/variablemodel.h \
+    models/differentialmodel.h \
+    models/initialcondmodel.h
 
 FORMS    += forms/mainwindow.ui \
+    forms/aboutgui.ui \
     forms/variablegui.ui
 
 win32 {
@@ -53,7 +71,8 @@ win32 {
 
 INCLUDEPATH += shared/boost \
                 $$MUPARSER_DIR/include \
-                $$QWT_DIR/src
+                $$QWT_DIR/src \
+                .
 
 win32 {
     LIBS += C:/Users/matt/Libraries/muparser_v2_2_3/lib/muParser.lib

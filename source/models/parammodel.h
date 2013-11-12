@@ -8,6 +8,7 @@
 #include <tuple>
 #include <mutex>
 
+typedef std::vector<std::string> VecStr;
 typedef std::pair<std::string, std::string> StrPair;
 class ParamModel : public QAbstractTableModel
 {
@@ -18,14 +19,17 @@ class ParamModel : public QAbstractTableModel
 //        ParamModel& operator=(const ParamModel&) = delete;
         virtual ~ParamModel();
 
-        virtual void SetPar(const std::string& key, const std::string& value);
-        virtual void SetPar(int i, const std::string& value);
-
-        const std::string& Key(int i) const;
+        virtual VecStr Expressions() const { return VecStr(); }
+        virtual VecStr Initializations() const { return VecStr(); }
+        const std::string& Key(size_t i) const;
         const std::string& Name() const { return _name; }
         size_t NumPars() const { return _parameters.size(); }
         const std::string& Value(const std::string& key) const;
-        const std::string& Value(int i) const;
+        const std::string& Value(size_t i) const;
+
+        void AddParameter(const std::string& key, const std::string& value = "");
+        virtual void SetPar(const std::string& key, const std::string& value);
+        virtual void SetPar(int i, const std::string& value);
 
         int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override;
@@ -42,7 +46,6 @@ class ParamModel : public QAbstractTableModel
 //    signals:
 
 //    protected:
-        void AddParameter(const std::string& key, const std::string& value = "");
 
     private:
         int Index(const std::string& par_name) const;

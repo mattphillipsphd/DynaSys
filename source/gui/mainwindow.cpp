@@ -4,6 +4,7 @@
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 10;
 const int MainWindow::IP_SAMPLES_SHOWN = 100;
+const std::string MainWindow::TEMP_FILE = ".temp.txt";
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -21,16 +22,18 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
     connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    _parserMgr.AddModel(_parameters);
 
     _variables = new ParamModel(this, "Variables");
-    _variables->AddParameter("q", "normrand");
+    _variables->AddParameter("q", Input::NORM_RAND_STR);
     _variables->AddParameter("r", "u*v");
     ui->tblVariables->setModel(_variables);
-    AddVarDelegate(0, ComboBoxDelegate::NORM_RAND);
-    AddVarDelegate(1, ComboBoxDelegate::USER);
+    AddVarDelegate(0, Input::NORM_RAND);
+    AddVarDelegate(1, Input::USER);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    _parserMgr.AddModel(_variables);
 
     _differentials = new ParamModel(this, "Differentials");
     _differentials->AddParameter("v'", "0.1*(u + a)/b");
@@ -39,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
     connect(_differentials, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    _parserMgr.AddModel(_differentials);
 
     _initConds = new ParamModel(this, "InitialConds");
     _initConds->AddParameter("v(0)", "1");
@@ -47,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
     connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    _parserMgr.AddModel(_initConds);
 
     _conditions = new ConditionModel(this);
     VecStr vs;
@@ -57,14 +62,25 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->clmConditions->setModel(_conditions);
     connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    _parserMgr.SetCondModel(_conditions);
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
+
+    _aboutGui = new AboutGui();
+    _aboutGui->setWindowModality(Qt::ApplicationModal);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
     if (_thread) _thread->detach();
+    QFile temp_file(TEMP_FILE.c_str());
+    if (temp_file.exists()) temp_file.remove();
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    _aboutGui->show();
 }
 
 void MainWindow::on_actionLoad_triggered()
@@ -94,7 +110,7 @@ void MainWindow::on_actionLoad_triggered()
     _cmbDelegates.clear();
     const size_t num_vars = _variables->NumPars();
     for (size_t i=0; i<num_vars; ++i)
-        AddVarDelegate(i, _variables->Value(i));
+        AddVarDelegate((int)i, _variables->Value(i));
     }
     catch (std::exception& e)
     {
@@ -105,12 +121,12 @@ void MainWindow::on_actionSave_Data_triggered()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    if ( !QFile(".temp.txt").exists() ) return;
+    if ( !QFile(TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
                                                          "");
     if (file_name.isEmpty()) return;
-    QFile::rename(".temp.txt", file_name);
+    QFile::rename(TEMP_FILE.c_str(), file_name);
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
@@ -183,7 +199,7 @@ void MainWindow::on_btnAddVariable_clicked()
     if (!var.empty())
     {
         _variables->AddParameter(var, "0");
-        AddVarDelegate(_variables->NumPars()-1, ComboBoxDelegate::USER);
+        AddVarDelegate((int)_variables->NumPars()-1, Input::USER);
     }
 }
 void MainWindow::on_btnRemoveCondition_clicked()
@@ -254,19 +270,18 @@ void MainWindow::on_btnStart_clicked()
 }
 void MainWindow::AddVarDelegate(int row, const std::string& type)
 {
-    AddVarDelegate(row, ComboBoxDelegate::Type(type));
+    AddVarDelegate(row, Input::Type(type));
 }
-void MainWindow::AddVarDelegate(int row, ComboBoxDelegate::TYPE type)
+void MainWindow::AddVarDelegate(int row, Input::TYPE type)
 {
     VecStr vstr;// = {"unirand", "normrand"};
-    vstr.push_back("gammarand");
-    vstr.push_back("normrand");
-    vstr.push_back("unirand");
+    vstr.push_back(Input::GAMMA_RAND_STR);
+    vstr.push_back(Input::NORM_RAND_STR);
+    vstr.push_back(Input::UNI_RAND_STR);
     ComboBoxDelegate* cbd = new ComboBoxDelegate(vstr);
     ui->tblVariables->setItemDelegateForRow(row, cbd);
     connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
     _cmbDelegates.push_back(cbd);
-    cbd->SetType(type);
 }
 void MainWindow::Draw()
 {
@@ -293,12 +308,11 @@ void MainWindow::Draw()
     curve_ip->attach(ui->qwtInnerProduct);
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    int num_pars = _parameters->NumPars(),
-            num_vars = _variables->NumPars(),
-            num_diffs = _differentials->NumPars(),
+    int num_pars = (int)_parameters->NumPars(),
+            num_vars = (int)_variables->NumPars(),
+            num_diffs = (int)_differentials->NumPars(),
             num_conds = _conditions->rowCount();
-    for (int i=0; i<num_conds; ++i)
-        _parserConds.push_back( mu::Parser() );
+//    _parserMgr.AddParsers(num_conds);
     std::unique_ptr<double[]> pars( new double[num_pars] ),
                                 vars( new double[num_vars] ), //This is purely for muParser
                                 diffs( new double[num_diffs] );
@@ -322,8 +336,8 @@ void MainWindow::Draw()
     while (_isDrawing)
     {
         static auto last_step = std::chrono::system_clock::now();
-        auto diff = std::chrono::system_clock::now() - last_step;
-        auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(diff);
+        auto step_diff = std::chrono::system_clock::now() - last_step;
+        auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(step_diff);
         bool need_new_step = diff_ms.count() > 1000.0 / (double)ui->spnStepsPerSec->value();
         if (!need_new_step)
             goto label;
@@ -334,16 +348,33 @@ void MainWindow::Draw()
         if (_needGetParams)
         {
             //Initialize
-            num_pars = _parameters->NumPars();
-            num_vars = _variables->NumPars();
-            num_diffs = _differentials->NumPars();
-            pars.reset( new double[num_pars] );
-            vars.reset( new double[num_vars] );
-            diffs.reset( new double[num_diffs] );
+//            num_pars = (int)_parameters->NumPars();
+            num_vars = (int)_variables->NumPars();
+            num_diffs = (int)_differentials->NumPars();
+//            pars.reset( new double[num_pars] );
+//            vars.reset( new double[num_vars] );
+//            diffs.reset( new double[num_diffs] );
             expressions.clear();
 
-            try
-            {
+//            try
+//            {
+                _parserMgr.DefineVars();
+                _parserMgr.AssignInputs();
+                _parserMgr.InitParsers();
+
+
+                //Differentials
+/*                for (int i=0; i<num_diffs; ++i)
+                {
+                    const std::string& key = _differentials->Key(i).substr(0,1),
+                            & value = _differentials->Value(i),
+                            & init_value = _initConds->Value(i);
+
+                    if (!is_initialized)
+                        initializations.push_back(key + " = " + init_value);
+                    expressions.push_back(key + " = " + key + " + " + value);
+                }
+
                 //Parameters
                 for (int i=0; i<num_pars; ++i)
                 {
@@ -354,9 +385,9 @@ void MainWindow::Draw()
                     for (auto& it : _parserConds)
                         it.DefineVar(key, &pars[i]);
                 }
-
+*/
                 //Variables (includes input signals)
-                for (int i=0; i<num_vars; ++i)
+/*                for (int i=0; i<num_vars; ++i)
                 {
                     const std::string& key = _variables->Key(i),
                             & value = _variables->Value(i);
@@ -406,9 +437,9 @@ void MainWindow::Draw()
                             break;
                     }
                 }
-
+*/
                 //Differentials
-                for (int i=0; i<num_diffs; ++i)
+/*                for (int i=0; i<num_diffs; ++i)
                 {
                     const std::string& key = _differentials->Key(i).substr(0,1),
                             & value = _differentials->Value(i),
@@ -422,11 +453,11 @@ void MainWindow::Draw()
                     expressions.push_back(key + " = " + key + " + " + value);
                 }
             }
-            catch (mu::ParserError& e)
+*//*            catch (mu::ParserError& e)
             {
                 std::cout << e.GetMsg() << std::endl;
             }
-        }
+*/        }
 
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
@@ -447,40 +478,62 @@ void MainWindow::Draw()
             {
                 for (const auto& it : initializations)
                 {
-                    _parser.SetExpr(it);
-                    _parser.Eval();
+                    _parserMgr.SetExpression(it);
+                    _parserMgr.ParserEval();
+//                    _parser.SetExpr(it);
+//                    _parser.Eval();
                 }
                 is_initialized = true;
             }
 
             if (_needGetParams)
             {
-                std::string expr = expressions.front();
-                std::for_each(expressions.cbegin()+1, expressions.cend(),
-                              [&](const std::string& it)
-                {
-                    expr += ", " + it;
-                });
-                _parser.SetExpr(expr);
+//                std::string expr = expressions.front();
+//                std::for_each(expressions.cbegin()+1, expressions.cend(),
+//                              [&](const std::string& it)
+//                {
+//                    expr += ", " + it;
+//                });
+//                _parser.SetExpr(expr);
+                _parserMgr.SetExpression(expressions);
+                _parserMgr.SetConditions();
 
-                for (int k=0; k<num_conds; ++k)
-                {
-                    expr = _conditions->Condition(k);
-                    _parserConds[k].SetExpr(expr);
-                }
+//                for (int k=0; k<num_conds; ++k)
+//                {
+//                    std::string expr = _conditions->Condition(k);
+//                    _parserConds[k].SetExpr(expr);
+//                }
             }
             _needGetParams = false;
 
             std::string output;
             for (int k=0; k<num_steps; ++k)
             {
-                for (int i=0; i<num_vars; ++i)
-                    if (!inputs.at(i).empty()) //It's a variable
-                        vars[i] = inputs.at(i).at(input_ct);
-                ++input_ct;
-                input_ct %= MAX_BUF_SIZE;
+//                for (int i=0; i<num_vars; ++i)
+//                    if (!inputs.at(i).empty()) //It's a variable
+//                        vars[i] = inputs.at(i).at(input_ct);
+//                ++input_ct;
+//                input_ct %= MAX_BUF_SIZE;
 
-                _parser.Eval();
+                _parserMgr.ParserEval();
+                _parserMgr.ParserCondEval();
+
+                //Check conditions and update as need be
+/*                for (int k=0; k<num_conds; ++k)
+                {
+                    if (_parserConds.at(k).Eval())
+                    {
+                        VecStr cond_exprns = _conditions->Expressions(k);
+                        for (const auto& it : cond_exprns)
+                        {
+                            _parserConds[k].SetExpr(it);
+                            _parserConds[k].Eval();
+                        }
+                        _parserConds[k].SetExpr( _conditions->Condition(k) );
+                    }
+                }
+*/
+                //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
                 for (int i=0; i<num_diffs; ++i)
                 {
@@ -496,19 +549,6 @@ void MainWindow::Draw()
                 ip.push_back(ip_k);
             }
 
-            for (int k=0; k<num_conds; ++k)
-            {
-                if (_parserConds.at(k).Eval())
-                {
-                    VecStr cond_exprns = _conditions->Expressions(k);
-                    for (const auto& it : cond_exprns)
-                    {
-                        _parserConds[k].SetExpr(it);
-                        _parserConds[k].Eval();
-                    }
-                    _parserConds[k].SetExpr( _conditions->Condition(k) );
-                }
-            }
         }
         catch (mu::ParserError& e)
         {
@@ -570,8 +610,8 @@ void MainWindow::Draw()
 void MainWindow::ComboBoxChanged(const QString& text)
 {
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
-//    int row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
-    cbd->SetType(text.toStdString());
+    size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
+    _parserMgr.SetInput(_variables, row, text.toStdString());
 }
 void MainWindow::ParamsChanged(QModelIndex, QModelIndex) //slot
 {

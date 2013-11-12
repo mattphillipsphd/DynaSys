@@ -14,9 +14,13 @@
 
 #include <muParser.h>
 
+#include "aboutgui.h"
 #include "comboboxdelegate.h"
 #include "../models/conditionmodel.h"
-#include "../models/parammodel.h"
+#include "../models/differentialmodel.h"
+#include "../models/initialcondmodel.h"
+#include "../models/variablemodel.h"
+#include "../memrep/parsermgr.h"
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
 
@@ -40,6 +44,7 @@ class MainWindow : public QMainWindow
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
                         IP_SAMPLES_SHOWN;
+        static const std::string TEMP_FILE;
 
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();
@@ -50,6 +55,7 @@ class MainWindow : public QMainWindow
         void DoReplot();
 
     private slots:
+        void on_actionAbout_triggered();
         void on_actionLoad_triggered();
         void on_actionSave_Data_triggered();
         void on_actionSave_Model_triggered();
@@ -73,9 +79,11 @@ class MainWindow : public QMainWindow
     private:
         Ui::MainWindow *ui;
 
-        void AddVarDelegate(int row, ComboBoxDelegate::TYPE type);
+        void AddVarDelegate(int row, Input::TYPE type);
         void AddVarDelegate(int row, const std::string& type);
         void Draw();
+
+        AboutGui* _aboutGui;
 
         ConditionModel* _conditions;
         ParamModel* _differentials,
@@ -87,8 +95,9 @@ class MainWindow : public QMainWindow
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needGetParams;
-        mu::Parser _parser;
-        std::vector<mu::Parser> _parserConds;
+//        mu::Parser _parser;
+//        std::vector<mu::Parser> _parserConds;
+        ParserMgr _parserMgr;
         std::thread* _thread;
 };
 

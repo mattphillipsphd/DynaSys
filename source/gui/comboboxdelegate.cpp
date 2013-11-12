@@ -1,7 +1,7 @@
 #include "comboboxdelegate.h"
 
 ComboBoxDelegate::ComboBoxDelegate(VecStr items, QObject *parent)
-    : _items(items), QStyledItemDelegate(parent), _type(UNKNOWN)
+    : _items(items), QStyledItemDelegate(parent)
 {
 }
 
@@ -64,19 +64,4 @@ void ComboBoxDelegate::updateEditorGeometry(QWidget* editor,
 {
     editor->setGeometry(option.rect);
 }
-ComboBoxDelegate::TYPE ComboBoxDelegate::Type(const std::string& text)
-{
-    if (text=="gammarand")
-        return GAMMA_RAND;
-    if (text=="normrand")
-        return NORM_RAND;
-    if (text=="unirand")
-        return UNI_RAND;
 
-    return USER;
-}
-
-void ComboBoxDelegate::SetType(const std::string& text)
-{
-    _type = Type(text);
-}
