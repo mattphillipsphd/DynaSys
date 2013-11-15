@@ -57,9 +57,10 @@ MainWindow::MainWindow(QWidget *parent) :
     VecStr vs;
     vs.push_back("v = 1"); vs.push_back("u = 2");
     _conditions->AddCondition("v>30", vs);
-//    _conditions->AddCondition("v>30", {"v = 1", "u = 2"});
-//    _conditions->AddCondition("u>30", {"v = 100", "u = 200"});
-    ui->clmConditions->setModel(_conditions);
+    ui->lsConditions->setModel(_conditions);
+    ui->lsConditions->setModelColumn(0);
+    ui->lsResults->setModel(_conditions);
+    ui->lsResults->setModelColumn(1);
     connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.SetCondModel(_conditions);
@@ -103,7 +104,7 @@ void MainWindow::on_actionLoad_triggered()
     delete _variables;      _variables = models[1];     ui->tblVariables->setModel(_variables);
     delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
     delete _initConds;      _initConds = models[3];     ui->tblInitConds->setModel(_initConds);
-    delete _conditions;     _conditions = conditions;   ui->clmConditions->setModel(_conditions);
+    delete _conditions;     _conditions = conditions;   ui->lsConditions->setModel(_conditions);
 
     for (auto it : _cmbDelegates)
         delete it;
@@ -171,7 +172,7 @@ void MainWindow::on_btnAddExpression_clicked()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    QModelIndex index = ui->clmConditions->currentIndex();
+    QModelIndex index = ui->lsConditions->currentIndex();
     if (index.parent().isValid()) return;
 
     std::string expr = QInputDialog::getText(this, "New Condition Result",
@@ -205,9 +206,9 @@ void MainWindow::on_btnAddVariable_clicked()
 void MainWindow::on_btnRemoveCondition_clicked()
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    QModelIndexList rows = ui->clmConditions->selectionModel()->selectedRows();
+    QModelIndexList rows = ui->lsConditions->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
-    ui->clmConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    ui->lsConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
 }
 void MainWindow::on_btnRemoveDiff_clicked()
 {
@@ -220,10 +221,9 @@ void MainWindow::on_btnRemoveDiff_clicked()
 void MainWindow::on_btnRemoveExpression_clicked()
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    QModelIndexList rows = ui->clmConditions->selectionModel()->selectedRows();
-    if (rows.isEmpty() || !rows.at(0).parent().isValid()) return;
-    ui->clmConditions->model()->removeRows(rows.at(0).row(),
-                                               rows.size(), rows.at(0).parent());
+    QModelIndexList rows = ui->lsResults->selectionModel()->selectedRows();
+    if (rows.isEmpty()) return;
+    ui->lsResults->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
 }
 void MainWindow::on_btnRemoveParameter_clicked()
 {
