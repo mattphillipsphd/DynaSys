@@ -24,6 +24,7 @@ class ParamModel : public QAbstractTableModel
         const std::string& Key(size_t i) const;
         const std::string& Name() const { return _name; }
         size_t NumPars() const { return _parameters.size(); }
+        virtual std::string ShortKey(size_t i) const;
         const std::string& Value(const std::string& key) const;
         const std::string& Value(size_t i) const;
 

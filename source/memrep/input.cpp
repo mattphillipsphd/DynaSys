@@ -25,9 +25,24 @@ Input::Input(double* data)
     : _ct(0), _data(data), _input(nullptr), _type(UNKNOWN)
 {
 }
+Input::Input(const Input& other) : _ct(other._ct), _type(other._type)
+{
+    DeepCopy(other);
+}
+/*Input::Input& Input::operator=(const Input& other)
+{
+    if (&other != this)
+    {
+        size_t _ct;
+        double* const _data,
+                * _input;
+//        std::mutex _mutex;
+        TYPE _type;
+    }
+}*/
 Input::~Input()
 {
-    ResetInput();
+    if (_input) delete _input;
 }
 
 void Input::GenerateInput(TYPE type)
@@ -105,6 +120,14 @@ void Input::NextInput(int n)
     *_data = _input[_ct];
 }
 
+void Input::DeepCopy(const Input& other)
+{
+    _data = new double[other._ct];
+    memcpy(_data,  other._data, other._ct*sizeof(_data[0]));
+
+    _input = new double[other._ct];
+    memcpy(_input,  other._input, other._ct*sizeof(_input[0]));
+}
 template<typename T>
 void Input::GenerateRandInput(T& distribution)
 {

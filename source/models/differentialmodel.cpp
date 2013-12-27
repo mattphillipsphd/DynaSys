@@ -17,3 +17,8 @@ VecStr DifferentialModel::Expressions() const
     }
     return expressions;
 }
+
+std::string DifferentialModel::ShortKey(size_t i) const
+{
+    return ParamModel::Key(i).substr(0,1);
+}

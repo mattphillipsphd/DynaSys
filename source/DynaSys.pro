@@ -75,9 +75,13 @@ INCLUDEPATH += shared/boost \
                 .
 
 win32 {
-    LIBS += C:/Users/matt/Libraries/muparser_v2_2_3/lib/muParser.lib
-    #LIBS += -L$$MUPARSER_DIR/lib/muParser.lib \
-    LIBS +=        -L$$QWT_DIR/lib/ -lqwt
+    CONFIG(debug, debug|release) {
+        LIBS += C:/Users/matt/Libraries/muparser_v2_2_3/lib/muparserd.lib
+        LIBS +=        -L$$QWT_DIR/lib/ -lqwtd
+    } else {
+        LIBS += C:/Users/matt/Libraries/muparser_v2_2_3/lib/muParser.lib
+        LIBS +=        -L$$QWT_DIR/lib/ -lqwt
+    }
 } else {
     LIBS += -L$$MUPARSER_DIR/lib -lmuparser \
             -L$$QWT_DIR/lib -lqwt

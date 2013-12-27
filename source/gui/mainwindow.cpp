@@ -24,18 +24,18 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_parameters);
 
-    _variables = new ParamModel(this, "Variables");
+    _variables = new VariableModel(this, "Variables");
     _variables->AddParameter("q", Input::NORM_RAND_STR);
     _variables->AddParameter("r", "u*v");
     ui->tblVariables->setModel(_variables);
-    AddVarDelegate(0, Input::NORM_RAND);
-    AddVarDelegate(1, Input::USER);
+    AddVarDelegate(0);
+    AddVarDelegate(1);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_variables);
 
-    _differentials = new ParamModel(this, "Differentials");
+    _differentials = new DifferentialModel(this, "Differentials");
     _differentials->AddParameter("v'", "0.1*(u + a)/b");
     _differentials->AddParameter("u'", "0.1*(b - v)");
     ui->tblDifferentials->setModel(_differentials);
@@ -44,7 +44,7 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_differentials);
 
-    _initConds = new ParamModel(this, "InitialConds");
+    _initConds = new InitialCondModel(this, "InitialConds");
     _initConds->AddParameter("v(0)", "1");
     _initConds->AddParameter("u(0)", "0");
     ui->tblInitConds->setModel(_initConds);
@@ -200,7 +200,7 @@ void MainWindow::on_btnAddVariable_clicked()
     if (!var.empty())
     {
         _variables->AddParameter(var, "0");
-        AddVarDelegate((int)_variables->NumPars()-1, Input::USER);
+        AddVarDelegate((int)_variables->NumPars()-1);
     }
 }
 void MainWindow::on_btnRemoveCondition_clicked()
@@ -270,9 +270,9 @@ void MainWindow::on_btnStart_clicked()
 }
 void MainWindow::AddVarDelegate(int row, const std::string& type)
 {
-    AddVarDelegate(row, Input::Type(type));
+    AddVarDelegate(row);//, Input::Type(type));
 }
-void MainWindow::AddVarDelegate(int row, Input::TYPE type)
+void MainWindow::AddVarDelegate(int row)
 {
     VecStr vstr;// = {"unirand", "normrand"};
     vstr.push_back(Input::GAMMA_RAND_STR);
@@ -310,8 +310,8 @@ void MainWindow::Draw()
     //Get all of the information from the parameter fields, introducing new variables as needed.
     int num_pars = (int)_parameters->NumPars(),
             num_vars = (int)_variables->NumPars(),
-            num_diffs = (int)_differentials->NumPars(),
-            num_conds = _conditions->rowCount();
+            num_diffs = (int)_differentials->NumPars();//,
+//            num_conds = _conditions->rowCount();
 //    _parserMgr.AddParsers(num_conds);
     std::unique_ptr<double[]> pars( new double[num_pars] ),
                                 vars( new double[num_vars] ), //This is purely for muParser
@@ -330,8 +330,8 @@ void MainWindow::Draw()
  *no instance of mu::Parser should appear here.
  */
 
-    std::vector< std::vector<double> > inputs;
-    int input_ct = 0;
+//    std::vector< std::vector<double> > inputs;
+//    int input_ct = 0;
     bool is_initialized = false;
     while (_isDrawing)
     {

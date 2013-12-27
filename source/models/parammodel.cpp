@@ -12,6 +12,10 @@ const std::string& ParamModel::Key(size_t i) const
 {
     return _parameters.at(i).first;
 }
+std::string ParamModel::ShortKey(size_t i) const
+{
+    return Key(i);
+}
 const std::string& ParamModel::Value(const std::string& key) const
 {
     return Value( Index(key) );

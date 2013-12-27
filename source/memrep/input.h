@@ -25,6 +25,8 @@ class Input
                                 UNI_RAND_STR;
 
         Input(double* data);
+        Input(const Input& other);
+        Input& operator=(const Input& other);
         ~Input();
 
         void GenerateInput(TYPE type);
@@ -38,12 +40,13 @@ class Input
                             INPUT_SIZE,
                             INPUT_MASK;
 
+        void DeepCopy(const Input& other);
         template<typename T>
         void GenerateRandInput(T& distribution);
         void ResetInput();
 
         size_t _ct;
-        double* const _data,
+        double* _data,
                 * _input;
 //        std::mutex _mutex;
         TYPE _type;

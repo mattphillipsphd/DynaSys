@@ -11,8 +11,8 @@ VecStr InitialCondModel::Initializations() const
     const size_t num_pars = NumPars();
     for (size_t i=0; i<num_pars; ++i)
     {
-        const std::string& key = Key(i),
-                & value = Value(i);
+        std::string key = Key(i);
+        const std::string& value = Value(i);
         int pos = key.find('(');
         key = key.substr(0,pos);
         initializations.push_back(key + " = " + value);

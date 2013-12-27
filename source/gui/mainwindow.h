@@ -79,7 +79,7 @@ class MainWindow : public QMainWindow
     private:
         Ui::MainWindow *ui;
 
-        void AddVarDelegate(int row, Input::TYPE type);
+        void AddVarDelegate(int row);
         void AddVarDelegate(int row, const std::string& type);
         void Draw();
 
