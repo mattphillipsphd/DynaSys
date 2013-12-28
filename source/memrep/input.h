@@ -1,6 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#include <cstring>
+
 #include <fstream>
 #include <iostream>
 #include <mutex>

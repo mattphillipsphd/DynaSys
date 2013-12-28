@@ -316,7 +316,7 @@ void MainWindow::Draw()
     std::unique_ptr<double[]> pars( new double[num_pars] ),
                                 vars( new double[num_vars] ), //This is purely for muParser
                                 diffs( new double[num_diffs] );
-    std::vector<std::string> expressions, initializations;
+//    std::vector<std::string> expressions, initializations;
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
     std::vector< std::deque<double> > pts(num_diffs);
@@ -354,12 +354,12 @@ void MainWindow::Draw()
 //            pars.reset( new double[num_pars] );
 //            vars.reset( new double[num_vars] );
 //            diffs.reset( new double[num_diffs] );
-            expressions.clear();
+//            expressions.clear();
 
 //            try
 //            {
-                _parserMgr.DefineVars();
-                _parserMgr.AssignInputs();
+                _parserMgr.InitVars();
+//                _parserMgr.AssignInputs();
                 _parserMgr.InitParsers();
 
 
@@ -476,14 +476,15 @@ void MainWindow::Draw()
         {
             if (!is_initialized)
             {
-                for (const auto& it : initializations)
+                _parserMgr.InitParsers();
+/*                for (const auto& it : initializations)
                 {
                     _parserMgr.SetExpression(it);
                     _parserMgr.ParserEval();
 //                    _parser.SetExpr(it);
 //                    _parser.Eval();
                 }
-                is_initialized = true;
+*/                is_initialized = true;
             }
 
             if (_needGetParams)
@@ -495,7 +496,7 @@ void MainWindow::Draw()
 //                    expr += ", " + it;
 //                });
 //                _parser.SetExpr(expr);
-                _parserMgr.SetExpression(expressions);
+                _parserMgr.SetExpressions();//(expressions);
                 _parserMgr.SetConditions();
 
 //                for (int k=0; k<num_conds; ++k)
@@ -611,7 +612,7 @@ void MainWindow::ComboBoxChanged(const QString& text)
 {
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
-    _parserMgr.SetInput(_variables, row, text.toStdString());
+    _parserMgr.AssignInput(_variables, row, text.toStdString());
 }
 void MainWindow::ParamsChanged(QModelIndex, QModelIndex) //slot
 {

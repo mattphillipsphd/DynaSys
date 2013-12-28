@@ -19,6 +19,8 @@ class ParamModel : public QAbstractTableModel
 //        ParamModel& operator=(const ParamModel&) = delete;
         virtual ~ParamModel();
 
+        virtual bool DoAddToParser() const { return true; } //Whether the model values
+            //are added to the parser in ParserMgr::DefineVars
         virtual VecStr Expressions() const { return VecStr(); }
         virtual VecStr Initializations() const { return VecStr(); }
         const std::string& Key(size_t i) const;

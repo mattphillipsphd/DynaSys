@@ -9,6 +9,8 @@ class InitialCondModel : public ParamModel
 
     public:
         explicit InitialCondModel(QObject *parent, const std::string& name);
+
+        virtual bool DoAddToParser() const override { return false; }
         virtual VecStr Initializations() const override;
 
     signals:

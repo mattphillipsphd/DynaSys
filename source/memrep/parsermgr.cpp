@@ -10,7 +10,9 @@ ParserMgr::~ParserMgr()
 
 void ParserMgr::AddExpression(const std::string& exprn)
 {
-    const std::string& old_exprn = _parser.GetExpr();
+    if (exprn.empty()) return;
+    std::string old_exprn = _parser.GetExpr();
+    old_exprn.erase( old_exprn.find_last_not_of(" ")+1 );
     _parser.SetExpr(old_exprn.empty() ? "" : old_exprn + ", "
                      + exprn );
 }
@@ -19,7 +21,40 @@ void ParserMgr::AddModel(ParamModel* model, double* data)
     if (!data) data = new double[model->NumPars()];
     _models.push_back( std::make_pair(model, data) );
 }
-void ParserMgr::AssignInputs()
+void ParserMgr::AssignInput(const ParamModel* model, size_t i, const std::string& type_str)
+{
+    Input::TYPE type = Input::Type(type_str);
+    double* data = Data(model);
+    switch (type)
+    {
+        case Input::UNI_RAND:
+        case Input::GAMMA_RAND:
+        case Input::NORM_RAND:
+        {
+            Input input(&data[i]);
+            input.GenerateInput(type);
+            _inputs.push_back(input);
+            break;
+        }
+        case Input::TXT_FILE:
+        {
+            Input input(&data[i]);
+            std::string file_name = model->Value(i);
+            std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
+            {
+                return c=='"';
+            });
+            input.LoadInput(file_name);
+            _inputs.push_back(input);
+            break;
+        }
+        case Input::USER:
+            break;
+        case Input::UNKNOWN:
+            throw("Error, ParserMgr::SetInput");
+    }
+}
+/*void ParserMgr::AssignInputs()
 {
     for (auto& it : _models)
     {
@@ -28,9 +63,13 @@ void ParserMgr::AssignInputs()
         for (size_t i=0; i<num_pars; ++i)
         {
             const std::string& value = model->Value(i);
-            SetInput(model, i, value);
+            AssignInput(model, i, value);
         }
     }
+}*/
+void ParserMgr::ClearExpressions()
+{
+    _parser.SetExpr("");
 }
 void ParserMgr::ClearModels()
 {
@@ -49,20 +88,20 @@ double* ParserMgr::Data(const ParamModel* model)
     return it->second;
 }
 
-void ParserMgr::DefineVars()
+void ParserMgr::InitVars()
 {
     try
     {
         for (auto& it : _models)
         {
             ParamModel* model = it.first;
+            if (!model->DoAddToParser()) continue;
             double* data = it.second;
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
             {
                 const std::string& key = model->ShortKey(i),
                         & value = model->Value(i);
-                data[i] = atof(value.c_str()); // ###
 
                 //Set up the parsers
                 _parser.DefineVar(key, &data[i]);
@@ -70,8 +109,11 @@ void ParserMgr::DefineVars()
                 for (auto& itp : _parserConds)
                     itp.DefineVar(key, &data[i]);
 
-                //Assign the source of the data--i.e. attach an input if needed
-                SetInput(model, i, value);
+                //Assign the source of the data--i.e. attach an input source if needed
+                AssignInput(model, i, value);
+
+                //Initialize
+                data[i] = atof(value.c_str()); // ###
             }
         }
     }
@@ -178,36 +220,22 @@ void ParserMgr::SetExpression(const VecStr& exprns)
     for (const auto& it: exprns)
         AddExpression(it);
 }
-void ParserMgr::SetInput(const ParamModel* model, size_t i, const std::string& type_str)
+void ParserMgr::SetExpressions()
 {
-    Input::TYPE type = Input::Type(type_str);
-    double* data = Data(model);
-    switch (type)
+    try
     {
-        case Input::UNI_RAND:
-        case Input::GAMMA_RAND:
-        case Input::NORM_RAND:
+        ClearExpressions();
+        for (auto& it : _models)
         {
-            Input input(&data[i]);
-            input.GenerateInput(type);
-            _inputs.push_back(input);
-            break;
+            ParamModel* model = it.first;
+            VecStr expressions = model->Expressions();
+            for (const auto& it : expressions)
+                AddExpression(it);
         }
-        case Input::TXT_FILE:
-        {
-            Input input(&data[i]);
-            std::string file_name = model->Value(i);
-            std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
-            {
-                return c=='"';
-            });
-            input.LoadInput(file_name);
-            _inputs.push_back(input);
-            break;
-        }
-        case Input::USER:
-            break;
-        case Input::UNKNOWN:
-            throw("Error, ParserMgr::SetInput");
+    }
+    catch (mu::ParserError& e)
+    {
+        std::cerr << e.GetMsg() << std::endl;
+        qDebug() << e.GetMsg().c_str();
     }
 }
