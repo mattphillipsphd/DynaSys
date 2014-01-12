@@ -3,6 +3,7 @@
 ConditionModel::ConditionModel(QObject *parent) :
     QStandardItemModel(parent)
 {
+//    setColumnCount(2);
 }
 
 void ConditionModel::AddCondition(const std::string& condition, const VecStr& exprns)
@@ -20,6 +21,14 @@ void ConditionModel::AddExpression(int row, const std::string& exprn)
     QStandardItem* parent = item(row),
             * exprn_itm = new QStandardItem(exprn.c_str());
     parent->appendRow(exprn_itm);
+}
+
+void ConditionModel::SetExpressions(int row, const VecStr& exprns)
+{
+    QStandardItem* parent = item(row);
+    parent->setRowCount(0);
+    for (const auto& it : exprns)
+        AddExpression(row, it);
 }
 
 const std::string ConditionModel::Condition(int row) const

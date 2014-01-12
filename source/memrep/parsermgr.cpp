@@ -13,12 +13,12 @@ void ParserMgr::AddExpression(const std::string& exprn)
     if (exprn.empty()) return;
     std::string old_exprn = _parser.GetExpr();
     old_exprn.erase( old_exprn.find_last_not_of(" ")+1 );
-    _parser.SetExpr(old_exprn.empty() ? "" : old_exprn + ", "
+    _parser.SetExpr(old_exprn.empty() ? exprn : old_exprn + ", "
                      + exprn );
 }
-void ParserMgr::AddModel(ParamModel* model, double* data)
+void ParserMgr::AddModel(ParamModel* model)
 {
-    if (!data) data = new double[model->NumPars()];
+    double* data = new double[model->NumPars()];
     _models.push_back( std::make_pair(model, data) );
 }
 void ParserMgr::AssignInput(const ParamModel* model, size_t i, const std::string& type_str)
@@ -78,6 +78,10 @@ void ParserMgr::ClearModels()
     _models.clear();
 }
 
+const double* ParserMgr::ConstData(const ParamModel* model) const
+{
+    return const_cast<ParserMgr*>(this)->Data(model);
+}
 double* ParserMgr::Data(const ParamModel* model)
 {
     auto it = std::find_if(_models.cbegin(), _models.cend(),
@@ -88,41 +92,6 @@ double* ParserMgr::Data(const ParamModel* model)
     return it->second;
 }
 
-void ParserMgr::InitVars()
-{
-    try
-    {
-        for (auto& it : _models)
-        {
-            ParamModel* model = it.first;
-            if (!model->DoAddToParser()) continue;
-            double* data = it.second;
-            const size_t num_pars = model->NumPars();
-            for (size_t i=0; i<num_pars; ++i)
-            {
-                const std::string& key = model->ShortKey(i),
-                        & value = model->Value(i);
-
-                //Set up the parsers
-                _parser.DefineVar(key, &data[i]);
-                _parserResult.DefineVar(key, &data[i]);
-                for (auto& itp : _parserConds)
-                    itp.DefineVar(key, &data[i]);
-
-                //Assign the source of the data--i.e. attach an input source if needed
-                AssignInput(model, i, value);
-
-                //Initialize
-                data[i] = atof(value.c_str()); // ###
-            }
-        }
-    }
-    catch (mu::ParserError& e)
-    {
-        std::cerr << e.GetMsg() << std::endl;
-        qDebug() << e.GetMsg().c_str();
-    }
-}
 void ParserMgr::InitParsers()
 {
     try
@@ -155,6 +124,41 @@ void ParserMgr::InitParsers()
         std::cerr << e.GetMsg() << std::endl;
     }
 }
+void ParserMgr::InitVars()
+{
+    try
+    {
+        DefineVars(_parser);
+        DefineVars(_parserResult);
+        for (auto& itp : _parserConds)
+            DefineVars(itp);
+
+        for (auto& it : _models)
+        {
+            ParamModel* model = it.first;
+            if (!model->DoAddToParser()) continue;
+            double* data = it.second;
+            const size_t num_pars = model->NumPars();
+            for (size_t i=0; i<num_pars; ++i)
+            {
+                const std::string& value = model->Value(i);
+
+                //Assign the source of the data--i.e. attach an input source if needed
+                AssignInput(model, i, value);
+
+                //Initialize
+                qDebug() << value.c_str() << ", " << atof(value.c_str());
+                if (model->Name()=="Parameters")
+                    data[i] = atof(value.c_str()); // ###
+            }
+        }
+    }
+    catch (mu::ParserError& e)
+    {
+        std::cerr << e.GetMsg() << std::endl;
+        qDebug() << e.GetMsg().c_str();
+    }
+}
 
 void ParserMgr::InputEval(int idx)
 {
@@ -168,7 +172,7 @@ void ParserMgr::InputEval(int idx)
 }
 void ParserMgr::ParserCondEval()
 {
-    int num_conds = (int)_conditions->NumPars();
+    const int num_conds = (int)_conditions->NumPars();
     for (int k=0; k<num_conds; ++k)
     {
         if (_parserConds.at(k).Eval())
@@ -192,12 +196,17 @@ void ParserMgr::ParserEval()
     catch (mu::ParserError& e)
     {
         std::cerr << e.GetMsg() << std::endl;
+        qDebug() << e.GetMsg().c_str();
     }
 }
 
 void ParserMgr::SetConditions()
 {
     int num_conds = (int)_conditions->NumPars();
+    _parserConds = std::vector<mu::Parser>(num_conds);
+    for (auto& itp : _parserConds)
+        DefineVars(itp);
+
     for (int k=0; k<num_conds; ++k)
     {
         std::string expr = _conditions->Condition(k);
@@ -207,7 +216,6 @@ void ParserMgr::SetConditions()
 void ParserMgr::SetCondModel(ConditionModel* conditions)
 {
     _conditions = conditions;
-    _parserConds = std::vector<mu::Parser>( conditions->NumPars() );
     SetConditions();
 }
 void ParserMgr::SetExpression(const std::string& exprn)
@@ -239,3 +247,28 @@ void ParserMgr::SetExpressions()
         qDebug() << e.GetMsg().c_str();
     }
 }
+
+void ParserMgr::DefineVars(mu::Parser& parser)
+{
+    try
+    {
+        for (auto& it : _models)
+        {
+            ParamModel* model = it.first;
+            if (!model->DoAddToParser()) continue;
+            double* data = it.second;
+            const size_t num_pars = model->NumPars();
+            for (size_t i=0; i<num_pars; ++i)
+            {
+                const std::string& key = model->ShortKey(i);
+                parser.DefineVar(key, &data[i]);
+            }
+        }
+    }
+    catch (mu::ParserError& e)
+    {
+        std::cerr << e.GetMsg() << std::endl;
+        qDebug() << e.GetMsg().c_str();
+    }
+}
+

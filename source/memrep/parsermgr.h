@@ -20,15 +20,15 @@ class ParserMgr
 
         void AddCondModel(ConditionModel* model);
         void AddExpression(const std::string& exprn);
-        void AddModel(ParamModel* model, double* data = nullptr);
+        void AddModel(ParamModel* model);
         void AssignInput(const ParamModel* model, size_t i, const std::string& type_str);
 //        void AssignInputs();
             //Assign the source of the data for the variables
         void ClearExpressions();
         void ClearModels();
-        double* Data(const ParamModel* model);
-        void InitVars();
+        const double* ConstData(const ParamModel* model) const;
         void InitParsers();
+        void InitVars();
         void InputEval(int idx = -1);
         void ParserCondEval();
         void ParserEval();
@@ -39,6 +39,9 @@ class ParserMgr
         void SetExpressions();
 
     private:
+        double* Data(const ParamModel* model);
+        void DefineVars(mu::Parser& parser);
+
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
         std::vector< std::pair<ParamModel*, double*> > _models;
