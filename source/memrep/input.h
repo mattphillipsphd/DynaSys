@@ -9,6 +9,8 @@
 #include <random>
 #include <string>
 
+#include <QDebug>
+
 class Input
 {
     public:

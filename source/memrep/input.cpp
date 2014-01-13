@@ -9,6 +9,7 @@ const std::string Input::UNI_RAND_STR = "uniform rand";
 
 Input::TYPE Input::Type(const std::string& text)
 {
+    if (text.empty()) return USER;
     if (text.at(0)=='"')
         return TXT_FILE;
     if (text==GAMMA_RAND_STR)
@@ -25,7 +26,7 @@ Input::Input(double* data)
     : _ct(0), _data(data), _input(nullptr), _type(UNKNOWN)
 {
 }
-Input::Input(const Input& other) : _ct(other._ct), _type(other._type)
+Input::Input(const Input& other) : _ct(other._ct), _data(other._data), _type(other._type)
 {
     DeepCopy(other);
 }
@@ -42,7 +43,7 @@ Input::Input(const Input& other) : _ct(other._ct), _type(other._type)
 }*/
 Input::~Input()
 {
-    if (_input) delete _input;
+    if (_input) delete[] _input;
 }
 
 void Input::GenerateInput(TYPE type)
@@ -128,11 +129,8 @@ void Input::NextInput(int n)
 
 void Input::DeepCopy(const Input& other)
 {
-    _data = new double[INPUT_SIZE];
-    memcpy(_data,  other._data, other._ct*sizeof(_data[0]));
-
     _input = new double[INPUT_SIZE];
-    memcpy(_input,  other._input, other._ct*sizeof(_input[0]));
+    memcpy(_input,  other._input, INPUT_SIZE*sizeof(_input[0]));
 }
 template<typename T>
 void Input::GenerateRandInput(T& distribution)
@@ -149,7 +147,7 @@ void Input::ResetInput()
     _ct = 0;
     if (_input)
     {
-        delete _input;
+        delete[] _input;
         _input = nullptr;
     }
     _type = UNKNOWN;

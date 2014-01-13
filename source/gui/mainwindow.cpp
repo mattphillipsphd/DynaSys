@@ -95,7 +95,7 @@ void MainWindow::on_actionLoad_triggered()
 
         std::string file_name = QFileDialog::getOpenFileName(nullptr,
                                                              "Load dynamical system",
-                                                             "").toStdString();
+                                                             "../../DynaSysFiles").toStdString();
         if (file_name.empty()) return;
 
         std::vector<ParamModel*> models;
@@ -438,11 +438,13 @@ void MainWindow::Draw()
 
         //Plot the current state vector
         marker->setValue(diffs[0], diffs[1]);
+#ifdef QT_DEBUG
         if (num_steps<100)
         {
-            std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
-            qDebug() << diffs[0] << ", " << diffs[1] << ", " << ip.back();
+//            std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
+//            qDebug() << diffs[0] << ", " << diffs[1] << ", " << ip.back();
         }
+#endif
         const int num_saved_pts = (int)pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;

@@ -133,6 +133,8 @@ void ParserMgr::InitVars()
         for (auto& itp : _parserConds)
             DefineVars(itp);
 
+        _inputs.clear();
+
         for (auto& it : _models)
         {
             ParamModel* model = it.first;
