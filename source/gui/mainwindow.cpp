@@ -13,7 +13,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    setWindowTitle("DynaSys - default model");
+    setWindowTitle("DynaSys " + QString(ds::VERSION_STR.c_str()) + " - default model");
 
     _parameters = new ParamModel(this, "Parameters");
     _parameters->AddParameter("a", "4");
@@ -125,7 +125,7 @@ void MainWindow::on_actionLoad_triggered()
         for (size_t i=0; i<num_vars; ++i)
             AddVarDelegate((int)i, _variables->Value(i));
 
-        setWindowTitle(("DynaSys - " + file_name).c_str());
+        setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
     }
     catch (std::exception& e)
     {
@@ -159,7 +159,7 @@ void MainWindow::on_actionSave_Model_triggered()
     models.push_back(_initConds);
     SysFileOut out(file_name, models, _conditions);
     out.Save();
-    setWindowTitle(("DynaSys - " + file_name).c_str());
+    setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
 }
 
 void MainWindow::on_btnAddCondition_clicked()

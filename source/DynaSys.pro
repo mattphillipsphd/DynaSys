@@ -32,7 +32,8 @@ SOURCES += main.cpp\
     memrep/input.cpp \
     models/variablemodel.cpp \
     models/differentialmodel.cpp \
-    models/initialcondmodel.cpp
+    models/initialcondmodel.cpp \
+    globals/globals.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -47,7 +48,8 @@ HEADERS  += gui/mainwindow.h \
     memrep/input.h \
     models/variablemodel.h \
     models/differentialmodel.h \
-    models/initialcondmodel.h
+    models/initialcondmodel.h \
+    globals/globals.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
