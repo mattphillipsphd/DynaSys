@@ -1,11 +1,15 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#include <cstring>
+
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <random>
 #include <string>
+
+#include <QDebug>
 
 class Input
 {
