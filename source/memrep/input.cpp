@@ -9,6 +9,7 @@ const std::string Input::UNI_RAND_STR = "uniform rand";
 
 Input::TYPE Input::Type(const std::string& text)
 {
+    if (text.empty()) return USER;
     if (text.at(0)=='"')
         return TXT_FILE;
     if (text==GAMMA_RAND_STR)
@@ -25,7 +26,7 @@ Input::Input(double* data)
     : _ct(0), _data(data), _input(nullptr), _type(UNKNOWN)
 {
 }
-Input::Input(const Input& other) : _ct(other._ct), _type(other._type)
+Input::Input(const Input& other) : _ct(other._ct), _data(other._data), _type(other._type)
 {
     DeepCopy(other);
 }
@@ -42,7 +43,7 @@ Input::Input(const Input& other) : _ct(other._ct), _type(other._type)
 }*/
 Input::~Input()
 {
-    if (_input) delete _input;
+    if (_input) delete[] _input;
 }
 
 void Input::GenerateInput(TYPE type)
@@ -96,11 +97,17 @@ void Input::LoadInput(const std::string& file_name)
         std::getline(file, line);
 
         const int num_elts = std::stoi(line);
-        _input = new double[num_elts];
+        _input = new double[INPUT_SIZE];
+        size_t input_ct = 0;
         for (int i=0; i<num_elts; ++i)
         {
             std::getline(file, line);
-            _input[i] = std::stoi(line);
+            _input[input_ct++] = std::stoi(line);
+        }
+        while (input_ct<INPUT_SIZE)
+        {
+            _input[input_ct] = _input[input_ct-num_elts];
+            ++input_ct;
         }
 
         _type = TXT_FILE;
@@ -122,11 +129,8 @@ void Input::NextInput(int n)
 
 void Input::DeepCopy(const Input& other)
 {
-    _data = new double[other._ct];
-    memcpy(_data,  other._data, other._ct*sizeof(_data[0]));
-
-    _input = new double[other._ct];
-    memcpy(_input,  other._input, other._ct*sizeof(_input[0]));
+    _input = new double[INPUT_SIZE];
+    memcpy(_input,  other._input, INPUT_SIZE*sizeof(_input[0]));
 }
 template<typename T>
 void Input::GenerateRandInput(T& distribution)
@@ -143,7 +147,7 @@ void Input::ResetInput()
     _ct = 0;
     if (_input)
     {
-        delete _input;
+        delete[] _input;
         _input = nullptr;
     }
     _type = UNKNOWN;

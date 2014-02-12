@@ -22,7 +22,15 @@ void SysFileIn::Load()
         std::string name = line.substr(0,tab),
                 num = line.substr(tab+1);
         const int num_pars = std::stoi(num.c_str());
-        ParamModel* model = new ParamModel(nullptr, name);
+        ParamModel* model;
+        if (name=="Parameters")
+            model = new ParamModel(nullptr, name);
+        else if (name=="Variables")
+            model = new VariableModel(nullptr, name);
+        else if (name=="Differentials")
+            model = new DifferentialModel(nullptr, name);
+        else if (name=="InitialConds")
+            model = new InitialCondModel(nullptr, name);
         _models.push_back(model);
 
         for (int j=0; j<num_pars; ++j)

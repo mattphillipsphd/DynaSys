@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 
+#include "../globals/globals.h"
 #include "../models/parammodel.h"
 #include "../models/conditionmodel.h"
 

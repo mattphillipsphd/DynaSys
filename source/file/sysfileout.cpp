@@ -10,7 +10,7 @@ void SysFileOut::Save()
 {
     _out.open(_name);
 
-    _out << "DynaSys 0.0.0" << std::endl;
+    _out << "DynaSys " << ds::VERSION_STR << std::endl;
     _out << _models.size() << std::endl;
     for (auto it : _models)
     {

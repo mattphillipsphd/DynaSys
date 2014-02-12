@@ -5,7 +5,10 @@
 #include <fstream>
 
 #include "../models/conditionmodel.h"
+#include "../models/differentialmodel.h"
+#include "../models/initialcondmodel.h"
 #include "../models/parammodel.h"
+#include "../models/variablemodel.h"
 
 class SysFileIn
 {

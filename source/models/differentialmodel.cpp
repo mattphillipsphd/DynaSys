@@ -11,7 +11,7 @@ VecStr DifferentialModel::Expressions() const
     const size_t num_pars = NumPars();
     for (size_t i=0; i<num_pars; ++i)
     {
-        const std::string& key = Key(i),
+        const std::string& key = ShortKey(i),
                 & value = Value(i);
         expressions.push_back(key + " = " + key + " + " + value);
     }
@@ -20,5 +20,5 @@ VecStr DifferentialModel::Expressions() const
 
 std::string DifferentialModel::ShortKey(size_t i) const
 {
-    return ParamModel::Key(i).substr(0,1);
+    return ParamModel::Key(i).substr( 0, Key(i).size()-1 );
 }

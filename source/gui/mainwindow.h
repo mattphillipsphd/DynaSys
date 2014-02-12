@@ -32,6 +32,8 @@
 #include <random>
 #include <thread>
 
+#include <QStringListModel>
+
 namespace Ui {
 class MainWindow;
 }
@@ -72,6 +74,8 @@ class MainWindow : public QMainWindow
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
+        void on_lsConditions_clicked(const QModelIndex& index);
+
         void ComboBoxChanged(const QString& text);
         void ParamsChanged(QModelIndex, QModelIndex);
         void Replot();
@@ -94,7 +98,7 @@ class MainWindow : public QMainWindow
         std::vector<ComboBoxDelegate*> _cmbDelegates;
         volatile bool _isDrawing;
         std::mutex _mutex;
-        volatile bool _needGetParams;
+        volatile bool _needInitialize;
 //        mu::Parser _parser;
 //        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
