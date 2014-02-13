@@ -62,6 +62,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Model_triggered();
 
         void on_btnAddCondition_clicked();
+        void on_btnPulse_clicked();
         void on_btnAddDiff_clicked();
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
@@ -85,6 +86,7 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row);
         void AddVarDelegate(int row, const std::string& type);
         void Draw();
+        void UpdatePulseVList(); // ### There should be a way to make this automatic...
 
         AboutGui* _aboutGui;
 

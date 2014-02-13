@@ -8,7 +8,9 @@ const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _thread(nullptr)
+    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true),
+    _pulseResetValue(std::numeric_limits<double>::min), _pulseStepsRemaining(0),
+    _thread(nullptr)
 {
     ui->setupUi(this);
 
@@ -33,6 +35,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_variables);
+    UpdatePulseVList();
+
 
     _differentials = new DifferentialModel(this, "Differentials");
     _differentials->AddParameter("v'", "0.1*(u + a)/b");
@@ -177,6 +181,15 @@ void MainWindow::on_btnAddCondition_clicked()
         _parserMgr.SetConditions();
     }
 }
+void MainWindow::on_btnPulse_clicked()
+{
+//    ui->btnPulse->setEnabled(false);
+    size_t idx = ui->cmbVariables->currentIndex();
+    _pulseResetValue = _variables->Value(idx);
+    _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
+    double val = ui->edPulseValue->text().toDouble();
+    // ### Need to do this by hijacking the parameter entry process, so to speak
+}
 void MainWindow::on_btnAddDiff_clicked()
 {
     std::lock_guard<std::mutex> lock(_mutex);
@@ -228,6 +241,7 @@ void MainWindow::on_btnAddVariable_clicked()
         _variables->AddParameter(var, "0");
         AddVarDelegate((int)_variables->NumPars()-1);
     }
+    UpdatePulseVList();
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
@@ -279,6 +293,7 @@ void MainWindow::on_btnRemoveVariable_clicked()
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    UpdatePulseVList();
 }
 void MainWindow::on_btnStart_clicked()
 {
@@ -529,4 +544,11 @@ void MainWindow::Replot() //slot
 {
     ui->qwtPlot->replot();
     ui->qwtInnerProduct->replot();
+}
+void MainWindow::UpdatePulseVList()
+{
+    ui->cmbVariables->clear();
+    VecStr keys = _variables->Keys();
+    for (size_t i=0; i<keys.size(); ++i)
+        ui->cmbVariables->insertItem(i, keys.at(i).c_str());
 }

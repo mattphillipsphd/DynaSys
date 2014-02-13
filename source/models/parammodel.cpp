@@ -12,6 +12,14 @@ const std::string& ParamModel::Key(size_t i) const
 {
     return _parameters.at(i).first;
 }
+VecStr ParamModel::Keys() const
+{
+    VecStr vs;
+    const size_t num_pars = _parameters.size();
+    for (size_t i=0; i<num_pars; ++i)
+        vs.push_back(Key(i));
+    return vs;
+}
 std::string ParamModel::ShortKey(size_t i) const
 {
     return Key(i);

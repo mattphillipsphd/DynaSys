@@ -24,6 +24,7 @@ class ParamModel : public QAbstractTableModel
         virtual VecStr Expressions() const { return VecStr(); }
         virtual VecStr Initializations() const { return VecStr(); }
         const std::string& Key(size_t i) const;
+        VecStr Keys() const;
         const std::string& Name() const { return _name; }
         size_t NumPars() const { return _parameters.size(); }
         virtual std::string ShortKey(size_t i) const;
