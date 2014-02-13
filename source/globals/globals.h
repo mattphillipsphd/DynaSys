@@ -5,6 +5,7 @@
 
 namespace ds
 {
+    extern const std::string TEMP_FILE;
     extern const std::string VERSION_STR;
 }
 

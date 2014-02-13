@@ -4,12 +4,13 @@
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
-const std::string MainWindow::TEMP_FILE = ".temp.txt";
 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _thread(nullptr)
+    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true),
+    _pulseResetValue(std::numeric_limits<double>::min), _pulseStepsRemaining(0),
+    _thread(nullptr)
 {
     ui->setupUi(this);
 
@@ -34,6 +35,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_variables);
+    UpdatePulseVList();
+
 
     _differentials = new DifferentialModel(this, "Differentials");
     _differentials->AddParameter("v'", "0.1*(u + a)/b");
@@ -78,7 +81,7 @@ MainWindow::~MainWindow()
 {
     delete ui;
     if (_thread) _thread->detach();
-    QFile temp_file(TEMP_FILE.c_str());
+    QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
 
@@ -103,6 +106,9 @@ void MainWindow::on_actionLoad_triggered()
         SysFileIn in(file_name, models, conditions);
         in.Load();
 
+        //Have to do this before models are deleted!
+        _parserMgr.ClearModels();
+
         delete _parameters;     _parameters = models[0];    ui->tblParameters->setModel(_parameters);
         delete _variables;      _variables = models[1];     ui->tblVariables->setModel(_variables);
         delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
@@ -110,7 +116,6 @@ void MainWindow::on_actionLoad_triggered()
         delete _conditions;     _conditions = conditions;   ui->lsConditions->setModel(_conditions);
 
         // ### Push the models all at once
-        _parserMgr.ClearModels();
         delete ui->lsResults->model();
         _parserMgr.AddModel(_parameters);
         _parserMgr.AddModel(_variables);
@@ -136,12 +141,14 @@ void MainWindow::on_actionSave_Data_triggered()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    if ( !QFile(TEMP_FILE.c_str()).exists() ) return;
+    if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
                                                          "");
     if (file_name.isEmpty()) return;
-    QFile::rename(TEMP_FILE.c_str(), file_name);
+    QFile old(file_name);
+    if (old.exists()) old.remove();
+    QFile::rename(ds::TEMP_FILE.c_str(), file_name);
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
@@ -173,6 +180,19 @@ void MainWindow::on_btnAddCondition_clicked()
         _conditions->AddCondition(cond, VecStr());
         _parserMgr.SetConditions();
     }
+}
+void MainWindow::on_btnPulse_clicked()
+{
+//    ui->btnPulse->setEnabled(false);
+    size_t idx = ui->cmbVariables->currentIndex();
+    std::string var = ui->cmbVariables->currentText().toStdString();
+    _pulseResetValue = _variables->Value(idx);
+    _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
+    double val = ui->edPulseValue->text().toDouble();
+    // ### Need to do this by hijacking the parameter entry process, so to speak
+    //Really, need to eliminate MainWindow::ParamsChanged, change code so that individual
+    //parameters can be manipulated without re-initializing the whole setup.  When this
+    //happens it will be easy to also add a *ramp*, which would be very useful
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
@@ -225,6 +245,7 @@ void MainWindow::on_btnAddVariable_clicked()
         _variables->AddParameter(var, "0");
         AddVarDelegate((int)_variables->NumPars()-1);
     }
+    UpdatePulseVList();
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
@@ -276,6 +297,7 @@ void MainWindow::on_btnRemoveVariable_clicked()
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    UpdatePulseVList();
 }
 void MainWindow::on_btnStart_clicked()
 {
@@ -350,15 +372,29 @@ void MainWindow::Draw()
     curve_ip->attach(ui->qwtInnerProduct);
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    int num_diffs = (int)_differentials->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials);
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
+    const double* diffs = _parserMgr.ConstData(_differentials),
+            * vars = _parserMgr.ConstData(_variables);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
     std::vector< std::deque<double> > pts(num_diffs);
     std::deque<double> ip;
 
-    QFile temp(".temp.txt");
-    temp.open(QFile::WriteOnly | QFile::Text);
+    QFile temp(ds::TEMP_FILE.c_str());
+    std::string output;
+    bool is_recording = ui->cboxRecord->isChecked();
+    if (is_recording)
+    {
+        temp.open(QFile::WriteOnly | QFile::Text);
+        for (size_t i=0; i<(size_t)num_diffs; ++i)
+            output += _differentials->ShortKey(i) + "\t";
+        for (size_t i=0; i<(size_t)num_vars; ++i)
+            output += _variables->ShortKey(i)+ "\t";
+        output += "\n";
+        temp.write(output.c_str());
+        temp.flush();
+    }
 
     while (_isDrawing)
     {
@@ -391,31 +427,46 @@ void MainWindow::Draw()
             {
                 _parserMgr.InitVars();
                 _parserMgr.InitParsers();
-                qDebug() << diffs[0] << ", " << diffs[1];
                 _parserMgr.SetExpressions();
                 _parserMgr.SetConditions();
                 _needInitialize = false;
             }
 
-            std::string output;
             for (int k=0; k<num_steps; ++k)
             {
                 _parserMgr.ParserEval();
+#ifdef QT_DEBUG
+                std::string sd;
+                for (int i=0; i<num_diffs; ++i)
+                    sd += std::to_string(diffs[i]) + ", ";
+                qDebug() << "Diffs: " << sd.c_str();
+
+                std::string sv;
+                for (int i=0; i<num_vars; ++i)
+                    sv += std::to_string(vars[i]) + ", ";
+                qDebug() << "Vars: " << sv.c_str();
+#endif
                 _parserMgr.ParserCondEval();
 
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
+                output.clear();
                 for (int i=0; i<num_diffs; ++i)
                 {
                     pts[i].push_back(diffs[i]);
-                    output += std::to_string(diffs[i]) + "\t";
+                    if (is_recording)
+                        output += std::to_string(diffs[i]) + "\t";
 
                     ip_k += diffs[i] * diffs[i];
                 }
-                output += "\n";
-                temp.write(output.c_str());
-                temp.flush();
-
+                if (is_recording)
+                {
+                    for (int i=0; i<num_vars; ++i)
+                        output += std::to_string(vars[i]) + "\t";
+                    output += "\n";
+                    temp.write(output.c_str());
+                    temp.flush();
+                }
                 ip.push_back(ip_k);
             }
 
@@ -497,4 +548,11 @@ void MainWindow::Replot() //slot
 {
     ui->qwtPlot->replot();
     ui->qwtInnerProduct->replot();
+}
+void MainWindow::UpdatePulseVList()
+{
+    ui->cmbVariables->clear();
+    VecStr keys = _variables->Keys();
+    for (size_t i=0; i<keys.size(); ++i)
+        ui->cmbVariables->insertItem(i, keys.at(i).c_str());
 }

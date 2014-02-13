@@ -28,7 +28,7 @@ class Input
                                 NORM_RAND_STR,
                                 UNI_RAND_STR;
 
-        Input(double* data);
+        Input(double* const value);
         Input(const Input& other);
         Input& operator=(const Input& other);
         ~Input();
@@ -50,8 +50,8 @@ class Input
         void ResetInput();
 
         size_t _ct;
-        double* _data,
-                * _input;
+        double* _input;
+        double* const _value;
 //        std::mutex _mutex;
         TYPE _type;
 };

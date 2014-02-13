@@ -22,11 +22,11 @@ Input::TYPE Input::Type(const std::string& text)
     return USER;
 }
 
-Input::Input(double* data)
-    : _ct(0), _data(data), _input(nullptr), _type(UNKNOWN)
+Input::Input(double* const value)
+    : _ct(0), _input(nullptr), _value(value), _type(UNKNOWN)
 {
 }
-Input::Input(const Input& other) : _ct(other._ct), _data(other._data), _type(other._type)
+Input::Input(const Input& other) : _ct(other._ct), _value(other._value), _type(other._type)
 {
     DeepCopy(other);
 }
@@ -35,7 +35,7 @@ Input::Input(const Input& other) : _ct(other._ct), _data(other._data), _type(oth
     if (&other != this)
     {
         size_t _ct;
-        double* const _data,
+        double* const _value,
                 * _input;
 //        std::mutex _mutex;
         TYPE _type;
@@ -83,7 +83,7 @@ void Input::GenerateInput(TYPE type)
     }
 
     _type = type;
-    *_data = _input[_ct];
+    *_value = _input[_ct];
 }
 void Input::LoadInput(const std::string& file_name)
 {
@@ -111,7 +111,7 @@ void Input::LoadInput(const std::string& file_name)
         }
 
         _type = TXT_FILE;
-        *_data = _input[_ct];
+        *_value = _input[_ct];
     }
     catch (std::exception& e)
     {
@@ -124,7 +124,7 @@ void Input::NextInput(int n)
         throw("Input::NextInput: _input is null");
     _ct+=n;
     _ct &= INPUT_MASK;
-    *_data = _input[_ct];
+    *_value = _input[_ct];
 }
 
 void Input::DeepCopy(const Input& other)

@@ -46,7 +46,6 @@ class MainWindow : public QMainWindow
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
                         IP_SAMPLES_SHOWN;
-        static const std::string TEMP_FILE;
 
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();
@@ -63,6 +62,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Model_triggered();
 
         void on_btnAddCondition_clicked();
+        void on_btnPulse_clicked();
         void on_btnAddDiff_clicked();
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
@@ -86,6 +86,7 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row);
         void AddVarDelegate(int row, const std::string& type);
         void Draw();
+        void UpdatePulseVList(); // ### There should be a way to make this automatic...
 
         AboutGui* _aboutGui;
 
@@ -102,6 +103,8 @@ class MainWindow : public QMainWindow
 //        mu::Parser _parser;
 //        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
+        double _pulseResetValue;
+        int _pulseStepsRemaining;
         std::thread* _thread;
 };
 
