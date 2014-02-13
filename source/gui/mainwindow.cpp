@@ -185,6 +185,7 @@ void MainWindow::on_btnPulse_clicked()
 {
 //    ui->btnPulse->setEnabled(false);
     size_t idx = ui->cmbVariables->currentIndex();
+    std::string var = ui->cmbVariables->currentText().toStdString();
     _pulseResetValue = _variables->Value(idx);
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
     double val = ui->edPulseValue->text().toDouble();
