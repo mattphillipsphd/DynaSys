@@ -46,7 +46,6 @@ class MainWindow : public QMainWindow
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
                         IP_SAMPLES_SHOWN;
-        static const std::string TEMP_FILE;
 
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();

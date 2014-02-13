@@ -4,7 +4,6 @@
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
-const std::string MainWindow::TEMP_FILE = ".temp.txt";
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -78,7 +77,7 @@ MainWindow::~MainWindow()
 {
     delete ui;
     if (_thread) _thread->detach();
-    QFile temp_file(TEMP_FILE.c_str());
+    QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
 
@@ -103,6 +102,9 @@ void MainWindow::on_actionLoad_triggered()
         SysFileIn in(file_name, models, conditions);
         in.Load();
 
+        //Have to do this before models are deleted!
+        _parserMgr.ClearModels();
+
         delete _parameters;     _parameters = models[0];    ui->tblParameters->setModel(_parameters);
         delete _variables;      _variables = models[1];     ui->tblVariables->setModel(_variables);
         delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
@@ -110,7 +112,6 @@ void MainWindow::on_actionLoad_triggered()
         delete _conditions;     _conditions = conditions;   ui->lsConditions->setModel(_conditions);
 
         // ### Push the models all at once
-        _parserMgr.ClearModels();
         delete ui->lsResults->model();
         _parserMgr.AddModel(_parameters);
         _parserMgr.AddModel(_variables);
@@ -136,12 +137,14 @@ void MainWindow::on_actionSave_Data_triggered()
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    if ( !QFile(TEMP_FILE.c_str()).exists() ) return;
+    if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
                                                          "");
     if (file_name.isEmpty()) return;
-    QFile::rename(TEMP_FILE.c_str(), file_name);
+    QFile old(file_name);
+    if (old.exists()) old.remove();
+    QFile::rename(ds::TEMP_FILE.c_str(), file_name);
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
@@ -350,15 +353,29 @@ void MainWindow::Draw()
     curve_ip->attach(ui->qwtInnerProduct);
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    int num_diffs = (int)_differentials->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials);
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
+    const double* diffs = _parserMgr.ConstData(_differentials),
+            * vars = _parserMgr.ConstData(_variables);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
     std::vector< std::deque<double> > pts(num_diffs);
     std::deque<double> ip;
 
-    QFile temp(".temp.txt");
-    temp.open(QFile::WriteOnly | QFile::Text);
+    QFile temp(ds::TEMP_FILE.c_str());
+    std::string output;
+    bool is_recording = ui->cboxRecord->isChecked();
+    if (is_recording)
+    {
+        temp.open(QFile::WriteOnly | QFile::Text);
+        for (size_t i=0; i<(size_t)num_diffs; ++i)
+            output += _differentials->ShortKey(i) + "\t";
+        for (size_t i=0; i<(size_t)num_vars; ++i)
+            output += _variables->ShortKey(i)+ "\t";
+        output += "\n";
+        temp.write(output.c_str());
+        temp.flush();
+    }
 
     while (_isDrawing)
     {
@@ -391,31 +408,46 @@ void MainWindow::Draw()
             {
                 _parserMgr.InitVars();
                 _parserMgr.InitParsers();
-                qDebug() << diffs[0] << ", " << diffs[1];
                 _parserMgr.SetExpressions();
                 _parserMgr.SetConditions();
                 _needInitialize = false;
             }
 
-            std::string output;
             for (int k=0; k<num_steps; ++k)
             {
                 _parserMgr.ParserEval();
+#ifdef QT_DEBUG
+                std::string sd;
+                for (int i=0; i<num_diffs; ++i)
+                    sd += std::to_string(diffs[i]) + ", ";
+                qDebug() << "Diffs: " << sd.c_str();
+
+                std::string sv;
+                for (int i=0; i<num_vars; ++i)
+                    sv += std::to_string(vars[i]) + ", ";
+                qDebug() << "Vars: " << sv.c_str();
+#endif
                 _parserMgr.ParserCondEval();
 
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
+                output.clear();
                 for (int i=0; i<num_diffs; ++i)
                 {
                     pts[i].push_back(diffs[i]);
-                    output += std::to_string(diffs[i]) + "\t";
+                    if (is_recording)
+                        output += std::to_string(diffs[i]) + "\t";
 
                     ip_k += diffs[i] * diffs[i];
                 }
-                output += "\n";
-                temp.write(output.c_str());
-                temp.flush();
-
+                if (is_recording)
+                {
+                    for (int i=0; i<num_vars; ++i)
+                        output += std::to_string(vars[i]) + "\t";
+                    output += "\n";
+                    temp.write(output.c_str());
+                    temp.flush();
+                }
                 ip.push_back(ip_k);
             }
 
