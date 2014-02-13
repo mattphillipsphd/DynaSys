@@ -189,6 +189,9 @@ void MainWindow::on_btnPulse_clicked()
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
     double val = ui->edPulseValue->text().toDouble();
     // ### Need to do this by hijacking the parameter entry process, so to speak
+    //Really, need to eliminate MainWindow::ParamsChanged, change code so that individual
+    //parameters can be manipulated without re-initializing the whole setup.  When this
+    //happens it will be easy to also add a *ramp*, which would be very useful
 }
 void MainWindow::on_btnAddDiff_clicked()
 {

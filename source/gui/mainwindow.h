@@ -103,6 +103,8 @@ class MainWindow : public QMainWindow
 //        mu::Parser _parser;
 //        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
+        double _pulseResetValue;
+        int _pulseStepsRemaining;
         std::thread* _thread;
 };
 
