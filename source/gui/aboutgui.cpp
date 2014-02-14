@@ -11,7 +11,8 @@ AboutGui::AboutGui(QWidget *parent) :
 
     ui->txtAbout->setText(
                 "DynaSys 0.0.1\n\n"
-                "Matt Phillips, mattphillipsphd@gmail.com"
+                "Matt Phillips, mattphillipsphd@gmail.com\n\n"
+                "Created with Qt and Ingo Borg's muParser."
                 );
 }
 
