@@ -1,7 +1,7 @@
 #include "sysfileout.h"
 
 SysFileOut::SysFileOut(const std::string& name,
-                       const std::vector<const ParamModel*>& models, const ConditionModel* conditions)
+                       const std::vector<const ParamModelBase*>& models, const ConditionModel* conditions)
     : _conditions(conditions), _models(models), _name(name)
 {
 }

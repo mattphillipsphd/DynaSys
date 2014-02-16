@@ -1,7 +1,7 @@
 #include "variablemodel.h"
 
 VariableModel::VariableModel(QObject *parent, const std::string& name) :
-    ParamModel(parent, name)
+    ParamModelBase(parent, name)
 {
 }
 

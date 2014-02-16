@@ -8,8 +8,8 @@ const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true),
-    _pulseResetValue(std::numeric_limits<double>::min), _pulseStepsRemaining(0),
+    ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
+    _pulseResetValue("-666"), _pulseStepsRemaining(0),
     _thread(nullptr)
 {
     ui->setupUi(this);
@@ -22,29 +22,30 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblParameters->setModel(_parameters);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
     connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+            this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_parameters);
 
     _variables = new VariableModel(this, "Variables");
     _variables->AddParameter("q", Input::NORM_RAND_STR);
     _variables->AddParameter("r", "u*v");
+    _variables->AddParameter("tau", "0.1");
     ui->tblVariables->setModel(_variables);
     AddVarDelegate(0);
     AddVarDelegate(1);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_variables);
     UpdatePulseVList();
 
 
     _differentials = new DifferentialModel(this, "Differentials");
-    _differentials->AddParameter("v'", "0.1*(u + a)/b");
-    _differentials->AddParameter("u'", "0.1*(b - v)");
+    _differentials->AddParameter("v'", "tau*(u + a)/b");
+    _differentials->AddParameter("u'", "tau*(b - v)");
     ui->tblDifferentials->setModel(_differentials);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
     connect(_differentials, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_differentials);
 
     _initConds = new InitialCondModel(this, "InitialConds");
@@ -53,7 +54,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblInitConds->setModel(_initConds);
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
     connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_initConds);
 
     _conditions = new ConditionModel(this);
@@ -62,13 +63,11 @@ MainWindow::MainWindow(QWidget *parent) :
     _conditions->AddCondition("v>30", vs);
     ui->lsConditions->setModel(_conditions);
     ui->lsConditions->setModelColumn(0);
-    QStringList exprns;
-    exprns << vs.at(0).c_str() << vs.at(1).c_str();
-    ui->lsResults->setModel( new QStringListModel(exprns) );
+    ResetResultsList(0);
 //    ui->lsResults->setModelColumn(0);
     qDebug() << _conditions->columnCount();
     connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.SetCondModel(_conditions);
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
@@ -101,7 +100,7 @@ void MainWindow::on_actionLoad_triggered()
                                                              "../../DynaSysFiles").toStdString();
         if (file_name.empty()) return;
 
-        std::vector<ParamModel*> models;
+        std::vector<ParamModelBase*> models;
         ConditionModel* conditions = new ConditionModel(this);
         SysFileIn in(file_name, models, conditions);
         in.Load();
@@ -116,7 +115,7 @@ void MainWindow::on_actionLoad_triggered()
         delete _conditions;     _conditions = conditions;   ui->lsConditions->setModel(_conditions);
 
         // ### Push the models all at once
-        delete ui->lsResults->model();
+        ResetResultsList(0);
         _parserMgr.AddModel(_parameters);
         _parserMgr.AddModel(_variables);
         _parserMgr.AddModel(_differentials);
@@ -159,7 +158,7 @@ void MainWindow::on_actionSave_Model_triggered()
                                                          "").toStdString();
     if (file_name.empty()) return;
 
-    std::vector<const ParamModel*> models;
+    std::vector<const ParamModelBase*> models;
     models.push_back(_parameters);
     models.push_back(_variables);
     models.push_back(_differentials);
@@ -190,7 +189,7 @@ void MainWindow::on_btnPulse_clicked()
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
     double val = ui->edPulseValue->text().toDouble();
     // ### Need to do this by hijacking the parameter entry process, so to speak
-    //Really, need to eliminate MainWindow::ParamsChanged, change code so that individual
+    //Really, need to eliminate MainWindow::ExprnChanged, change code so that individual
     //parameters can be manipulated without re-initializing the whole setup.  When this
     //happens it will be easy to also add a *ramp*, which would be very useful
 }
@@ -219,11 +218,7 @@ void MainWindow::on_btnAddExpression_clicked()
     if (expr.empty()) return;
 
     _conditions->AddExpression(index.row(), expr);
-    VecStr exprns = _conditions->Expressions(index.row());
-    QStringList qexprns;
-    for (const auto& it : exprns)
-        qexprns << it.c_str();
-    qobject_cast<QStringListModel*>(ui->lsResults->model())->setStringList(qexprns);
+    ResetResultsList(index.row());
 }
 void MainWindow::on_btnAddParameter_clicked()
 {
@@ -272,11 +267,7 @@ void MainWindow::on_btnRemoveExpression_clicked()
 
     int row = ui->lsConditions->currentIndex().row();
     if (row == -1) row = 0;
-    QStringList items = qobject_cast<QStringListModel*>(ui->lsResults->model())->stringList();
-    VecStr exprns;
-    for (const auto& it : items)
-        exprns.push_back(it.toStdString());
-    _conditions->SetExpressions(row, exprns);
+    UpdateResultsModel(row);
 }
 void MainWindow::on_btnRemoveParameter_clicked()
 {
@@ -325,11 +316,6 @@ void MainWindow::on_btnStart_clicked()
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
     const int row = index.row();
-    VecStr exprns = _conditions->Expressions(row);
-    QStringList qexprns;
-    for (const auto& it : exprns) qexprns << it.c_str();
-    delete ui->lsResults->model();
-    ui->lsResults->setModel( new QStringListModel(qexprns) );
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -425,11 +411,17 @@ void MainWindow::Draw()
         {
             if (_needInitialize)
             {
-                _parserMgr.InitVars();
+                _parserMgr.InitModels();
                 _parserMgr.InitParsers();
                 _parserMgr.SetExpressions();
                 _parserMgr.SetConditions();
                 _needInitialize = false;
+            }
+            if (_needUpdateExprns)
+            {
+                _parserMgr.SetExpressions();
+                _parserMgr.SetConditions();
+                _needUpdateExprns = false;
             }
 
             for (int k=0; k<num_steps; ++k)
@@ -540,14 +532,45 @@ void MainWindow::ComboBoxChanged(const QString& text)
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
     _parserMgr.AssignInput(_variables, row, text.toStdString());
 }
-void MainWindow::ParamsChanged(QModelIndex, QModelIndex) //slot
+void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
-    _needInitialize = true;
+    _needUpdateExprns = true;
+}
+void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex)
+{
+    int idx = topLeft.row();
+    std::string exprn = _parameters->Expression(idx);
+    _parserMgr.QuickEval(exprn);
+}
+void MainWindow::ResultsChanged(QModelIndex, QModelIndex)
+{
+    int cond_row = ui->lsConditions->currentIndex().row();
+    if (cond_row==-1) return;
+    UpdateResultsModel(cond_row);
 }
 void MainWindow::Replot() //slot
 {
     ui->qwtPlot->replot();
     ui->qwtInnerProduct->replot();
+}
+void MainWindow::ResetResultsList(int cond_row)
+{
+    delete ui->lsResults->model();
+    VecStr exprns = _conditions->Expressions(cond_row);
+    QStringList qexprns;
+    for (const auto& it : exprns) qexprns << it.c_str();
+    QStringListModel* model = new QStringListModel(qexprns);
+    ui->lsResults->setModel(model);
+    connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ResultsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+}
+void MainWindow::UpdateResultsModel(int cond_row)
+{
+    QStringList items = qobject_cast<QStringListModel*>(ui->lsResults->model())->stringList();
+    VecStr exprns;
+    for (const auto& it : items)
+        exprns.push_back(it.toStdString());
+    _conditions->SetExpressions(cond_row, exprns);
 }
 void MainWindow::UpdatePulseVList()
 {

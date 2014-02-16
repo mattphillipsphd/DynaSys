@@ -1,24 +1,26 @@
 #include "differentialmodel.h"
 
 DifferentialModel::DifferentialModel(QObject *parent, const std::string& name) :
-    ParamModel(parent, name)
+    ParamModelBase(parent, name)
 {
 }
 
+std::string DifferentialModel::Expression(size_t idx) const
+{
+    const std::string& key = ShortKey(idx),
+            & value = Value(idx);
+    return key + " = " + key + " + " + value;
+}
 VecStr DifferentialModel::Expressions() const
 {
     VecStr expressions;
     const size_t num_pars = NumPars();
     for (size_t i=0; i<num_pars; ++i)
-    {
-        const std::string& key = ShortKey(i),
-                & value = Value(i);
-        expressions.push_back(key + " = " + key + " + " + value);
-    }
+        expressions.push_back( Expression(i) );
     return expressions;
 }
 
-std::string DifferentialModel::ShortKey(size_t i) const
+std::string DifferentialModel::ShortKey(size_t idx) const
 {
-    return ParamModel::Key(i).substr( 0, Key(i).size()-1 );
+    return ParamModelBase::Key(idx).substr( 0, Key(idx).size()-1 );
 }

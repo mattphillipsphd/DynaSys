@@ -33,7 +33,8 @@ SOURCES += main.cpp\
     models/variablemodel.cpp \
     models/differentialmodel.cpp \
     models/initialcondmodel.cpp \
-    globals/globals.cpp
+    globals/globals.cpp \
+    models/parammodelbase.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -49,7 +50,8 @@ HEADERS  += gui/mainwindow.h \
     models/variablemodel.h \
     models/differentialmodel.h \
     models/initialcondmodel.h \
-    globals/globals.h
+    globals/globals.h \
+    models/parammodelbase.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

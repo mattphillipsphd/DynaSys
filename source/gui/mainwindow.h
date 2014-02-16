@@ -19,6 +19,7 @@
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
+#include "../models/parammodel.h"
 #include "../models/variablemodel.h"
 #include "../memrep/parsermgr.h"
 #include "../file/sysfilein.h"
@@ -77,7 +78,9 @@ class MainWindow : public QMainWindow
         void on_lsConditions_clicked(const QModelIndex& index);
 
         void ComboBoxChanged(const QString& text);
-        void ParamsChanged(QModelIndex, QModelIndex);
+        void ExprnChanged(QModelIndex, QModelIndex);
+        void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
+        void ResultsChanged(QModelIndex, QModelIndex);
         void Replot();
 
     private:
@@ -86,12 +89,14 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row);
         void AddVarDelegate(int row, const std::string& type);
         void Draw();
+        void ResetResultsList(int cond_row);
+        void UpdateResultsModel(int cond_row);
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
 
         AboutGui* _aboutGui;
 
         ConditionModel* _conditions;
-        ParamModel* _differentials,
+        ParamModelBase* _differentials,
                 * _initConds,
                 * _parameters, //Must be numeric
                 * _variables;   //Can invoke other expressions
@@ -99,11 +104,11 @@ class MainWindow : public QMainWindow
         std::vector<ComboBoxDelegate*> _cmbDelegates;
         volatile bool _isDrawing;
         std::mutex _mutex;
-        volatile bool _needInitialize;
+        volatile bool _needInitialize, _needUpdateExprns;
 //        mu::Parser _parser;
 //        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
-        double _pulseResetValue;
+        std::string _pulseResetValue;
         int _pulseStepsRemaining;
         std::thread* _thread;
 };

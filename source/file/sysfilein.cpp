@@ -1,7 +1,7 @@
 #include "sysfilein.h"
 
 SysFileIn::SysFileIn(const std::string& name,
-                     std::vector<ParamModel*>& models, ConditionModel* conditions)
+                     std::vector<ParamModelBase*>& models, ConditionModel* conditions)
     : _conditions(conditions), _models(models), _name(name)
 {
 }
@@ -22,7 +22,7 @@ void SysFileIn::Load()
         std::string name = line.substr(0,tab),
                 num = line.substr(tab+1);
         const int num_pars = std::stoi(num.c_str());
-        ParamModel* model;
+        ParamModelBase* model;
         if (name=="Parameters")
             model = new ParamModel(nullptr, name);
         else if (name=="Variables")

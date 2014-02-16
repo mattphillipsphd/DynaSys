@@ -9,7 +9,7 @@
 
 #include "../memrep/input.h"
 #include "../models/conditionmodel.h"
-#include "../models/parammodel.h"
+#include "../models/parammodelbase.h"
 
 typedef std::vector<std::string> VecStr;
 class ParserMgr
@@ -20,18 +20,19 @@ class ParserMgr
 
         void AddCondModel(ConditionModel* model);
         void AddExpression(const std::string& exprn);
-        void AddModel(ParamModel* model);
-        void AssignInput(const ParamModel* model, size_t i, const std::string& type_str);
+        void AddModel(ParamModelBase* model);
+        void AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str);
 //        void AssignInputs();
             //Assign the source of the data for the variables
         void ClearExpressions();
         void ClearModels();
-        const double* ConstData(const ParamModel* model) const;
+        const double* ConstData(const ParamModelBase* model) const;
         void InitParsers();
-        void InitVars();
+        void InitModels();
         void InputEval(int idx = -1);
         void ParserCondEval();
         void ParserEval();
+        void QuickEval(const std::string& exprn);
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
         void SetExpression(const std::string& exprn);
@@ -39,12 +40,12 @@ class ParserMgr
         void SetExpressions();
 
     private:
-        double* Data(const ParamModel* model);
-        void DefineVars(mu::Parser& parser);
+        void AssociateVars(mu::Parser& parser);
+        double* Data(const ParamModelBase* model);
 
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
-        std::vector< std::pair<ParamModel*, double*> > _models;
+        std::vector< std::pair<ParamModelBase*, double*> > _models;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;

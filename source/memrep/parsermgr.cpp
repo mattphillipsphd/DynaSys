@@ -16,12 +16,12 @@ void ParserMgr::AddExpression(const std::string& exprn)
     _parser.SetExpr(old_exprn.empty() ? exprn : old_exprn + ", "
                      + exprn );
 }
-void ParserMgr::AddModel(ParamModel* model)
+void ParserMgr::AddModel(ParamModelBase* model)
 {
     double* data = new double[model->NumPars()];
     _models.push_back( std::make_pair(model, data) );
 }
-void ParserMgr::AssignInput(const ParamModel* model, size_t i, const std::string& type_str)
+void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str)
 {
     Input::TYPE type = Input::Type(type_str);
     double* data = Data(model);
@@ -58,7 +58,7 @@ void ParserMgr::AssignInput(const ParamModel* model, size_t i, const std::string
 {
     for (auto& it : _models)
     {
-        ParamModel* model = it.first;
+        ParamModelBase* model = it.first;
         const size_t num_pars = model->NumPars();
         for (size_t i=0; i<num_pars; ++i)
         {
@@ -78,18 +78,9 @@ void ParserMgr::ClearModels()
     _models.clear();
 }
 
-const double* ParserMgr::ConstData(const ParamModel* model) const
+const double* ParserMgr::ConstData(const ParamModelBase* model) const
 {
     return const_cast<ParserMgr*>(this)->Data(model);
-}
-double* ParserMgr::Data(const ParamModel* model)
-{
-    auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::pair<ParamModel*,double*> p)
-    {
-            return p.first == model;
-    });
-    return it->second;
 }
 
 void ParserMgr::InitParsers()
@@ -99,22 +90,25 @@ void ParserMgr::InitParsers()
         VecStr initializations, expressions;
         for (auto& it : _models)
         {
-            ParamModel* model = it.first;
-            VecStr model_inits = model->Initializations(),
-                    model_exprns = model->Expressions();
-            initializations.insert(initializations.end(),
-                                   model_inits.begin(),
-                                   model_inits.end());
-            expressions.insert(expressions.end(),
-                                   model_exprns.begin(),
-                                   model_exprns.end());
+            ParamModelBase* model = it.first;
+            if (model->DoInitialize())
+            {
+                VecStr model_inits = model->Initializations();
+                initializations.insert(initializations.end(),
+                                       model_inits.begin(),
+                                       model_inits.end());
+            }
+            if (model->DoEvaluate())
+            {
+                VecStr model_exprns = model->Expressions();
+                expressions.insert(expressions.end(),
+                                       model_exprns.begin(),
+                                       model_exprns.end());
+            }
         }
 
         for (const auto& it : initializations)
-        {
-            SetExpression(it);
-            _parser.Eval();
-        }
+            QuickEval(it);
 
         SetExpression(expressions);
             //Note that the expressions are not actually evaluated
@@ -124,21 +118,21 @@ void ParserMgr::InitParsers()
         std::cerr << e.GetMsg() << std::endl;
     }
 }
-void ParserMgr::InitVars()
+void ParserMgr::InitModels()
 {
     try
     {
-        DefineVars(_parser);
-        DefineVars(_parserResult);
+        AssociateVars(_parser);
+        AssociateVars(_parserResult);
         for (auto& itp : _parserConds)
-            DefineVars(itp);
+            AssociateVars(itp);
 
         _inputs.clear();
 
         for (auto& it : _models)
         {
-            ParamModel* model = it.first;
-            if (!model->DoAddToParser()) continue;
+            ParamModelBase* model = it.first;
+            if (!model->DoInitialize()) continue;
             double* data = it.second;
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
@@ -192,6 +186,7 @@ void ParserMgr::ParserEval()
 {
     try
     {
+        qDebug() << _parser.GetExpr().c_str();
         _parser.Eval();
         InputEval();
     }
@@ -201,13 +196,20 @@ void ParserMgr::ParserEval()
         qDebug() << e.GetMsg().c_str();
     }
 }
+void ParserMgr::QuickEval(const std::string& exprn)
+{
+    std::string temp = _parser.GetExpr();
+    _parser.SetExpr(exprn);
+    _parser.Eval();
+    _parser.SetExpr(temp);
+}
 
 void ParserMgr::SetConditions()
 {
     int num_conds = (int)_conditions->NumPars();
     _parserConds = std::vector<mu::Parser>(num_conds);
     for (auto& itp : _parserConds)
-        DefineVars(itp);
+        AssociateVars(itp);
 
     for (int k=0; k<num_conds; ++k)
     {
@@ -237,7 +239,8 @@ void ParserMgr::SetExpressions()
         ClearExpressions();
         for (auto& it : _models)
         {
-            ParamModel* model = it.first;
+            ParamModelBase* model = it.first;
+            if (!model->DoEvaluate()) continue;
             VecStr expressions = model->Expressions();
             for (const auto& it : expressions)
                 AddExpression(it);
@@ -250,14 +253,14 @@ void ParserMgr::SetExpressions()
     }
 }
 
-void ParserMgr::DefineVars(mu::Parser& parser)
+void ParserMgr::AssociateVars(mu::Parser& parser)
 {
     try
     {
         for (auto& it : _models)
         {
-            ParamModel* model = it.first;
-            if (!model->DoAddToParser()) continue;
+            ParamModelBase* model = it.first;
+            if (model->Name()=="InitialConds") continue;
             double* data = it.second;
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
@@ -272,5 +275,14 @@ void ParserMgr::DefineVars(mu::Parser& parser)
         std::cerr << e.GetMsg() << std::endl;
         qDebug() << e.GetMsg().c_str();
     }
+}
+double* ParserMgr::Data(const ParamModelBase* model)
+{
+    auto it = std::find_if(_models.cbegin(), _models.cend(),
+                        [&](std::pair<ParamModelBase*,double*> p)
+    {
+            return p.first == model;
+    });
+    return it->second;
 }
 
