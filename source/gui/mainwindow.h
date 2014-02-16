@@ -46,7 +46,10 @@ class MainWindow : public QMainWindow
     public:
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
-                        IP_SAMPLES_SHOWN;
+                        IP_SAMPLES_SHOWN,
+                        XY_SAMPLES_SHOWN;
+            //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
+            //error
 
         explicit MainWindow(QWidget *parent = 0);
         ~MainWindow();
