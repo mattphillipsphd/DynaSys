@@ -410,7 +410,7 @@ void MainWindow::Draw()
         if (num_steps==0) num_steps = 1;
 
             //Shrink the buffer if need be
-        while (pts.at(0).size() + num_steps > XY_SAMPLES_SHOWN)
+        while (pts.at(0).size() + num_steps > MAX_BUF_SIZE)
             for (int i=0; i<num_diffs; ++i)
                 pts[i].pop_front();
         while (ip.size() + num_steps > IP_SAMPLES_SHOWN)
@@ -508,10 +508,15 @@ void MainWindow::Draw()
 #endif
         const int num_saved_pts = (int)pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
-        if (tail_len==-1) tail_len = std::min(num_saved_pts, XY_SAMPLES_SHOWN);
-        QPolygonF points(tail_len);
+        if (tail_len==-1) tail_len = num_saved_pts;
+        const int inc = tail_len < XY_SAMPLES_SHOWN/2
+                ? 1
+                : tail_len / (XY_SAMPLES_SHOWN/2);
+        const int num_drawn_pts = tail_len / inc;
+        QPolygonF points(num_drawn_pts);
+//        qDebug() << tail_len << inc;
         int ct_begin = std::max(0,num_saved_pts-tail_len);
-        for (int k=0, ct=ct_begin; k<tail_len; ++k, ++ct)
+        for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
             points[k] = QPointF(pts.at(0).at(ct), pts.at(1).at(ct));
         curve->setSamples(points);
 
