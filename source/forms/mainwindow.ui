@@ -339,7 +339,14 @@
      </layout>
     </item>
     <item>
-     <widget class="QwtPlot" name="qwtInnerProduct" native="true"/>
+     <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,0">
+      <item>
+       <widget class="QwtPlot" name="qwtInnerProduct" native="true"/>
+      </item>
+      <item>
+       <widget class="QTreeView" name="tblTimePlot"/>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
