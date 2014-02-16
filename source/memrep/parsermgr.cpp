@@ -186,7 +186,7 @@ void ParserMgr::ParserEval()
 {
     try
     {
-        qDebug() << _parser.GetExpr().c_str();
+//        qDebug() << _parser.GetExpr().c_str();
         _parser.Eval();
         InputEval();
     }

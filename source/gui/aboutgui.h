@@ -3,6 +3,8 @@
 
 #include <QWidget>
 
+#include "../globals/globals.h"
+
 namespace Ui {
 class AboutGui;
 }

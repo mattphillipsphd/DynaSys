@@ -9,7 +9,7 @@ const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
-    _pulseResetValue("-666"), _pulseStepsRemaining(0),
+    _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _thread(nullptr)
 {
     ui->setupUi(this);
@@ -21,8 +21,6 @@ MainWindow::MainWindow(QWidget *parent) :
     _parameters->AddParameter("b", "10");
     ui->tblParameters->setModel(_parameters);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
-    connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_parameters);
 
     _variables = new VariableModel(this, "Variables");
@@ -33,19 +31,14 @@ MainWindow::MainWindow(QWidget *parent) :
     AddVarDelegate(0);
     AddVarDelegate(1);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
-    connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_variables);
     UpdatePulseVList();
-
 
     _differentials = new DifferentialModel(this, "Differentials");
     _differentials->AddParameter("v'", "tau*(u + a)/b");
     _differentials->AddParameter("u'", "tau*(b - v)");
     ui->tblDifferentials->setModel(_differentials);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
-    connect(_differentials, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_differentials);
 
     _initConds = new InitialCondModel(this, "InitialConds");
@@ -53,8 +46,6 @@ MainWindow::MainWindow(QWidget *parent) :
     _initConds->AddParameter("u(0)", "0");
     ui->tblInitConds->setModel(_initConds);
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
-    connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.AddModel(_initConds);
 
     _conditions = new ConditionModel(this);
@@ -66,11 +57,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ResetResultsList(0);
 //    ui->lsResults->setModelColumn(0);
     qDebug() << _conditions->columnCount();
-    connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     _parserMgr.SetCondModel(_conditions);
 
+    ConnectModels();
+
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
+    connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -113,9 +105,9 @@ void MainWindow::on_actionLoad_triggered()
         delete _differentials;  _differentials = models[2]; ui->tblDifferentials->setModel(_differentials);
         delete _initConds;      _initConds = models[3];     ui->tblInitConds->setModel(_initConds);
         delete _conditions;     _conditions = conditions;   ui->lsConditions->setModel(_conditions);
+        ConnectModels();
 
         // ### Push the models all at once
-        ResetResultsList(0);
         _parserMgr.AddModel(_parameters);
         _parserMgr.AddModel(_variables);
         _parserMgr.AddModel(_differentials);
@@ -128,6 +120,8 @@ void MainWindow::on_actionLoad_triggered()
         const size_t num_vars = _variables->NumPars();
         for (size_t i=0; i<num_vars; ++i)
             AddVarDelegate((int)i, _variables->Value(i));
+
+        UpdatePulseVList();
 
         setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
     }
@@ -183,15 +177,12 @@ void MainWindow::on_btnAddCondition_clicked()
 void MainWindow::on_btnPulse_clicked()
 {
 //    ui->btnPulse->setEnabled(false);
-    size_t idx = ui->cmbVariables->currentIndex();
-    std::string var = ui->cmbVariables->currentText().toStdString();
-    _pulseResetValue = _variables->Value(idx);
+    _pulseParIdx = ui->cmbVariables->currentIndex();
+    if (_pulseParIdx==-1) _pulseParIdx = 0;
+    _pulseResetValue = _parameters->Value(_pulseParIdx);
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
-    double val = ui->edPulseValue->text().toDouble();
-    // ### Need to do this by hijacking the parameter entry process, so to speak
-    //Really, need to eliminate MainWindow::ExprnChanged, change code so that individual
-    //parameters can be manipulated without re-initializing the whole setup.  When this
-    //happens it will be easy to also add a *ramp*, which would be very useful
+    std::string val = ui->edPulseValue->text().toStdString();
+    _parameters->SetPar(_pulseParIdx, val);
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
@@ -316,6 +307,7 @@ void MainWindow::on_btnStart_clicked()
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
     const int row = index.row();
+    ResetResultsList(row);
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -332,6 +324,23 @@ void MainWindow::AddVarDelegate(int row)
     ui->tblVariables->setItemDelegateForRow(row, cbd);
     connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
     _cmbDelegates.push_back(cbd);
+}
+void MainWindow::ConnectModels()
+{
+    connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    connect(_differentials, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    if (_conditions->NumPars()==0)
+        delete ui->lsResults->model();
+    else
+        ResetResultsList(0);
 }
 void MainWindow::Draw()
 {
@@ -440,6 +449,14 @@ void MainWindow::Draw()
 #endif
                 _parserMgr.ParserCondEval();
 
+                if (_pulseStepsRemaining>0) --_pulseStepsRemaining;
+                if (_pulseStepsRemaining==0)
+                {
+                    emit DoUpdateParams();
+                    ui->tblParameters->update();
+                    _pulseStepsRemaining = -1;
+                }
+
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
                 output.clear();
@@ -528,6 +545,7 @@ void MainWindow::Draw()
 
 void MainWindow::ComboBoxChanged(const QString& text)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
     _parserMgr.AssignInput(_variables, row, text.toStdString());
@@ -538,12 +556,14 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 }
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     int idx = topLeft.row();
     std::string exprn = _parameters->Expression(idx);
     _parserMgr.QuickEval(exprn);
 }
 void MainWindow::ResultsChanged(QModelIndex, QModelIndex)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     int cond_row = ui->lsConditions->currentIndex().row();
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
@@ -552,6 +572,10 @@ void MainWindow::Replot() //slot
 {
     ui->qwtPlot->replot();
     ui->qwtInnerProduct->replot();
+}
+void MainWindow::UpdateParams() //slot
+{
+    _parameters->SetPar(_pulseParIdx, _pulseResetValue);
 }
 void MainWindow::ResetResultsList(int cond_row)
 {
@@ -575,7 +599,7 @@ void MainWindow::UpdateResultsModel(int cond_row)
 void MainWindow::UpdatePulseVList()
 {
     ui->cmbVariables->clear();
-    VecStr keys = _variables->Keys();
+    VecStr keys = _parameters->Keys(); // ### rename cmbVariables
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbVariables->insertItem(i, keys.at(i).c_str());
 }

@@ -55,6 +55,7 @@ class MainWindow : public QMainWindow
 
     signals:
         void DoReplot();
+        void DoUpdateParams();
 
     private slots:
         void on_actionAbout_triggered();
@@ -82,12 +83,14 @@ class MainWindow : public QMainWindow
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
         void Replot();
+        void UpdateParams();
 
     private:
         Ui::MainWindow *ui;
 
         void AddVarDelegate(int row);
         void AddVarDelegate(int row, const std::string& type);
+        void ConnectModels();
         void Draw();
         void ResetResultsList(int cond_row);
         void UpdateResultsModel(int cond_row);
@@ -109,7 +112,9 @@ class MainWindow : public QMainWindow
 //        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
         std::string _pulseResetValue;
+        size_t _pulseParIdx;
         int _pulseStepsRemaining;
+            //Consider making a little pulse struct/class
         std::thread* _thread;
 };
 

@@ -9,11 +9,11 @@ AboutGui::AboutGui(QWidget *parent) :
 
     setWindowTitle("About DynaSys");
 
-    ui->txtAbout->setText(
-                "DynaSys 0.0.1\n\n"
+    ui->txtAbout->setText(std::string(
+                "DynaSys " + ds::VERSION_STR + "\n\n"
                 "Matt Phillips, mattphillipsphd@gmail.com\n\n"
-                "Created with Qt and Ingo Borg's muParser."
-                );
+                "Created with Qt, Qwt, and Ingo Berg's muParser."
+                ).c_str());
 }
 
 AboutGui::~AboutGui()
