@@ -25,6 +25,26 @@
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout">
           <item>
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>X:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="cmbDiffX"/>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_10">
+            <property name="text">
+             <string>Y:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="cmbDiffY"/>
+          </item>
+          <item>
            <widget class="QPushButton" name="btnStart">
             <property name="font">
              <font>
@@ -79,7 +99,7 @@
           <item>
            <widget class="QLabel" name="label_2">
             <property name="text">
-             <string># of samples in tail:</string>
+             <string>tail length:</string>
             </property>
            </widget>
           </item>
@@ -344,7 +364,7 @@
        <widget class="QwtPlot" name="qwtInnerProduct" native="true"/>
       </item>
       <item>
-       <widget class="QTreeView" name="tblTimePlot"/>
+       <widget class="QTableView" name="tblTimePlot"/>
       </item>
      </layout>
     </item>

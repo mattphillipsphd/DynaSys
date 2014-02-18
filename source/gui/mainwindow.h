@@ -79,6 +79,9 @@ class MainWindow : public QMainWindow
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
+        void on_cmbDiffX_currentIndexChanged(int index);
+        void on_cmbDiffY_currentIndexChanged(int index);
+
         void on_lsConditions_clicked(const QModelIndex& index);
 
         void ComboBoxChanged(const QString& text);
@@ -95,9 +98,11 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row, const std::string& type);
         void ConnectModels();
         void Draw();
+        void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
-        void UpdateResultsModel(int cond_row);
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
+        void UpdateResultsModel(int cond_row);
+        void UpdateTimePlotTable();
 
         AboutGui* _aboutGui;
 
@@ -108,6 +113,7 @@ class MainWindow : public QMainWindow
                 * _variables;   //Can invoke other expressions
 
         std::vector<ComboBoxDelegate*> _cmbDelegates;
+        const double* _phasePlotX, * _phasePlotY;
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needInitialize, _needUpdateExprns;

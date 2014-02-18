@@ -4,12 +4,13 @@
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
-const int MainWindow::XY_SAMPLES_SHOWN = 64 * 1024;
+const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
+    _phasePlotX(nullptr), _phasePlotY(nullptr),
     _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _thread(nullptr)
 {
@@ -59,6 +60,9 @@ MainWindow::MainWindow(QWidget *parent) :
 //    ui->lsResults->setModelColumn(0);
     qDebug() << _conditions->columnCount();
     _parserMgr.SetCondModel(_conditions);
+
+    ResetPhasePlotAxes();
+    UpdateTimePlotTable();
 
     ConnectModels();
 
@@ -122,7 +126,9 @@ void MainWindow::on_actionLoad_triggered()
         for (size_t i=0; i<num_vars; ++i)
             AddVarDelegate((int)i, _variables->Value(i));
 
+        ResetPhasePlotAxes();
         UpdatePulseVList();
+        UpdateTimePlotTable();
 
         setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
     }
@@ -305,6 +311,16 @@ void MainWindow::on_btnStart_clicked()
         ui->btnStart->setText("Start");
     }
 }
+void MainWindow::on_cmbDiffX_currentIndexChanged(int index)
+{
+    const double* diffs = _parserMgr.ConstData(_differentials);
+    _phasePlotX = &diffs[index];
+}
+void MainWindow::on_cmbDiffY_currentIndexChanged(int index)
+{
+    const double* diffs = _parserMgr.ConstData(_differentials);
+    _phasePlotY = &diffs[index];
+}
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
     const int row = index.row();
@@ -461,9 +477,12 @@ void MainWindow::Draw()
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
                 output.clear();
+                pts[0].push_back(*_phasePlotX);
+                pts[1].push_back(*_phasePlotY);
+                    // ### Write all pts, just use phase plot to determine which gets drawn, save
+                    //an index not an address
                 for (int i=0; i<num_diffs; ++i)
                 {
-                    pts[i].push_back(diffs[i]);
                     if (is_recording)
                         output += std::to_string(diffs[i]) + "\t";
 
@@ -497,8 +516,6 @@ void MainWindow::Draw()
             return;
         }
 
-        //Plot the current state vector
-        marker->setValue(diffs[0], diffs[1]);
 #ifdef QT_DEBUG
         if (num_steps<100)
         {
@@ -506,6 +523,9 @@ void MainWindow::Draw()
 //            qDebug() << diffs[0] << ", " << diffs[1] << ", " << ip.back();
         }
 #endif
+        //Plot the current state vector
+        marker->setValue(*_phasePlotX, *_phasePlotY);
+
         const int num_saved_pts = (int)pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;
@@ -583,16 +603,37 @@ void MainWindow::UpdateParams() //slot
 {
     _parameters->SetPar(_pulseParIdx, _pulseResetValue);
 }
+void MainWindow::ResetPhasePlotAxes()
+{
+    const double* diffs = _parserMgr.ConstData(_differentials);
+    QStringList qdiffs = ds::VecStrToQSList( _differentials->Keys() );
+
+    ui->cmbDiffX->clear();
+    ui->cmbDiffX->insertItems(0, qdiffs);
+    _phasePlotX = &diffs[0];
+    ui->cmbDiffX->setCurrentIndex(0);
+
+    const int yidx = _differentials->NumPars() > 1 ? 1 : 0;
+    ui->cmbDiffY->clear();
+    ui->cmbDiffY->insertItems(0, qdiffs);
+    _phasePlotY = &diffs[yidx];
+    ui->cmbDiffY->setCurrentIndex(yidx);
+}
 void MainWindow::ResetResultsList(int cond_row)
 {
     delete ui->lsResults->model();
-    VecStr exprns = _conditions->Expressions(cond_row);
-    QStringList qexprns;
-    for (const auto& it : exprns) qexprns << it.c_str();
+    QStringList qexprns = ds::VecStrToQSList( _conditions->Expressions(cond_row) );
     QStringListModel* model = new QStringListModel(qexprns);
     ui->lsResults->setModel(model);
     connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ResultsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+}
+void MainWindow::UpdatePulseVList()
+{
+    ui->cmbVariables->clear();
+    VecStr keys = _parameters->Keys(); // ### rename cmbVariables
+    for (size_t i=0; i<keys.size(); ++i)
+        ui->cmbVariables->insertItem(i, keys.at(i).c_str());
 }
 void MainWindow::UpdateResultsModel(int cond_row)
 {
@@ -602,10 +643,7 @@ void MainWindow::UpdateResultsModel(int cond_row)
         exprns.push_back(it.toStdString());
     _conditions->SetExpressions(cond_row, exprns);
 }
-void MainWindow::UpdatePulseVList()
+void MainWindow::UpdateTimePlotTable()
 {
-    ui->cmbVariables->clear();
-    VecStr keys = _parameters->Keys(); // ### rename cmbVariables
-    for (size_t i=0; i<keys.size(); ++i)
-        ui->cmbVariables->insertItem(i, keys.at(i).c_str());
+//    ui->tblTimePlot->set
 }
