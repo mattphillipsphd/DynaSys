@@ -477,15 +477,11 @@ void MainWindow::Draw()
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
                 output.clear();
-                pts[0].push_back(*_phasePlotX);
-                pts[1].push_back(*_phasePlotY);
-                    // ### Write all pts, just use phase plot to determine which gets drawn, save
-                    //an index not an address
                 for (int i=0; i<num_diffs; ++i)
                 {
                     if (is_recording)
                         output += std::to_string(diffs[i]) + "\t";
-
+                    pts[i].push_back( diffs[i] );
                     ip_k += diffs[i] * diffs[i];
                 }
                 if (is_recording)
@@ -524,7 +520,9 @@ void MainWindow::Draw()
         }
 #endif
         //Plot the current state vector
-        marker->setValue(*_phasePlotX, *_phasePlotY);
+        const int xidx = ui->cmbDiffX->currentIndex(),
+                yidx = ui->cmbDiffY->currentIndex();
+        marker->setValue(diffs[xidx], diffs[yidx]);
 
         const int num_saved_pts = (int)pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
@@ -537,7 +535,7 @@ void MainWindow::Draw()
 //        qDebug() << tail_len << inc;
         int ct_begin = std::max(0,num_saved_pts-tail_len);
         for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
-            points[k] = QPointF(pts.at(0).at(ct), pts.at(1).at(ct));
+            points[k] = QPointF(pts.at(xidx).at(ct), pts.at(yidx).at(ct));
         curve->setSamples(points);
 
         //Plot points for the inner-product graph
@@ -554,8 +552,8 @@ void MainWindow::Draw()
         ui->qwtInnerProduct->setAxisScale( QwtPlot::yLeft, *ylims_ip.first, *ylims_ip.second );
 
             //Get axis limits
-        auto xlims = std::minmax_element(pts[0].cbegin(), pts[0].cend()),
-                ylims = std::minmax_element(pts[1].cbegin(), pts[1].cend());
+        auto xlims = std::minmax_element(pts.at(xidx).cbegin(), pts.at(xidx).cend()),
+                ylims = std::minmax_element(pts.at(yidx).cbegin(), pts.at(yidx).cend());
         ui->qwtPlot->setAxisScale( QwtPlot::xBottom, *xlims.first, *xlims.second );
         ui->qwtPlot->setAxisScale( QwtPlot::yLeft, *ylims.first, *ylims.second );
 
