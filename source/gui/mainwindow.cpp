@@ -377,20 +377,29 @@ void MainWindow::Draw()
     curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
     curve->attach(ui->qwtPlot);
 
-    //The inner-product plot
-    QwtPlotCurve* curve_ip = new QwtPlotCurve();
-    curve_ip->setPen( Qt::black, 1 );
-    curve_ip->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-    curve_ip->attach(ui->qwtInnerProduct);
-
-    //Get all of the information from the parameter fields, introducing new variables as needed.
+    //The time plot
     const int num_diffs = (int)_differentials->NumPars(),
             num_vars = (int)_variables->NumPars();
+    const int NUM_ALL_TPLOTS = 1 + num_diffs + num_vars;
+        // +1 for inner product.  The strategy is to attach all possible curves
+        //but only the enabled ones have non-empty samples.
+    std::vector<QwtPlotCurve*> curve_tp(NUM_ALL_TPLOTS);
+    for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+    {
+        QwtPlotCurve* curv = new QwtPlotCurve();
+        curv->setPen( Qt::black, 1 ); // ###
+        curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+        curv->attach(ui->qwtInnerProduct);
+        curve_tp[i] = curv;
+    }
+
+    //Get all of the information from the parameter fields, introducing new variables as needed.
     const double* diffs = _parserMgr.ConstData(_differentials),
             * vars = _parserMgr.ConstData(_variables);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
-    std::vector< std::deque<double> > pts(num_diffs);
+    std::vector< std::deque<double> > diff_pts(num_diffs),
+            var_pts(num_vars);
     std::deque<double> ip;
 
     QFile temp(ds::TEMP_FILE.c_str());
@@ -426,9 +435,13 @@ void MainWindow::Draw()
         if (num_steps==0) num_steps = 1;
 
             //Shrink the buffer if need be
-        while (pts.at(0).size() + num_steps > MAX_BUF_SIZE)
+        while (diff_pts.at(0).size() + num_steps > MAX_BUF_SIZE)
+        {
             for (int i=0; i<num_diffs; ++i)
-                pts[i].pop_front();
+                diff_pts[i].pop_front();
+            for (int i=0; i<num_vars; ++i)
+                var_pts[i].pop_front();
+        }
         while (ip.size() + num_steps > IP_SAMPLES_SHOWN)
             ip.pop_front();
 
@@ -481,9 +494,11 @@ void MainWindow::Draw()
                 {
                     if (is_recording)
                         output += std::to_string(diffs[i]) + "\t";
-                    pts[i].push_back( diffs[i] );
+                    diff_pts[i].push_back( diffs[i] );
                     ip_k += diffs[i] * diffs[i];
                 }
+                for (int i=0; i<num_vars; ++i)
+                    var_pts[i].push_back( vars[i] );
                 if (is_recording)
                 {
                     for (int i=0; i<num_vars; ++i)
@@ -524,7 +539,7 @@ void MainWindow::Draw()
                 yidx = ui->cmbDiffY->currentIndex();
         marker->setValue(diffs[xidx], diffs[yidx]);
 
-        const int num_saved_pts = (int)pts[0].size();
+        const int num_saved_pts = (int)diff_pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;
         const int inc = tail_len < XY_SAMPLES_SHOWN/2
@@ -535,25 +550,65 @@ void MainWindow::Draw()
 //        qDebug() << tail_len << inc;
         int ct_begin = std::max(0,num_saved_pts-tail_len);
         for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
-            points[k] = QPointF(pts.at(xidx).at(ct), pts.at(yidx).at(ct));
+            points[k] = QPointF(diff_pts.at(xidx).at(ct), diff_pts.at(yidx).at(ct));
         curve->setSamples(points);
 
         //Plot points for the inner-product graph
-        const int NUM_IP_POINTS = (int)ip.size();
-        QPolygonF points_ip(NUM_IP_POINTS);
-        for (int k=0; k<NUM_IP_POINTS; ++k)
-            points_ip[k] = QPointF(k, ip[k]);
-        curve_ip->setSamples(points_ip);
+        const int NUM_TP_POINTS = (int)ip.size();
+        TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
+        for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+        {
+            QwtPlotCurve* curv = curve_tp[i];
+            if (!tp_model->IsEnabled(i))
+            {
+                curv->setSamples(QPolygonF());
+                continue;
+            }
+            std::string name = tp_model->Name(i);
+            if (name=="IP")
+            {
+                QPolygonF points_tp(NUM_TP_POINTS);
+                for (int k=0; k<NUM_TP_POINTS; ++k)
+                    points_tp[k] = QPointF(k, ip[k]);
+                curv->setSamples(points_tp);
+                continue;
+            }
+            int didx = _differentials->Index(name);
+            if (didx != -1)
+            {
+                QPolygonF points_tp(NUM_TP_POINTS);
+                for (int k=0; k<NUM_TP_POINTS; ++k)
+                    points_tp[k] = QPointF(k, diff_pts.at(didx).at(k));
+                curv->setSamples(points_tp);
+                continue;
+            }
+            int vidx = _variables->Index(name);
+            if (vidx != -1)
+            {
+                QPolygonF points_tp(NUM_TP_POINTS);
+                for (int k=0; k<NUM_TP_POINTS; ++k)
+                    points_tp[k] = QPointF(k, var_pts.at(vidx).at(k));
+                curv->setSamples(points_tp);
+            }
+        }
 
-            //Get axis limits for inner-product plot
-        auto xlims_ip = std::make_pair((const double)0, (const double)(ip.size()-1));
-        auto ylims_ip = std::minmax_element(ip.cbegin(), ip.cend());
-        ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, xlims_ip.first, xlims_ip.second );
-        ui->qwtInnerProduct->setAxisScale( QwtPlot::yLeft, *ylims_ip.first, *ylims_ip.second );
+            //Get axis limits for time plot
+        auto xlims_tp = std::make_pair((const double)0, (const double)(ip.size()-1));
+        ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, xlims_tp.first, xlims_tp.second );
+        double y_tp_min(std::numeric_limits<double>::max()),
+                y_tp_max(std::numeric_limits<double>::min());
+        for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+            if (tp_model->IsEnabled(i))
+            {
+                QwtPlotCurve* curv = curve_tp[i];
+                if (curv->maxYValue() > y_tp_max) y_tp_max = curv->maxYValue();
+                if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
+            }
+        ui->qwtInnerProduct->setAxisScale( QwtPlot::yLeft, y_tp_min, y_tp_max );
 
             //Get axis limits
-        auto xlims = std::minmax_element(pts.at(xidx).cbegin(), pts.at(xidx).cend()),
-                ylims = std::minmax_element(pts.at(yidx).cbegin(), pts.at(yidx).cend());
+        auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
+                ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
         ui->qwtPlot->setAxisScale( QwtPlot::xBottom, *xlims.first, *xlims.second );
         ui->qwtPlot->setAxisScale( QwtPlot::yLeft, *ylims.first, *ylims.second );
 
@@ -631,7 +686,7 @@ void MainWindow::UpdatePulseVList()
     ui->cmbVariables->clear();
     VecStr keys = _parameters->Keys(); // ### rename cmbVariables
     for (size_t i=0; i<keys.size(); ++i)
-        ui->cmbVariables->insertItem(i, keys.at(i).c_str());
+        ui->cmbVariables->insertItem((int)i, keys.at(i).c_str());
 }
 void MainWindow::UpdateResultsModel(int cond_row)
 {
@@ -643,5 +698,14 @@ void MainWindow::UpdateResultsModel(int cond_row)
 }
 void MainWindow::UpdateTimePlotTable()
 {
-//    ui->tblTimePlot->set
+    delete ui->tblTimePlot->model();
+    VecStr vs,
+            dkeys = _differentials->Keys(),
+            vkeys = _variables->Keys();
+    vs.push_back("IP");
+    vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
+    vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());
+
+    TPVTableModel* model = new TPVTableModel(vs, this);
+    ui->tblTimePlot->setModel(model);
 }

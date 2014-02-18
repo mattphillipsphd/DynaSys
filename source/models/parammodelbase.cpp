@@ -161,6 +161,6 @@ int ParamModelBase::Index(const std::string& par_name) const
     {
         return par_name == par.first;
     });
-    if (it == _parameters.cend()) throw "ParamModelBase::Index";
+    if (it == _parameters.cend()) return -1;
     return it - _parameters.cbegin();
 }

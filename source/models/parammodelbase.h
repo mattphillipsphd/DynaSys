@@ -8,7 +8,8 @@
 #include <tuple>
 #include <mutex>
 
-typedef std::vector<std::string> VecStr;
+#include "../globals/globals.h"
+
 typedef std::pair<std::string, std::string> StrPair;
 class ParamModelBase : public QAbstractTableModel
 {
@@ -25,6 +26,7 @@ class ParamModelBase : public QAbstractTableModel
             //are used to initialize the variables
         virtual std::string Expression(size_t i) const;
         virtual VecStr Expressions() const;
+        int Index(const std::string& par_name) const;
         virtual VecStr Initializations() const { return VecStr(); }
         const std::string& Key(size_t i) const;
         VecStr Keys() const;
@@ -55,8 +57,6 @@ class ParamModelBase : public QAbstractTableModel
 //    protected:
 
     private:
-        int Index(const std::string& par_name) const;
-
         std::mutex _mutex;
         const std::string _name;
         std::vector<StrPair> _parameters;

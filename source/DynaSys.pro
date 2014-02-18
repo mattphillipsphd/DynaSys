@@ -34,7 +34,8 @@ SOURCES += main.cpp\
     models/differentialmodel.cpp \
     models/initialcondmodel.cpp \
     globals/globals.cpp \
-    models/parammodelbase.cpp
+    models/parammodelbase.cpp \
+    models/tpvtablemodel.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -51,7 +52,8 @@ HEADERS  += gui/mainwindow.h \
     models/differentialmodel.h \
     models/initialcondmodel.h \
     globals/globals.h \
-    models/parammodelbase.h
+    models/parammodelbase.h \
+    models/tpvtablemodel.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

@@ -20,6 +20,7 @@
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
 #include "../models/parammodel.h"
+#include "../models/tpvtablemodel.h"
 #include "../models/variablemodel.h"
 #include "../memrep/parsermgr.h"
 #include "../file/sysfilein.h"
