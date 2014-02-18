@@ -219,7 +219,11 @@ void MainWindow::on_btnAddParameter_clicked()
                                                  "Parameter Name:",
                                                  QLineEdit::Normal).toStdString();
     if (!par.empty())
+    {
         _parameters->AddParameter(par, "0");
+        _parserMgr.InitModels();
+    }
+    UpdatePulseVList();
 }
 void MainWindow::on_btnAddVariable_clicked()
 {
@@ -232,7 +236,6 @@ void MainWindow::on_btnAddVariable_clicked()
         _variables->AddParameter(var, "0");
         AddVarDelegate((int)_variables->NumPars()-1);
     }
-    UpdatePulseVList();
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
@@ -273,6 +276,7 @@ void MainWindow::on_btnRemoveParameter_clicked()
         _cmbDelegates[ it.row() ] = nullptr;
     }
     std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
+    UpdatePulseVList();
 }
 void MainWindow::on_btnRemoveVariable_clicked()
 {
@@ -280,7 +284,6 @@ void MainWindow::on_btnRemoveVariable_clicked()
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
-    UpdatePulseVList();
 }
 void MainWindow::on_btnStart_clicked()
 {
