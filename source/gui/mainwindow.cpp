@@ -10,9 +10,8 @@ const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow), _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
-    _phasePlotX(nullptr), _phasePlotY(nullptr),
     _pulseResetValue("-666"), _pulseStepsRemaining(-1),
-    _thread(nullptr)
+    _thread(nullptr), _tpColors(InitTPColors())
 {
     ui->setupUi(this);
 
@@ -68,6 +67,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
+
+    ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -311,16 +312,6 @@ void MainWindow::on_btnStart_clicked()
         ui->btnStart->setText("Start");
     }
 }
-void MainWindow::on_cmbDiffX_currentIndexChanged(int index)
-{
-    const double* diffs = _parserMgr.ConstData(_differentials);
-    _phasePlotX = &diffs[index];
-}
-void MainWindow::on_cmbDiffY_currentIndexChanged(int index)
-{
-    const double* diffs = _parserMgr.ConstData(_differentials);
-    _phasePlotY = &diffs[index];
-}
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
     const int row = index.row();
@@ -380,14 +371,15 @@ void MainWindow::Draw()
     //The time plot
     const int num_diffs = (int)_differentials->NumPars(),
             num_vars = (int)_variables->NumPars();
-    const int NUM_ALL_TPLOTS = 1 + num_diffs + num_vars;
+    const int num_all_tplots = 1 + num_diffs + num_vars,
+            num_colors = _tpColors.size();
         // +1 for inner product.  The strategy is to attach all possible curves
         //but only the enabled ones have non-empty samples.
-    std::vector<QwtPlotCurve*> curve_tp(NUM_ALL_TPLOTS);
-    for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+    std::vector<QwtPlotCurve*> curve_tp(num_all_tplots);
+    for (int i=0; i<num_all_tplots; ++i)
     {
         QwtPlotCurve* curv = new QwtPlotCurve();
-        curv->setPen( Qt::black, 1 ); // ###
+        curv->setPen( _tpColors.at(i%num_colors), 1 );
         curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
         curv->attach(ui->qwtInnerProduct);
         curve_tp[i] = curv;
@@ -470,12 +462,12 @@ void MainWindow::Draw()
                 std::string sd;
                 for (int i=0; i<num_diffs; ++i)
                     sd += std::to_string(diffs[i]) + ", ";
-                qDebug() << "Diffs: " << sd.c_str();
+//                qDebug() << "Diffs: " << sd.c_str();
 
                 std::string sv;
                 for (int i=0; i<num_vars; ++i)
                     sv += std::to_string(vars[i]) + ", ";
-                qDebug() << "Vars: " << sv.c_str();
+//                qDebug() << "Vars: " << sv.c_str();
 #endif
                 _parserMgr.ParserCondEval();
 
@@ -554,9 +546,9 @@ void MainWindow::Draw()
         curve->setSamples(points);
 
         //Plot points for the inner-product graph
-        const int NUM_TP_POINTS = (int)ip.size();
+        const int num_tp_points = (int)ip.size();
         TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
-        for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+        for (int i=0; i<num_all_tplots; ++i)
         {
             QwtPlotCurve* curv = curve_tp[i];
             if (!tp_model->IsEnabled(i))
@@ -567,27 +559,29 @@ void MainWindow::Draw()
             std::string name = tp_model->Name(i);
             if (name=="IP")
             {
-                QPolygonF points_tp(NUM_TP_POINTS);
-                for (int k=0; k<NUM_TP_POINTS; ++k)
+                QPolygonF points_tp(num_tp_points);
+                for (int k=0; k<num_tp_points; ++k)
                     points_tp[k] = QPointF(k, ip[k]);
                 curv->setSamples(points_tp);
                 continue;
             }
-            int didx = _differentials->Index(name);
+            int didx = _differentials->ShortKeyIndex(name);
+            const int dv_start = std::max(0, (int)ip.size()-num_tp_points),
+                    dv_end = dv_start + num_tp_points;
             if (didx != -1)
             {
-                QPolygonF points_tp(NUM_TP_POINTS);
-                for (int k=0; k<NUM_TP_POINTS; ++k)
-                    points_tp[k] = QPointF(k, diff_pts.at(didx).at(k));
+                QPolygonF points_tp(num_tp_points);
+                for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
+                    points_tp[ct] = QPointF(ct, diff_pts.at(didx).at(k));
                 curv->setSamples(points_tp);
                 continue;
             }
-            int vidx = _variables->Index(name);
+            int vidx = _variables->KeyIndex(name);
             if (vidx != -1)
             {
-                QPolygonF points_tp(NUM_TP_POINTS);
-                for (int k=0; k<NUM_TP_POINTS; ++k)
-                    points_tp[k] = QPointF(k, var_pts.at(vidx).at(k));
+                QPolygonF points_tp(num_tp_points);
+                for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
+                    points_tp[ct] = QPointF(ct, var_pts.at(vidx).at(k));
                 curv->setSamples(points_tp);
             }
         }
@@ -597,7 +591,7 @@ void MainWindow::Draw()
         ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, xlims_tp.first, xlims_tp.second );
         double y_tp_min(std::numeric_limits<double>::max()),
                 y_tp_max(std::numeric_limits<double>::min());
-        for (int i=0; i<NUM_ALL_TPLOTS; ++i)
+        for (int i=0; i<num_all_tplots; ++i)
             if (tp_model->IsEnabled(i))
             {
                 QwtPlotCurve* curv = curve_tp[i];
@@ -620,6 +614,26 @@ void MainWindow::Draw()
 
     temp.close();
     _isDrawing = false;
+}
+const std::vector<QColor> MainWindow::InitTPColors() const
+{
+    std::vector<QColor> vc;
+    vc.push_back(Qt::black);
+    vc.push_back(Qt::blue);
+    vc.push_back(Qt::red);
+    vc.push_back(Qt::green);
+    vc.push_back(Qt::gray);
+    vc.push_back(Qt::cyan);
+    vc.push_back(Qt::magenta);
+    vc.push_back(Qt::yellow);
+    vc.push_back(Qt::darkBlue);
+    vc.push_back(Qt::darkRed);
+    vc.push_back(Qt::darkGreen);
+    vc.push_back(Qt::darkGray);
+    vc.push_back(Qt::darkCyan);
+    vc.push_back(Qt::darkMagenta);
+    vc.push_back(Qt::darkYellow);
+    return vc;
 }
 
 void MainWindow::ComboBoxChanged(const QString& text)
@@ -658,18 +672,15 @@ void MainWindow::UpdateParams() //slot
 }
 void MainWindow::ResetPhasePlotAxes()
 {
-    const double* diffs = _parserMgr.ConstData(_differentials);
-    QStringList qdiffs = ds::VecStrToQSList( _differentials->Keys() );
+    QStringList qdiffs = ds::VecStrToQSList( _differentials->ShortKeys() );
 
     ui->cmbDiffX->clear();
     ui->cmbDiffX->insertItems(0, qdiffs);
-    _phasePlotX = &diffs[0];
     ui->cmbDiffX->setCurrentIndex(0);
 
     const int yidx = _differentials->NumPars() > 1 ? 1 : 0;
     ui->cmbDiffY->clear();
     ui->cmbDiffY->insertItems(0, qdiffs);
-    _phasePlotY = &diffs[yidx];
     ui->cmbDiffY->setCurrentIndex(yidx);
 }
 void MainWindow::ResetResultsList(int cond_row)
@@ -700,7 +711,7 @@ void MainWindow::UpdateTimePlotTable()
 {
     delete ui->tblTimePlot->model();
     VecStr vs,
-            dkeys = _differentials->Keys(),
+            dkeys = _differentials->ShortKeys(),
             vkeys = _variables->Keys();
     vs.push_back("IP");
     vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
@@ -708,4 +719,13 @@ void MainWindow::UpdateTimePlotTable()
 
     TPVTableModel* model = new TPVTableModel(vs, this);
     ui->tblTimePlot->setModel(model);
+
+    const size_t num_tp_rows = vs.size(),
+            num_colors = _tpColors.size();
+    for (size_t i=0; i<num_tp_rows; ++i)
+    {
+        CheckBoxDelegate* cbd = new CheckBoxDelegate(
+                    _tpColors.at(i%num_colors), this);
+        ui->tblTimePlot->setItemDelegateForRow(i, cbd);
+    }
 }

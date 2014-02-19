@@ -24,3 +24,9 @@ std::string DifferentialModel::ShortKey(size_t idx) const
 {
     return ParamModelBase::Key(idx).substr( 0, Key(idx).size()-1 );
 }
+
+int DifferentialModel::ShortKeyIndex(const std::string& par_name) const
+{
+    std::string key = par_name + "'";
+    return KeyIndex(key);
+}

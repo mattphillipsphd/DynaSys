@@ -26,13 +26,15 @@ class ParamModelBase : public QAbstractTableModel
             //are used to initialize the variables
         virtual std::string Expression(size_t i) const;
         virtual VecStr Expressions() const;
-        int Index(const std::string& par_name) const;
         virtual VecStr Initializations() const { return VecStr(); }
         const std::string& Key(size_t i) const;
+        int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
         const std::string& Name() const { return _name; }
         size_t NumPars() const { return _parameters.size(); }
         virtual std::string ShortKey(size_t i) const;
+        virtual int ShortKeyIndex(const std::string& par_name) const;
+        VecStr ShortKeys() const;
         const std::string& Value(const std::string& key) const;
         const std::string& Value(size_t i) const;
 

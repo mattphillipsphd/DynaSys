@@ -42,7 +42,7 @@ QVariant TPVTableModel::data(const QModelIndex &index, int role) const
     {
         case Qt::EditRole:
         case Qt::DisplayRole:
-            value = _data.at(index.row()).is_enabled ? "1" : "0";
+            value = _data.at(index.row()).is_enabled;
             break;
         default:
             break;
@@ -87,7 +87,7 @@ bool TPVTableModel::setData(const QModelIndex &index, const QVariant &value, int
         case Qt::EditRole:
         {
             if (index.row()>=rowCount()) throw "TPVTableModel::setData: Index out of bounds";
-            _data[ index.row() ].is_enabled = value.toString()=="0" ? false : true;
+            _data[ index.row() ].is_enabled = value.toBool();
             break;
         }
         default:

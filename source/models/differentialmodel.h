@@ -15,6 +15,7 @@ class DifferentialModel : public ParamModelBase
         virtual std::string Expression(size_t idx) const override;
         virtual VecStr Expressions() const override;
         virtual std::string ShortKey(size_t idx) const override;
+        virtual int ShortKeyIndex(const std::string& par_name) const override;
 };
 
 #endif // DIFFERENTIALMODEL_H
