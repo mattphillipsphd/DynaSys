@@ -11,7 +11,6 @@
 #include "../models/conditionmodel.h"
 #include "../models/parammodelbase.h"
 
-typedef std::vector<std::string> VecStr;
 class ParserMgr
 {
     public:

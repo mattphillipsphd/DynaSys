@@ -36,9 +36,17 @@ std::string ParamModelBase::ShortKey(size_t i) const
 {
     return Key(i);
 }
+VecStr ParamModelBase::ShortKeys() const
+{
+    VecStr vs;
+    const size_t num_pars = _parameters.size();
+    for (size_t i=0; i<num_pars; ++i)
+        vs.push_back(ShortKey(i));
+    return vs;
+}
 const std::string& ParamModelBase::Value(const std::string& key) const
 {
-    return Value( Index(key) );
+    return Value( KeyIndex(key) );
 }
 const std::string& ParamModelBase::Value(size_t i) const
 {
@@ -56,7 +64,7 @@ void ParamModelBase::AddParameter(const std::string& key, const std::string& val
 }
 void ParamModelBase::SetPar(const std::string& key, const std::string& value)
 {
-    SetPar( Index(key), value );
+    SetPar( KeyIndex(key), value );
 }
 void ParamModelBase::SetPar(int i, const std::string& value)
 {
@@ -155,12 +163,16 @@ bool ParamModelBase::setHeaderData(int section, Qt::Orientation orientation, con
     throw "ParamModelBase::setHeaderData: Can't change parameter name.";
 }
 
-int ParamModelBase::Index(const std::string& par_name) const
+int ParamModelBase::KeyIndex(const std::string& par_name) const
 {
     auto it = std::find_if(_parameters.cbegin(), _parameters.cend(), [=](const StrPair& par)
     {
         return par_name == par.first;
     });
-    if (it == _parameters.cend()) throw "ParamModelBase::Index";
+    if (it == _parameters.cend()) return -1;
     return it - _parameters.cbegin();
+}
+int ParamModelBase::ShortKeyIndex(const std::string& par_name) const
+{
+    return KeyIndex(par_name);
 }

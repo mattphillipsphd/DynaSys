@@ -18,3 +18,9 @@ std::string InitialCondModel::ShortKey(size_t idx) const
     std::string key = Key(idx);
     return key.substr( 0, key.find('(') );
 }
+
+int InitialCondModel::ShortKeyIndex(const std::string& par_name) const
+{
+    std::string key = par_name + "{0}";
+    return KeyIndex(key);
+}

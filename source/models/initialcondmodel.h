@@ -14,6 +14,7 @@ class InitialCondModel : public ParamModelBase
         virtual bool DoInitialize() const override { return true; }
         virtual VecStr Initializations() const override;
         virtual std::string ShortKey(size_t idx) const override;
+        virtual int ShortKeyIndex(const std::string& par_name) const override;
 
     signals:
 

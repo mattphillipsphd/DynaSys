@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <QColor>
 #include <QDebug>
 #include <QFileDialog>
 #include <QFile>
@@ -15,11 +16,13 @@
 #include <muParser.h>
 
 #include "aboutgui.h"
+#include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
 #include "../models/parammodel.h"
+#include "../models/tpvtablemodel.h"
 #include "../models/variablemodel.h"
 #include "../memrep/parsermgr.h"
 #include "../file/sysfilein.h"
@@ -95,9 +98,12 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row, const std::string& type);
         void ConnectModels();
         void Draw();
+        const std::vector<QColor> InitTPColors() const;
+        void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
-        void UpdateResultsModel(int cond_row);
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
+        void UpdateResultsModel(int cond_row);
+        void UpdateTimePlotTable();
 
         AboutGui* _aboutGui;
 
@@ -111,14 +117,13 @@ class MainWindow : public QMainWindow
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needInitialize, _needUpdateExprns;
-//        mu::Parser _parser;
-//        std::vector<mu::Parser> _parserConds;
         ParserMgr _parserMgr;
         std::string _pulseResetValue;
         size_t _pulseParIdx;
         int _pulseStepsRemaining;
             //Consider making a little pulse struct/class
         std::thread* _thread;
+        const std::vector<QColor> _tpColors;
 };
 
 #endif // MAINWINDOW_H
