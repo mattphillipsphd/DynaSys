@@ -19,7 +19,7 @@ VecStr TPVTableModel::IsEnabled() const
 bool TPVTableModel::IsEnabled(int idx) const
 {
     QModelIndex index = createIndex(idx, 0);
-    return !( data(index,Qt::DisplayRole)=="0" );
+    return data(index,Qt::CheckStateRole).toBool();
 }
 std::string TPVTableModel::Name(int idx) const
 {
@@ -40,8 +40,13 @@ QVariant TPVTableModel::data(const QModelIndex &index, int role) const
     QVariant value;
     switch (role)
     {
+        case Qt::CheckStateRole:
+            if (index.column()!=0) break;
+            value = _data.at(index.row()).is_enabled;
+            break;
         case Qt::EditRole:
         case Qt::DisplayRole:
+            if (index.column()==0) break;
             value = _data.at(index.row()).is_enabled;
             break;
         default:
@@ -51,7 +56,9 @@ QVariant TPVTableModel::data(const QModelIndex &index, int role) const
 }
 Qt::ItemFlags TPVTableModel::flags(const QModelIndex &index) const
 {
-    return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
+    return QAbstractTableModel::flags(index) | Qt::ItemIsUserCheckable;
+//    return QAbstractTableModel::flags(index) |
+//            (index.column()==0) ? Qt::ItemIsUserCheckable : Qt::ItemIsEditable;
 }
 QVariant TPVTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
@@ -84,6 +91,8 @@ bool TPVTableModel::setData(const QModelIndex &index, const QVariant &value, int
 {
     switch (role)
     {
+        case Qt::CheckStateRole:
+            if (index.column()!=0) break;
         case Qt::EditRole:
         {
             if (index.row()>=rowCount()) throw "TPVTableModel::setData: Index out of bounds";

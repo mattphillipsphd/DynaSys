@@ -548,6 +548,8 @@ void MainWindow::Draw()
         //Plot points for the inner-product graph
         const int num_tp_points = (int)ip.size();
         TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
+        const int dv_start = std::max(0, (int)diff_pts.at(0).size()-num_tp_points),
+                dv_end = dv_start + num_tp_points;
         for (int i=0; i<num_all_tplots; ++i)
         {
             QwtPlotCurve* curv = curve_tp[i];
@@ -561,18 +563,16 @@ void MainWindow::Draw()
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=0; k<num_tp_points; ++k)
-                    points_tp[k] = QPointF(k, ip[k]);
+                    points_tp[k] = QPointF(dv_start+k, ip[k]);
                 curv->setSamples(points_tp);
                 continue;
             }
             int didx = _differentials->ShortKeyIndex(name);
-            const int dv_start = std::max(0, (int)ip.size()-num_tp_points),
-                    dv_end = dv_start + num_tp_points;
             if (didx != -1)
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(ct, diff_pts.at(didx).at(k));
+                    points_tp[ct] = QPointF(k, diff_pts.at(didx).at(k));
                 curv->setSamples(points_tp);
                 continue;
             }
@@ -581,7 +581,7 @@ void MainWindow::Draw()
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(ct, var_pts.at(vidx).at(k));
+                    points_tp[ct] = QPointF(k, var_pts.at(vidx).at(k));
                 curv->setSamples(points_tp);
             }
         }
@@ -598,6 +598,7 @@ void MainWindow::Draw()
                 if (curv->maxYValue() > y_tp_max) y_tp_max = curv->maxYValue();
                 if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
             }
+        ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, dv_start, dv_end );
         ui->qwtInnerProduct->setAxisScale( QwtPlot::yLeft, y_tp_min, y_tp_max );
 
             //Get axis limits
@@ -724,8 +725,13 @@ void MainWindow::UpdateTimePlotTable()
             num_colors = _tpColors.size();
     for (size_t i=0; i<num_tp_rows; ++i)
     {
+//        QStandardItem* item = new QStandardItem(true);
+//        item->setCheckable(true);
+//        item->setCheckState(Qt::Checked);
+//        model->setItem(x,y, item);
+
         CheckBoxDelegate* cbd = new CheckBoxDelegate(
                     _tpColors.at(i%num_colors), this);
-        ui->tblTimePlot->setItemDelegateForRow(i, cbd);
+        ui->tblTimePlot->setItemDelegateForRow((int)i, cbd);
     }
 }
