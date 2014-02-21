@@ -1,6 +1,6 @@
 #include "parsermgr.h"
 
-ParserMgr::ParserMgr()
+ParserMgr::ParserMgr() : _areModelsInitialized(false)
 {
 }
 ParserMgr::~ParserMgr()
@@ -76,6 +76,7 @@ void ParserMgr::ClearModels()
     for (auto it : _models)
         delete it.second;
     _models.clear();
+    _areModelsInitialized = false;
 }
 
 const double* ParserMgr::ConstData(const ParamModelBase* model) const
@@ -143,11 +144,12 @@ void ParserMgr::InitModels()
                 AssignInput(model, i, value);
 
                 //Initialize
-                qDebug() << value.c_str() << ", " << atof(value.c_str());
+                qDebug() << model->Key(i).c_str() << value.c_str() << ", " << atof(value.c_str());
                 if (model->Name()=="Parameters")
                     data[i] = atof(value.c_str()); // ###
             }
         }
+        _areModelsInitialized = true;
     }
     catch (mu::ParserError& e)
     {

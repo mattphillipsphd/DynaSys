@@ -20,6 +20,7 @@ class ParserMgr
         void AddCondModel(ConditionModel* model);
         void AddExpression(const std::string& exprn);
         void AddModel(ParamModelBase* model);
+        bool AreModelsInitialized() const { return _areModelsInitialized; }
         void AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str);
 //        void AssignInputs();
             //Assign the source of the data for the variables
@@ -42,6 +43,7 @@ class ParserMgr
         void AssociateVars(mu::Parser& parser);
         double* Data(const ParamModelBase* model);
 
+        bool _areModelsInitialized;
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
         std::vector< std::pair<ParamModelBase*, double*> > _models;

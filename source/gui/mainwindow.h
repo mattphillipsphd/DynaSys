@@ -65,6 +65,7 @@ class MainWindow : public QMainWindow
 
     private slots:
         void on_actionAbout_triggered();
+        void on_actionClear_triggered();
         void on_actionLoad_triggered();
         void on_actionSave_Data_triggered();
         void on_actionSave_Model_triggered();
@@ -98,6 +99,11 @@ class MainWindow : public QMainWindow
         void AddVarDelegate(int row, const std::string& type);
         void ConnectModels();
         void Draw();
+        void DrawPhasePortrait();
+        void DrawVectorField();
+        void InitDefaultModel();
+        void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
+                        ConditionModel* conditions = nullptr);
         const std::vector<QColor> InitTPColors() const;
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
