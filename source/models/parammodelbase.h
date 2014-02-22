@@ -39,8 +39,9 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Value(size_t i) const;
 
         void AddParameter(const std::string& key, const std::string& value = "");
-        virtual void SetPar(const std::string& key, const std::string& value);
-        virtual void SetPar(int i, const std::string& value);
+        void SetPar(const std::string& key, const std::string& value);
+        void SetPar(int i, const std::string& value);
+        void SetPar(int i, double value);
 
         int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override;
@@ -59,6 +60,15 @@ class ParamModelBase : public QAbstractTableModel
 //    protected:
 
     private:
+        struct Param
+        {
+            Param(const std::string& k)
+                : key(k), min(-100), max(100), value(0)
+            {}
+            const std::string key;
+            std::string max, min, value;
+        };
+
         std::mutex _mutex;
         const std::string _name;
         std::vector<StrPair> _parameters;

@@ -1,7 +1,7 @@
 #include "globals.h"
 
 const std::string ds::TEMP_FILE = ".temp.txt";
-const std::string ds::VERSION_STR = "0.0.3";
+const std::string ds::VERSION_STR = "0.0.4";
 
 template <typename T>
 QList<T> ds::VecToQList(const std::vector<T>& vec)

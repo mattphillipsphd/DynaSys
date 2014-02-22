@@ -70,6 +70,10 @@ void ParamModelBase::SetPar(int i, const std::string& value)
 {
     setData( createIndex(i,0), value.c_str(), Qt::EditRole );
 }
+void ParamModelBase::SetPar(int i, double value)
+{
+    setData( createIndex(i,0), value, Qt::EditRole );
+}
 
 int ParamModelBase::columnCount() const
 {

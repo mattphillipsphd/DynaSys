@@ -35,6 +35,8 @@ class ParserMgr
         void QuickEval(const std::string& exprn);
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
+        void SetData(const ParamModelBase* model, size_t idx, double val);
+            //No range checking
         void SetExpression(const std::string& exprn);
         void SetExpression(const VecStr& exprns);
         void SetExpressions();

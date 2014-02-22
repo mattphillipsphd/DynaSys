@@ -13,10 +13,17 @@ MainWindow::MainWindow(QWidget *parent) :
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr),
     _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
-    _pulseResetValue("-666"), _pulseStepsRemaining(-1),
+    _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _thread(nullptr), _tpColors(InitTPColors())
 {
     ui->setupUi(this);
+
+    QStringList modes;
+    modes << "Single" << "Vector field";
+    ui->cmbPlotMode->setModel( new QStringListModel(modes) );
+
+    ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
+    ui->sldParameter->setRange(-1000, 1000); // ###
 
     setWindowTitle("DynaSys " + QString(ds::VERSION_STR.c_str()) + " - default model");
 
@@ -29,8 +36,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
-
-    ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -162,6 +167,7 @@ void MainWindow::on_btnAddDiff_clicked()
     {
         _differentials->AddParameter(diff + "'", "0");
         _initConds->AddParameter(diff + "(0)", "0");
+        UpdateTimePlotTable();
     }
 }
 void MainWindow::on_btnAddExpression_clicked()
@@ -191,6 +197,7 @@ void MainWindow::on_btnAddParameter_clicked()
         _parserMgr.InitModels();
     }
     UpdatePulseVList();
+    UpdateSliderPList();
 }
 void MainWindow::on_btnAddVariable_clicked()
 {
@@ -202,6 +209,7 @@ void MainWindow::on_btnAddVariable_clicked()
     {
         _variables->AddParameter(var, "0");
         AddVarDelegate((int)_variables->NumPars()-1);
+        UpdateTimePlotTable();
     }
 }
 void MainWindow::on_btnRemoveCondition_clicked()
@@ -219,6 +227,7 @@ void MainWindow::on_btnRemoveDiff_clicked()
     if (rows.isEmpty()) return;
     ui->tblDifferentials->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     ui->tblInitConds->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    UpdateTimePlotTable();
 }
 void MainWindow::on_btnRemoveExpression_clicked()
 {
@@ -238,6 +247,7 @@ void MainWindow::on_btnRemoveParameter_clicked()
     if (rows.isEmpty()) return;
     ui->tblParameters->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdatePulseVList();
+    UpdateSliderPList();
 }
 void MainWindow::on_btnRemoveVariable_clicked()
 {
@@ -251,6 +261,7 @@ void MainWindow::on_btnRemoveVariable_clicked()
     }
     std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    UpdateTimePlotTable();
 }
 void MainWindow::on_btnStart_clicked()
 {
@@ -275,10 +286,41 @@ void MainWindow::on_btnStart_clicked()
         ui->btnStart->setText("Start");
     }
 }
+void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
+{
+    if (text=="Single")
+        _plotMode = SINGLE;
+    else if (text=="Vector field")
+    {
+        _plotMode = VECTOR_FIELD;
+        Draw();
+    }
+}
+void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
+{
+    if (index==-1) return;
+    double val = atof( _parameters->Value(index).c_str() );
+    if (val <= ui->sldParameter->maximum() || val >= ui->sldParameter->minimum())
+        ui->sldParameter->setValue(val*100);
+        // ###
+}
+
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
     const int row = index.row();
     ResetResultsList(row);
+}
+
+void MainWindow::on_sldParameter_valueChanged(int value)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    int idx = ui->cmbSlidePars->currentIndex();
+//    double val = (double)(value - ui->sldParameter->minimum())
+//            / (double)(ui->sldParameter->maximum() - ui->sldParameter->minimum());
+    double val = (double)value / 100.0; // ###
+    _parameters->SetPar(idx, std::to_string(val));
+    ui->tblParameters->update();
+    if (_plotMode==VECTOR_FIELD) Draw();
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -315,13 +357,19 @@ void MainWindow::ConnectModels()
 }
 void MainWindow::Draw()
 {
-    if (true)
-        DrawPhasePortrait();
-    else
-        DrawVectorField();
+    switch (_plotMode)
+    {
+        case SINGLE:
+            DrawPhasePortrait();
+            break;
+        case VECTOR_FIELD:
+            DrawVectorField();
+            break;
+    }
 }
 void MainWindow::DrawPhasePortrait()
 {
+    qDebug() << "MainWindow::DrawPhasePortrait";
     ui->qwtPlot->detachItems();
     ui->qwtInnerProduct->detachItems();
 
@@ -410,14 +458,7 @@ void MainWindow::DrawPhasePortrait()
             //Go through each expression and evaluate them
         try
         {
-            if (_needInitialize)
-            {
-                _parserMgr.InitModels();
-                _parserMgr.InitParsers();
-                _parserMgr.SetExpressions();
-                _parserMgr.SetConditions();
-                _needInitialize = false;
-            }
+            if (_needInitialize) InitParserMgr();
             if (_needUpdateExprns)
             {
                 _parserMgr.SetExpressions();
@@ -432,12 +473,12 @@ void MainWindow::DrawPhasePortrait()
                 std::string sd;
                 for (int i=0; i<num_diffs; ++i)
                     sd += std::to_string(diffs[i]) + ", ";
-                qDebug() << "Diffs: " << sd.c_str();
+//                qDebug() << "Diffs: " << sd.c_str();
 
                 std::string sv;
                 for (int i=0; i<num_vars; ++i)
                     sv += std::to_string(vars[i]) + ", ";
-                qDebug() << "Vars: " << sv.c_str();
+//                qDebug() << "Vars: " << sv.c_str();
 #endif
                 _parserMgr.ParserCondEval();
 
@@ -490,13 +531,6 @@ void MainWindow::DrawPhasePortrait()
                 return;
             }
 
-#ifdef QT_DEBUG
-        if (num_steps<100)
-        {
-//            std::cout << diffs[0] << ", " << diffs[1] << ", " << ip.back() << std::endl;
-//            qDebug() << diffs[0] << ", " << diffs[1] << ", " << ip.back();
-        }
-#endif
         //Plot the current state vector
         const int xidx = ui->cmbDiffX->currentIndex(),
                 yidx = ui->cmbDiffY->currentIndex();
@@ -589,44 +623,50 @@ void MainWindow::DrawPhasePortrait()
 }
 void MainWindow::DrawVectorField()
 {
-/*    ui->qwtPlot->detachItems();
-    ui->qwtInnerProduct->detachItems();
+    ui->qwtPlot->detachItems();
 
-    //The point indicating current value
-    QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-        QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
-    QwtPlotMarker* marker = new QwtPlotMarker();
-    marker->setSymbol(symbol);
-    marker->attach(ui->qwtPlot);
+    ui->qwtPlot->setAxisScale( QwtPlot::xBottom, -20, 20 );
+    ui->qwtPlot->setAxisScale( QwtPlot::yLeft, -20, 20 );
 
-    //The 'tail' of the plot
-    QwtPlotCurve* curve = new QwtPlotCurve();
-    curve->setPen( Qt::black, 1 );
-    curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-    curve->attach(ui->qwtPlot);
+    const double* diffs = _parserMgr.ConstData(_differentials);
+    const int xidx = ui->cmbDiffX->currentIndex(),
+            yidx = ui->cmbDiffY->currentIndex();
 
-    //The time plot
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
-    const int num_all_tplots = 1 + num_diffs + num_vars,
-            num_colors = _tpColors.size();
-        // +1 for inner product.  The strategy is to attach all possible curves
-        //but only the enabled ones have non-empty samples.
-    std::vector<QwtPlotCurve*> curve_tp(num_all_tplots);
-    for (int i=0; i<num_all_tplots; ++i)
-    {
-        QwtPlotCurve* curv = new QwtPlotCurve();
-        curv->setPen( _tpColors.at(i%num_colors), 1 );
-        curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-        curv->attach(ui->qwtInnerProduct);
-        curve_tp[i] = curv;
-    }
+    std::vector<QwtPlotCurve*> vec_field(20*20);
+    if (_needInitialize) InitParserMgr();
+    for (int i=0; i<20; ++i)
+        for (int j=0; j<20; ++j)
+        {
+            QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+                QBrush( Qt::red ), QPen( Qt::red, 2 ), QSize( 2, 2 ) );
+            QwtPlotMarker* marker = new QwtPlotMarker();
+            marker->setSymbol(symbol);
+            marker->attach(ui->qwtPlot);
 
-    ui->qwtPlot->setAxisScale( QwtPlot::xBottom, *xlims.first, *xlims.second );
-    ui->qwtPlot->setAxisScale( QwtPlot::yLeft, *ylims.first, *ylims.second );
+            QwtPlotCurve* curv = new QwtPlotCurve();
+            curv->setPen(Qt::blue, 1);
+            curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+            curv->attach(ui->qwtPlot);
+            vec_field[i*20 + j] = curv;
+
+            QPolygonF pts(2);
+            double x = i*2 - 20,
+                    y = j*2 - 20;
+            pts[0] = QPointF(x, y);
+            marker->setXValue(x);
+            marker->setYValue(y);
+            marker->setZ(-1);
+
+            _parserMgr.SetData(_differentials, xidx, x);
+            _parserMgr.SetData(_differentials, yidx, y);
+            _parserMgr.ParserEval();
+            pts[1] = QPointF(diffs[xidx], diffs[yidx]);
+
+            curv->setSamples(pts);
+            curv->setZ(1);
+        }
 
     emit DoReplot();
-*/
 }
 
 void MainWindow::InitDefaultModel()
@@ -643,6 +683,7 @@ void MainWindow::InitDefaultModel()
     AddVarDelegate(1);
     AddVarDelegate(2);
     UpdatePulseVList();
+    UpdateSliderPList();
 
     _differentials->AddParameter("v'", "tau*(u + a)/b");
     _differentials->AddParameter("u'", "tau*(b - v)");
@@ -694,7 +735,16 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
 
     // ### Put these in an 'update gui' function
     UpdatePulseVList();
+    UpdateSliderPList();
     UpdateTimePlotTable();
+}
+void MainWindow::InitParserMgr()
+{
+    _parserMgr.InitModels();
+    _parserMgr.InitParsers();
+    _parserMgr.SetExpressions();
+    _parserMgr.SetConditions();
+    _needInitialize = false;
 }
 
 const std::vector<QColor> MainWindow::InitTPColors() const
@@ -734,6 +784,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex)
     std::lock_guard<std::mutex> lock(_mutex);
     int idx = topLeft.row();
     std::string exprn = _parameters->Expression(idx);
+//    ui->sldParameter->setSliderPosition(100*atof(exprn.c_str()));
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
 }
@@ -783,6 +834,13 @@ void MainWindow::UpdatePulseVList()
     VecStr keys = _parameters->Keys(); // ### rename cmbVariables
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbVariables->insertItem((int)i, keys.at(i).c_str());
+}
+void MainWindow::UpdateSliderPList()
+{
+    ui->cmbSlidePars->clear();
+    VecStr keys = _parameters->Keys();
+    for (size_t i=0; i<keys.size(); ++i)
+        ui->cmbSlidePars->insertItem((int)i, keys.at(i).c_str());
 }
 void MainWindow::UpdateResultsModel(int cond_row)
 {

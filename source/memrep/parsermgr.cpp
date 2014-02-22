@@ -54,19 +54,6 @@ void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::st
             throw("Error, ParserMgr::SetInput");
     }
 }
-/*void ParserMgr::AssignInputs()
-{
-    for (auto& it : _models)
-    {
-        ParamModelBase* model = it.first;
-        const size_t num_pars = model->NumPars();
-        for (size_t i=0; i<num_pars; ++i)
-        {
-            const std::string& value = model->Value(i);
-            AssignInput(model, i, value);
-        }
-    }
-}*/
 void ParserMgr::ClearExpressions()
 {
     _parser.SetExpr("");
@@ -194,8 +181,8 @@ void ParserMgr::ParserEval()
     }
     catch (mu::ParserError& e)
     {
-        std::cerr << e.GetMsg() << std::endl;
-        qDebug() << e.GetMsg().c_str();
+        std::cerr << e.GetMsg() << "," << _parser.GetExpr() << std::endl;
+        qDebug() << e.GetMsg().c_str() << "," << _parser.GetExpr().c_str();
     }
 }
 void ParserMgr::QuickEval(const std::string& exprn)
@@ -223,6 +210,15 @@ void ParserMgr::SetCondModel(ConditionModel* conditions)
 {
     _conditions = conditions;
     SetConditions();
+}
+void ParserMgr::SetData(const ParamModelBase* model, size_t idx, double val)
+{
+    auto it = std::find_if(_models.begin(), _models.end(),
+                        [&](std::pair<ParamModelBase*,double*> p)
+    {
+            return p.first == model;
+    });
+    *(it->second + idx) = val;
 }
 void ParserMgr::SetExpression(const std::string& exprn)
 {

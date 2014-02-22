@@ -47,6 +47,12 @@ class MainWindow : public QMainWindow
     Q_OBJECT
     
     public:
+        enum PLOT_MODE
+        {
+            SINGLE,
+            VECTOR_FIELD
+        };
+
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
                         IP_SAMPLES_SHOWN,
@@ -83,7 +89,12 @@ class MainWindow : public QMainWindow
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
+        void on_cmbPlotMode_currentIndexChanged(const QString& text);
+        void on_cmbSlidePars_currentIndexChanged(int index);
+
         void on_lsConditions_clicked(const QModelIndex& index);
+
+        void on_sldParameter_valueChanged(int value);
 
         void ComboBoxChanged(const QString& text);
         void ExprnChanged(QModelIndex, QModelIndex);
@@ -104,10 +115,12 @@ class MainWindow : public QMainWindow
         void InitDefaultModel();
         void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
                         ConditionModel* conditions = nullptr);
+        void InitParserMgr();
         const std::vector<QColor> InitTPColors() const;
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
+        void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
         void UpdateTimePlotTable();
 
@@ -124,6 +137,7 @@ class MainWindow : public QMainWindow
         std::mutex _mutex;
         volatile bool _needInitialize, _needUpdateExprns;
         ParserMgr _parserMgr;
+        PLOT_MODE _plotMode;
         std::string _pulseResetValue;
         size_t _pulseParIdx;
         int _pulseStepsRemaining;
