@@ -155,6 +155,14 @@ void ParserMgr::InputEval(int idx)
     else
         _inputs[idx].NextInput();
 }
+double ParserMgr::Maximum(const ParamModelBase* model, size_t idx) const
+{
+    return model->Maximum(idx);
+}
+double ParserMgr::Minimum(const ParamModelBase* model, size_t idx) const
+{
+    return model->Minimum(idx);
+}
 void ParserMgr::ParserCondEval()
 {
     const int num_conds = (int)_conditions->NumPars();
@@ -191,6 +199,10 @@ void ParserMgr::QuickEval(const std::string& exprn)
     _parser.SetExpr(exprn);
     _parser.Eval();
     _parser.SetExpr(temp);
+}
+double ParserMgr::Range(const ParamModelBase* model, size_t idx) const
+{
+    return Maximum(model, idx) - Minimum(model, idx);
 }
 
 void ParserMgr::SetConditions()

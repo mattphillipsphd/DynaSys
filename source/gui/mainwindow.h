@@ -55,8 +55,11 @@ class MainWindow : public QMainWindow
 
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
+                        SLIDER_INT_LIM, //Because QSliders have integer increments
                         IP_SAMPLES_SHOWN,
-                        XY_SAMPLES_SHOWN;
+                        XY_SAMPLES_SHOWN,
+                        VF_HRES,
+                        VF_VRES;
             //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
             //error
 
@@ -126,6 +129,7 @@ class MainWindow : public QMainWindow
 
         AboutGui* _aboutGui;
 
+        // ### Get rid of all of these, store in ParserMgr, just refer to them by name
         ConditionModel* _conditions;
         ParamModelBase* _differentials,
                 * _initConds,

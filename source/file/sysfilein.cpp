@@ -12,16 +12,19 @@ void SysFileIn::Load()
     std::string line;
 
     std::getline(_in, line);
+    int version = ds::VersionNum(line);
+    bool has_minmax = (version>=4); //I.e. >= 0.0.4
+
     std::getline(_in, line);
 
-    const int num_models = std::stoi(line.c_str());
+    const int num_models = std::stoi(line);
     for (int i=0; i<num_models; ++i)
     {
         std::getline(_in, line);
-        int tab = line.find_first_of('\t');
+        size_t tab = line.find_first_of('\t');
         std::string name = line.substr(0,tab),
                 num = line.substr(tab+1);
-        const int num_pars = std::stoi(num.c_str());
+        const int num_pars = std::stoi(num);
         ParamModelBase* model;
         if (name=="Parameters")
             model = new ParamModel(nullptr, name);
@@ -36,10 +39,25 @@ void SysFileIn::Load()
         for (int j=0; j<num_pars; ++j)
         {
             std::getline(_in, line);
-            int tab = line.find_first_of('\t');
+            size_t tab = line.find_first_of('\t');
             std::string key = line.substr(0,tab),
                     value = line.substr(tab+1);
+            std::string pmin, pmax;
+            if (has_minmax)
+            {
+                size_t tab = value.find_first_of('\t');
+                std::string rest = value.substr(tab+1);
+                value = value.substr(0,tab);
+                tab = rest.find_first_of('\t');
+                pmin = rest.substr(0,tab);
+                pmax = rest.substr(tab+1);
+            }
             model->AddParameter(key, value);
+            if (has_minmax)
+            {
+                model->SetMinimum(j, std::stoi(pmin));
+                model->SetMaximum(j, std::stoi(pmax));
+            }
         }
 
         std::getline(_in, line);

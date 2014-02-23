@@ -3,8 +3,11 @@
 
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
+const int MainWindow::SLIDER_INT_LIM = 1000;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
+const int MainWindow::VF_HRES = 20;
+const int MainWindow::VF_VRES = 20;
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -23,7 +26,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
 
     ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
-    ui->sldParameter->setRange(-1000, 1000); // ###
+    ui->sldParameter->setRange(0, SLIDER_INT_LIM);
 
     setWindowTitle("DynaSys " + QString(ds::VERSION_STR.c_str()) + " - default model");
 
@@ -299,10 +302,12 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
     if (index==-1) return;
-    double val = atof( _parameters->Value(index).c_str() );
-    if (val <= ui->sldParameter->maximum() || val >= ui->sldParameter->minimum())
-        ui->sldParameter->setValue(val*100);
-        // ###
+    const double val = atof( _parameters->Value(index).c_str() ),
+            min = _parserMgr.Minimum(_parameters, index),
+            range = _parserMgr.Range(_parameters, index);
+    const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
+    qDebug() << "cmbSlidePars" << index << val << scaled_val;
+    ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
@@ -313,12 +318,13 @@ void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 
 void MainWindow::on_sldParameter_valueChanged(int value)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
-    int idx = ui->cmbSlidePars->currentIndex();
-//    double val = (double)(value - ui->sldParameter->minimum())
-//            / (double)(ui->sldParameter->maximum() - ui->sldParameter->minimum());
-    double val = (double)value / 100.0; // ###
-    _parameters->SetPar(idx, std::to_string(val));
+//    std::lock_guard<std::mutex> lock(_mutex);
+    const int index = ui->cmbSlidePars->currentIndex();
+    const double range = _parserMgr.Range(_parameters, index);
+    const double pct = (double)value / (double)SLIDER_INT_LIM,
+            dval = pct*range + _parserMgr.Minimum(_parameters, index);
+    _parameters->SetPar(index, std::to_string(dval));
+    qDebug() << "sldParameter" << index << value << dval;
     ui->tblParameters->update();
     if (_plotMode==VECTOR_FIELD) Draw();
 }
@@ -357,6 +363,7 @@ void MainWindow::ConnectModels()
 }
 void MainWindow::Draw()
 {
+    ui->qwtPlot->detachItems();
     switch (_plotMode)
     {
         case SINGLE:
@@ -370,7 +377,6 @@ void MainWindow::Draw()
 void MainWindow::DrawPhasePortrait()
 {
     qDebug() << "MainWindow::DrawPhasePortrait";
-    ui->qwtPlot->detachItems();
     ui->qwtInnerProduct->detachItems();
 
     //The point indicating current value
@@ -623,19 +629,24 @@ void MainWindow::DrawPhasePortrait()
 }
 void MainWindow::DrawVectorField()
 {
-    ui->qwtPlot->detachItems();
-
-    ui->qwtPlot->setAxisScale( QwtPlot::xBottom, -20, 20 );
-    ui->qwtPlot->setAxisScale( QwtPlot::yLeft, -20, 20 );
-
     const double* diffs = _parserMgr.ConstData(_differentials);
     const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
 
-    std::vector<QwtPlotCurve*> vec_field(20*20);
+    const double xmin = _parserMgr.Minimum(_initConds, xidx),
+            xmax = _parserMgr.Maximum(_initConds, xidx),
+            ymin = _parserMgr.Minimum(_initConds, yidx),
+            ymax = _parserMgr.Maximum(_initConds, yidx);
+    const double xinc = (xmax - xmin) / (double)VF_HRES,
+            yinc = (ymax - ymin) / (double)VF_VRES;
+
+    ui->qwtPlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
+    ui->qwtPlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
+
+//    std::vector<QwtPlotCurve*> vec_field(20*20);
     if (_needInitialize) InitParserMgr();
-    for (int i=0; i<20; ++i)
-        for (int j=0; j<20; ++j)
+    for (int i=0; i<VF_HRES; ++i)
+        for (int j=0; j<VF_VRES; ++j)
         {
             QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
                 QBrush( Qt::red ), QPen( Qt::red, 2 ), QSize( 2, 2 ) );
@@ -647,11 +658,11 @@ void MainWindow::DrawVectorField()
             curv->setPen(Qt::blue, 1);
             curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
             curv->attach(ui->qwtPlot);
-            vec_field[i*20 + j] = curv;
+//            vec_field[i*20 + j] = curv;
 
             QPolygonF pts(2);
-            double x = i*2 - 20,
-                    y = j*2 - 20;
+            double x = i*xinc + xmin,
+                    y = j*yinc + ymin;
             pts[0] = QPointF(x, y);
             marker->setXValue(x);
             marker->setYValue(y);
@@ -711,6 +722,8 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     if (_variables) delete _variables;
     _variables = (models) ? (*models)[1] : new VariableModel(this, "Variables");
     ui->tblVariables->setModel(_variables);
+    ui->tblVariables->setColumnHidden(1,true);
+    ui->tblVariables->setColumnHidden(2,true);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_variables);
 
@@ -718,6 +731,8 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     _differentials =(models) ? (*models)[2] :  new DifferentialModel(this, "Differentials");
     ui->tblDifferentials->setModel(_differentials);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
+    ui->tblDifferentials->setColumnHidden(1,true);
+    ui->tblDifferentials->setColumnHidden(2,true);
     _parserMgr.AddModel(_differentials);
 
     if (_initConds) delete _initConds;
@@ -778,6 +793,16 @@ void MainWindow::ComboBoxChanged(const QString& text)
 void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
     _needUpdateExprns = true;
+    if (_plotMode==VECTOR_FIELD) Draw();
+/*    const int xidx = ui->cmbDiffX->currentIndex(),
+            yidx = ui->cmbDiffY->currentIndex();
+    const double xmin = _parserMgr.Minimum(_initConds,xidx),
+            xmax = _parserMgr.Maximum(_initConds,xidx),
+            ymin = _parserMgr.Minimum(_initConds,yidx),
+            ymax = _parserMgr.Maximum(_initConds,yidx);
+    ui->qwtPlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
+    ui->qwtPlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
+    ui->qwtPlot->replot();*/
 }
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex)
 {

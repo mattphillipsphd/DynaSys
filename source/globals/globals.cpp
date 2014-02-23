@@ -19,3 +19,16 @@ QStringList ds::VecStrToQSList(const VecStr& vec)
         ql.push_back(it.c_str());
     return ql;
 }
+
+int ds::VersionNum(const std::string& ver_str)
+{
+    int major, minor, build;
+    size_t dot = ver_str.find_last_of('.');
+    build = std::stoi(ver_str.substr(dot+1));
+    std::string rest = ver_str.substr(0,dot);
+    dot = rest.find_last_of('.');
+    minor = std::stoi(rest.substr(dot+1));
+    size_t spc = rest.find_last_of(" \t");
+    major = std::stoi(rest.substr(spc+1, dot));
+    return 10000*major + 100*minor + build;
+}

@@ -30,6 +30,8 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
+        double Maximum(size_t idx) const;
+        double Minimum(size_t idx) const;
         const std::string& Name() const { return _name; }
         size_t NumPars() const { return _parameters.size(); }
         virtual std::string ShortKey(size_t i) const;
@@ -39,6 +41,8 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Value(size_t i) const;
 
         void AddParameter(const std::string& key, const std::string& value = "");
+        void SetMaximum(size_t idx, double val);
+        void SetMinimum(size_t idx, double val);
         void SetPar(const std::string& key, const std::string& value);
         void SetPar(int i, const std::string& value);
         void SetPar(int i, double value);
@@ -62,16 +66,21 @@ class ParamModelBase : public QAbstractTableModel
     private:
         struct Param
         {
-            Param(const std::string& k)
-                : key(k), min(-100), max(100), value(0)
+            Param()
+                : key(""), min("-100"), max("100"), value("0")
             {}
-            const std::string key;
-            std::string max, min, value;
+            Param(const std::string& k)
+                : key(k), min("-100"), max("100"), value("0")
+            {}
+            Param(const std::string& k, const std::string& v)
+                : key(k), min("-100"), max("100"), value(v)
+            {}
+            std::string key, max, min, value;
         };
 
         std::mutex _mutex;
         const std::string _name;
-        std::vector<StrPair> _parameters;
+        std::vector<Param> _parameters;
 };
 
 #endif // PARAMMODELBASE_H

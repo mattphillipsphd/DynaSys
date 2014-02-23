@@ -17,7 +17,8 @@ void SysFileOut::Save()
         const int num_pars = it->NumPars();
         _out << it->Name() << "\t" << num_pars << std::endl;
         for (int i=0; i<num_pars; ++i)
-            _out << it->Key(i) << "\t" << it->Value(i) << std::endl;
+            _out << it->Key(i) << "\t" << it->Value(i) << "\t"
+                 << it->Minimum(i) << "\t" << it->Maximum(i) << std::endl;
         _out << std::endl;
     }
 

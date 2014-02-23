@@ -30,9 +30,12 @@ class ParserMgr
         void InitParsers();
         void InitModels();
         void InputEval(int idx = -1);
+        double Maximum(const ParamModelBase* model, size_t idx) const;
+        double Minimum(const ParamModelBase* model, size_t idx) const;
         void ParserCondEval();
         void ParserEval();
         void QuickEval(const std::string& exprn);
+        double Range(const ParamModelBase* model, size_t idx) const;
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
         void SetData(const ParamModelBase* model, size_t idx, double val);
