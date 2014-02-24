@@ -2,6 +2,7 @@
 #define PARAMMODELBASE_H
 
 #include <QAbstractTableModel>
+#include <QDebug>
 
 #include <vector>
 #include <string>
@@ -27,7 +28,7 @@ class ParamModelBase : public QAbstractTableModel
         virtual std::string Expression(size_t i) const;
         virtual VecStr Expressions() const;
         virtual VecStr Initializations() const { return VecStr(); }
-        const std::string& Key(size_t i) const;
+        std::string Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
         double Maximum(size_t idx) const;
@@ -78,7 +79,7 @@ class ParamModelBase : public QAbstractTableModel
             std::string key, max, min, value;
         };
 
-        std::mutex _mutex;
+        mutable std::mutex _mutex;
         const std::string _name;
         std::vector<Param> _parameters;
 };

@@ -58,8 +58,7 @@ class MainWindow : public QMainWindow
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         IP_SAMPLES_SHOWN,
                         XY_SAMPLES_SHOWN,
-                        VF_HRES,
-                        VF_VRES;
+                        VF_RESOLUTION;
             //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
             //error
 
@@ -71,11 +70,13 @@ class MainWindow : public QMainWindow
     signals:
         void DoReplot();
         void DoUpdateParams();
+        void VFThreadComplete();
 
     private slots:
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionLoad_triggered();
+        void on_actionReload_Current_triggered();
         void on_actionSave_Data_triggered();
         void on_actionSave_Model_triggered();
 
@@ -99,7 +100,10 @@ class MainWindow : public QMainWindow
 
         void on_sldParameter_valueChanged(int value);
 
+        void on_spnTailLength_valueChanged(int);
+
         void ComboBoxChanged(const QString& text);
+        void EndVFThread();
         void ExprnChanged(QModelIndex, QModelIndex);
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
@@ -120,6 +124,7 @@ class MainWindow : public QMainWindow
                         ConditionModel* conditions = nullptr);
         void InitParserMgr();
         const std::vector<QColor> InitTPColors() const;
+        void LoadModel();
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
@@ -137,16 +142,18 @@ class MainWindow : public QMainWindow
                 * _variables;   //Can invoke other expressions
 
         std::vector<ComboBoxDelegate*> _cmbDelegates;
+        std::string _fileName;
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needInitialize, _needUpdateExprns;
         ParserMgr _parserMgr;
+        volatile bool _plottingNow;
         PLOT_MODE _plotMode;
         std::string _pulseResetValue;
         size_t _pulseParIdx;
         int _pulseStepsRemaining;
             //Consider making a little pulse struct/class
-        std::thread* _thread;
+        std::thread* _ppThread, * _vfThread;
         const std::vector<QColor> _tpColors;
 };
 

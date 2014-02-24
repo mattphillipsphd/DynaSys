@@ -55,8 +55,8 @@ void SysFileIn::Load()
             model->AddParameter(key, value);
             if (has_minmax)
             {
-                model->SetMinimum(j, std::stoi(pmin));
-                model->SetMaximum(j, std::stoi(pmax));
+                model->SetMinimum(j, std::stod(pmin));
+                model->SetMaximum(j, std::stod(pmax));
             }
         }
 

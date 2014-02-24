@@ -8,13 +8,17 @@ ParserMgr::~ParserMgr()
     ClearModels();
 }
 
-void ParserMgr::AddExpression(const std::string& exprn)
+void ParserMgr::AddExpression(const std::string& exprn, bool use_mutex)
 {
-    if (exprn.empty()) return;
-    std::string old_exprn = _parser.GetExpr();
-    old_exprn.erase( old_exprn.find_last_not_of(" ")+1 );
-    _parser.SetExpr(old_exprn.empty() ? exprn : old_exprn + ", "
-                     + exprn );
+    if (use_mutex) _mutex.lock();
+    if (!exprn.empty())
+    {
+        std::string old_exprn = _parser.GetExpr();
+        old_exprn.erase( old_exprn.find_last_not_of(" ")+1 );
+        _parser.SetExpr(old_exprn.empty() ? exprn : old_exprn + ", "
+                         + exprn );
+    }
+    if (use_mutex) _mutex.unlock();
 }
 void ParserMgr::AddModel(ParamModelBase* model)
 {
@@ -56,6 +60,7 @@ void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::st
 }
 void ParserMgr::ClearExpressions()
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     _parser.SetExpr("");
 }
 void ParserMgr::ClearModels()
@@ -108,6 +113,7 @@ void ParserMgr::InitParsers()
 }
 void ParserMgr::InitModels()
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     try
     {
         AssociateVars(_parser);
@@ -165,6 +171,7 @@ double ParserMgr::Minimum(const ParamModelBase* model, size_t idx) const
 }
 void ParserMgr::ParserCondEval()
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     const int num_conds = (int)_conditions->NumPars();
     for (int k=0; k<num_conds; ++k)
     {
@@ -179,13 +186,14 @@ void ParserMgr::ParserCondEval()
         }
     }
 }
-void ParserMgr::ParserEval()
+void ParserMgr::ParserEval(bool eval_input)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     try
     {
 //        qDebug() << _parser.GetExpr().c_str();
         _parser.Eval();
-        InputEval();
+        if (eval_input) InputEval();
     }
     catch (mu::ParserError& e)
     {
@@ -195,6 +203,7 @@ void ParserMgr::ParserEval()
 }
 void ParserMgr::QuickEval(const std::string& exprn)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     std::string temp = _parser.GetExpr();
     _parser.SetExpr(exprn);
     _parser.Eval();
@@ -204,9 +213,24 @@ double ParserMgr::Range(const ParamModelBase* model, size_t idx) const
 {
     return Maximum(model, idx) - Minimum(model, idx);
 }
+void ParserMgr::ResetDifferentials()
+{
+    ParamModelBase* init_conds = Model("InitialConds");
+    const size_t num_diffs = init_conds->NumPars();
+    std::string init_expr;
+    for (size_t i=0; i<num_diffs; ++i)
+    {
+        const std::string d = init_conds->ShortKey(i),
+                    expr = init_conds->Value(i);
+        if (i>0) init_expr += ", ";
+        init_expr += d + " = " + expr;
+    }
+    QuickEval(init_expr);
+}
 
 void ParserMgr::SetConditions()
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     int num_conds = (int)_conditions->NumPars();
     _parserConds = std::vector<mu::Parser>(num_conds);
     for (auto& itp : _parserConds)
@@ -225,6 +249,7 @@ void ParserMgr::SetCondModel(ConditionModel* conditions)
 }
 void ParserMgr::SetData(const ParamModelBase* model, size_t idx, double val)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     auto it = std::find_if(_models.begin(), _models.end(),
                         [&](std::pair<ParamModelBase*,double*> p)
     {
@@ -234,13 +259,15 @@ void ParserMgr::SetData(const ParamModelBase* model, size_t idx, double val)
 }
 void ParserMgr::SetExpression(const std::string& exprn)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     _parser.SetExpr(exprn);
 }
 void ParserMgr::SetExpression(const VecStr& exprns)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     _parser.SetExpr("");
     for (const auto& it: exprns)
-        AddExpression(it);
+        AddExpression(it, false);
 }
 void ParserMgr::SetExpressions()
 {
@@ -294,5 +321,14 @@ double* ParserMgr::Data(const ParamModelBase* model)
             return p.first == model;
     });
     return it->second;
+}
+ParamModelBase* ParserMgr::Model(const std::string& model)
+{
+    auto it = std::find_if(_models.cbegin(), _models.cend(),
+                        [&](std::pair<ParamModelBase*,double*> p)
+    {
+            return p.first->Name() == model;
+    });
+    return it->first;
 }
 

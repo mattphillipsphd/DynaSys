@@ -13,6 +13,15 @@ namespace ds
     extern const std::string TEMP_FILE;
     extern const std::string VERSION_STR;
 
+    enum PMODEL
+    {
+        PARAMETERS = 0,
+        VARIABLES,
+        DIFFERENTIALS,
+        INIT_CONDS,
+        CONDITIONS
+    };
+
     template<typename T>
     QList<T> VecToQList(const std::vector<T>& vec);
 

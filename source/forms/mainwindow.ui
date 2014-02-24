@@ -425,6 +425,7 @@
      <string>File</string>
     </property>
     <addaction name="actionLoad"/>
+    <addaction name="actionReload_Current"/>
     <addaction name="actionClear"/>
     <addaction name="actionSave_Model"/>
     <addaction name="actionSave_Data"/>
@@ -470,6 +471,11 @@
   <action name="actionClear">
    <property name="text">
     <string>Clear</string>
+   </property>
+  </action>
+  <action name="actionReload_Current">
+   <property name="text">
+    <string>Reload Current</string>
    </property>
   </action>
  </widget>

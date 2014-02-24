@@ -3,21 +3,20 @@
 
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
-const int MainWindow::SLIDER_INT_LIM = 1000;
+const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
-const int MainWindow::VF_HRES = 20;
-const int MainWindow::VF_VRES = 20;
+const int MainWindow::VF_RESOLUTION = 20;
 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _variables(nullptr), _parameters(nullptr),
+    _variables(nullptr), _parameters(nullptr), _fileName(""),
     _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
-    _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
-    _thread(nullptr), _tpColors(InitTPColors())
+    _plottingNow(false), _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
+    _ppThread(nullptr), _vfThread(nullptr), _tpColors(InitTPColors())
 {
     ui->setupUi(this);
 
@@ -39,6 +38,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
+    connect(this, SIGNAL(VFThreadComplete()),
+            this, SLOT(EndVFThread()), Qt::QueuedConnection);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -47,7 +48,7 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
     delete ui;
-    if (_thread) _thread->detach();
+    if (_ppThread) _ppThread->detach();
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
@@ -60,55 +61,34 @@ void MainWindow::on_actionAbout_triggered()
 void MainWindow::on_actionClear_triggered()
 {
     _isDrawing = false;
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     InitModels();
 }
 
 void MainWindow::on_actionLoad_triggered()
 {
-    try
-    {
-        std::lock_guard<std::mutex> lock(_mutex);
+//        std::lock_guard<std::mutex> lock(_mutex);
 
-        std::string file_name = QFileDialog::getOpenFileName(nullptr,
+    std::string file_name = QFileDialog::getOpenFileName(nullptr,
                                                              "Load dynamical system",
 #ifdef QT_DEBUG
                                                              "../DynaSysFiles").toStdString();
 #else
                                                              "../../DynaSysFiles").toStdString();
 #endif
-        if (file_name.empty()) return;
-
-        std::vector<ParamModelBase*> models;
-        ConditionModel* conditions = new ConditionModel(this);
-        SysFileIn in(file_name, models, conditions);
-        in.Load();
-
-        //Have to do this before models are deleted!
-        InitModels(&models, conditions);
-        ConnectModels();
-
-        for (auto it : _cmbDelegates)
-            delete it;
-        _cmbDelegates.clear();
-        const size_t num_vars = _variables->NumPars();
-        for (size_t i=0; i<num_vars; ++i)
-            AddVarDelegate((int)i, _variables->Value(i));
-
-        ResetPhasePlotAxes();
-        UpdatePulseVList();
-        UpdateTimePlotTable();
-
-        setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
-    }
-    catch (std::exception& e)
-    {
-        std::cerr << e.what() << std::endl;
-    }
+    if (file_name.empty()) return;
+    _fileName = file_name;
+    LoadModel();
 }
+void MainWindow::on_actionReload_Current_triggered()
+{
+    if (_fileName.empty()) return;
+    LoadModel();
+}
+
 void MainWindow::on_actionSave_Data_triggered()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
 
     if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
@@ -121,12 +101,14 @@ void MainWindow::on_actionSave_Data_triggered()
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
 
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save dynamical system",
                                                          "").toStdString();
     if (file_name.empty()) return;
+
+    _fileName = file_name;
 
     std::vector<const ParamModelBase*> models;
     models.push_back(_parameters);
@@ -140,7 +122,7 @@ void MainWindow::on_actionSave_Model_triggered()
 
 void MainWindow::on_btnAddCondition_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     std::string cond = QInputDialog::getText(this, "New Condition",
                                                  "Condition (evaluates to true/false):",
                                                  QLineEdit::Normal).toStdString();
@@ -162,7 +144,7 @@ void MainWindow::on_btnPulse_clicked()
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     std::string diff = QInputDialog::getText(this, "New Differential",
                                                  "Differential Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -175,7 +157,7 @@ void MainWindow::on_btnAddDiff_clicked()
 }
 void MainWindow::on_btnAddExpression_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
 
     QModelIndex index = ui->lsConditions->currentIndex();
     if (index.parent().isValid() || index.row()==-1) return;
@@ -190,7 +172,7 @@ void MainWindow::on_btnAddExpression_clicked()
 }
 void MainWindow::on_btnAddParameter_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     std::string par = QInputDialog::getText(this, "New Parameter",
                                                  "Parameter Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -204,7 +186,7 @@ void MainWindow::on_btnAddParameter_clicked()
 }
 void MainWindow::on_btnAddVariable_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     std::string var = QInputDialog::getText(this, "New Variable",
                                                  "Variable Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -217,7 +199,7 @@ void MainWindow::on_btnAddVariable_clicked()
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     QModelIndexList rows = ui->lsConditions->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->lsConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -225,7 +207,7 @@ void MainWindow::on_btnRemoveCondition_clicked()
 }
 void MainWindow::on_btnRemoveDiff_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     QModelIndexList rows = ui->tblDifferentials->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblDifferentials->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -234,7 +216,7 @@ void MainWindow::on_btnRemoveDiff_clicked()
 }
 void MainWindow::on_btnRemoveExpression_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     QModelIndexList rows = ui->lsResults->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->lsResults->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -245,7 +227,7 @@ void MainWindow::on_btnRemoveExpression_clicked()
 }
 void MainWindow::on_btnRemoveParameter_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     QModelIndexList rows = ui->tblParameters->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblParameters->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -254,7 +236,7 @@ void MainWindow::on_btnRemoveParameter_clicked()
 }
 void MainWindow::on_btnRemoveVariable_clicked()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     for (auto it : rows)
@@ -273,16 +255,17 @@ void MainWindow::on_btnStart_clicked()
         _isDrawing = _needInitialize = true;
         ui->btnAddDiff->setEnabled(false);
         ui->btnRemoveDiff->setEnabled(false);
-        _thread = new std::thread( std::bind(&MainWindow::Draw, this) );
+        _ppThread = new std::thread( std::bind(&MainWindow::Draw, this) );
         ui->btnStart->setText("Stop");
     }
     else // "Stop"
     {
-        if (_thread)
+        if (_ppThread)
         {
             _isDrawing = false;
-            _thread->detach();
-            _thread = nullptr;
+            _ppThread->detach();
+            delete _ppThread;
+            _ppThread = nullptr;
             ui->btnAddDiff->setEnabled(true);
             ui->btnRemoveDiff->setEnabled(true);
         }
@@ -291,22 +274,28 @@ void MainWindow::on_btnStart_clicked()
 }
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
+    qDebug() << "MainWindow::on_cmbPlotMode_currentIndexChanged";
     if (text=="Single")
         _plotMode = SINGLE;
     else if (text=="Vector field")
     {
         _plotMode = VECTOR_FIELD;
-        Draw();
+        if (!_vfThread)
+        {
+            _vfThread = new std::thread( std::bind(&MainWindow::Draw, this) );
+            _vfThread->detach();
+        }
     }
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
     if (index==-1) return;
-    const double val = atof( _parameters->Value(index).c_str() ),
+    qDebug() << "MainWindow::on_cmbSlidePars_currentIndexChanged";
+    const double val = std::stod( _parameters->Value(index) ),
             min = _parserMgr.Minimum(_parameters, index),
             range = _parserMgr.Range(_parameters, index);
     const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
-    qDebug() << "cmbSlidePars" << index << val << scaled_val;
+    qDebug() << "MainWindow::on_cmbSlidePars_currentIndexChanged" << index << val << scaled_val;
     ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
 }
 
@@ -318,15 +307,29 @@ void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 
 void MainWindow::on_sldParameter_valueChanged(int value)
 {
+    qDebug() << "MainWindow::on_sldParameter_valueChanged";
 //    std::lock_guard<std::mutex> lock(_mutex);
     const int index = ui->cmbSlidePars->currentIndex();
     const double range = _parserMgr.Range(_parameters, index);
     const double pct = (double)value / (double)SLIDER_INT_LIM,
             dval = pct*range + _parserMgr.Minimum(_parameters, index);
     _parameters->SetPar(index, std::to_string(dval));
-    qDebug() << "sldParameter" << index << value << dval;
+    qDebug() << "MainWindow::on_sldParameter_valueChanged" << index << value << dval;
     ui->tblParameters->update();
-    if (_plotMode==VECTOR_FIELD) Draw();
+    if (_plotMode==VECTOR_FIELD)
+        if (!_vfThread)
+        {
+            _vfThread = new std::thread( std::bind(&MainWindow::Draw, this) );
+            _vfThread->detach();
+        }
+}
+void MainWindow::on_spnTailLength_valueChanged(int)
+{
+    if (_plotMode==VECTOR_FIELD)
+    {
+        _vfThread = new std::thread( std::bind(&MainWindow::Draw, this) );
+        _vfThread->detach();
+    }
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -335,7 +338,7 @@ void MainWindow::AddVarDelegate(int row, const std::string& type)
 }
 void MainWindow::AddVarDelegate(int row)
 {
-    VecStr vstr;// = {"unirand", "normrand"};
+    VecStr vstr;
     vstr.push_back(Input::GAMMA_RAND_STR);
     vstr.push_back(Input::NORM_RAND_STR);
     vstr.push_back(Input::UNI_RAND_STR);
@@ -363,6 +366,9 @@ void MainWindow::ConnectModels()
 }
 void MainWindow::Draw()
 {
+//    std::lock_guard<std::mutex> lock(_mutex);
+    if (_plottingNow) return;
+    _plottingNow = true;
     ui->qwtPlot->detachItems();
     switch (_plotMode)
     {
@@ -373,6 +379,7 @@ void MainWindow::Draw()
             DrawVectorField();
             break;
     }
+    _plottingNow = false;
 }
 void MainWindow::DrawPhasePortrait()
 {
@@ -443,7 +450,7 @@ void MainWindow::DrawPhasePortrait()
             goto label;
         last_step = std::chrono::system_clock::now();
         {
-        std::lock_guard<std::mutex> lock(_mutex);
+//        std::lock_guard<std::mutex> lock(_mutex);
 
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
@@ -629,6 +636,11 @@ void MainWindow::DrawPhasePortrait()
 }
 void MainWindow::DrawVectorField()
 {
+    qDebug() << "MainWindow::DrawVectorField 1";
+//    std::lock_guard<std::mutex> lock(_mutex);
+    qDebug() << "MainWindow::DrawVectorField 2";
+
+    const int num_diffs = _differentials->NumPars();
     const double* diffs = _parserMgr.ConstData(_differentials);
     const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
@@ -637,47 +649,74 @@ void MainWindow::DrawVectorField()
             xmax = _parserMgr.Maximum(_initConds, xidx),
             ymin = _parserMgr.Minimum(_initConds, yidx),
             ymax = _parserMgr.Maximum(_initConds, yidx);
-    const double xinc = (xmax - xmin) / (double)VF_HRES,
-            yinc = (ymax - ymin) / (double)VF_VRES;
+    const double xinc = (xmax - xmin) / (double)(VF_RESOLUTION-1),
+            yinc = (ymax - ymin) / (double)(VF_RESOLUTION-1);
 
     ui->qwtPlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
     ui->qwtPlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
 
-//    std::vector<QwtPlotCurve*> vec_field(20*20);
-    if (_needInitialize) InitParserMgr();
-    for (int i=0; i<VF_HRES; ++i)
-        for (int j=0; j<VF_VRES; ++j)
-        {
-            QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-                QBrush( Qt::red ), QPen( Qt::red, 2 ), QSize( 2, 2 ) );
-            QwtPlotMarker* marker = new QwtPlotMarker();
-            marker->setSymbol(symbol);
-            marker->attach(ui->qwtPlot);
+    qDebug() << "MainWindow::DrawVectorField 3";
+    InitParserMgr();
+    qDebug() << "MainWindow::DrawVectorField 4";
+    const int num_steps = std::max(1, ui->spnTailLength->value());
+    try
+    {
+        for (int i=0; i<VF_RESOLUTION; ++i)
+            for (int j=0; j<VF_RESOLUTION; ++j)
+            {
+                QwtSymbol *symbol1 = new QwtSymbol( QwtSymbol::Ellipse,
+                    QBrush(Qt::red), QPen(Qt::red, 2), QSize(2, 2) );
+                QwtSymbol *symbol2 = new QwtSymbol( QwtSymbol::Ellipse,
+                    QBrush(Qt::yellow), QPen(Qt::yellow, 2), QSize(2, 2) );
+                QwtPlotMarker* marker1 = new QwtPlotMarker(),
+                        * marker2 = new QwtPlotMarker;
+                marker1->setSymbol(symbol1);
+                marker1->attach(ui->qwtPlot);
+                marker2->setSymbol(symbol2);
+                marker2->attach(ui->qwtPlot);
 
-            QwtPlotCurve* curv = new QwtPlotCurve();
-            curv->setPen(Qt::blue, 1);
-            curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-            curv->attach(ui->qwtPlot);
-//            vec_field[i*20 + j] = curv;
+                QwtPlotCurve* curv = new QwtPlotCurve();
+                curv->setPen(Qt::blue, 1);
+                curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+                curv->attach(ui->qwtPlot);
 
-            QPolygonF pts(2);
-            double x = i*xinc + xmin,
-                    y = j*yinc + ymin;
-            pts[0] = QPointF(x, y);
-            marker->setXValue(x);
-            marker->setYValue(y);
-            marker->setZ(-1);
+                QPolygonF pts(num_steps+1);
+                const double x = i*xinc + xmin,
+                            y = j*yinc + ymin;
+                pts[0] = QPointF(x, y);
+                marker1->setXValue(x);
+                marker1->setYValue(y);
+                marker1->setZ(-1);
 
-            _parserMgr.SetData(_differentials, xidx, x);
-            _parserMgr.SetData(_differentials, yidx, y);
-            _parserMgr.ParserEval();
-            pts[1] = QPointF(diffs[xidx], diffs[yidx]);
+                if (num_diffs>2)
+                    _parserMgr.ResetDifferentials();
+                _parserMgr.SetData(_differentials, xidx, x);
+                _parserMgr.SetData(_differentials, yidx, y);
+                for (int k=1; k<=num_steps; ++k)
+                {
+                    _parserMgr.ParserEval(false);
+                    pts[k] = QPointF(diffs[xidx], diffs[yidx]);
+                }
+                marker2->setXValue(pts[num_steps].x());
+                marker2->setYValue(pts[num_steps].y());
+                marker2->setZ(1);
 
-            curv->setSamples(pts);
-            curv->setZ(1);
-        }
+//                qDebug() << i << j << pts[0] << pts[1];
 
+                curv->setSamples(pts);
+                curv->setZ(0);
+            }
+    }
+    catch (std::exception& e)
+    {
+        qDebug() << "MainWindow::DrawVectorField" << e.what();
+    }
+
+    qDebug() << "MainWindow::DrawVectorField 5";
     emit DoReplot();
+    std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
+    qDebug() << "MainWindow::DrawVectorField 6";
+    emit VFThreadComplete();
 }
 
 void MainWindow::InitDefaultModel()
@@ -783,17 +822,30 @@ const std::vector<QColor> MainWindow::InitTPColors() const
     return vc;
 }
 
-void MainWindow::ComboBoxChanged(const QString& text)
+void MainWindow::ComboBoxChanged(const QString& text) //slot
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
     _parserMgr.AssignInput(_variables, row, text.toStdString());
 }
+void MainWindow::EndVFThread() //slot
+{
+    if (_vfThread)
+    {
+        delete _vfThread;
+        _vfThread = nullptr;
+    }
+}
 void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
     _needUpdateExprns = true;
-    if (_plotMode==VECTOR_FIELD) Draw();
+    if (_plotMode==VECTOR_FIELD)
+        if (!_vfThread)
+        {
+            _vfThread = new std::thread( std::bind(&MainWindow::Draw, this) );
+            _vfThread->detach();
+        }
 /*    const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
     const double xmin = _parserMgr.Minimum(_initConds,xidx),
@@ -804,31 +856,63 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
     ui->qwtPlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
     ui->qwtPlot->replot();*/
 }
-void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex)
+void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     int idx = topLeft.row();
     std::string exprn = _parameters->Expression(idx);
 //    ui->sldParameter->setSliderPosition(100*atof(exprn.c_str()));
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
 }
-void MainWindow::ResultsChanged(QModelIndex, QModelIndex)
+void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     int cond_row = ui->lsConditions->currentIndex().row();
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
 }
 void MainWindow::Replot() //slot
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+//    std::lock_guard<std::mutex> lock(_mutex);
     ui->qwtPlot->replot();
     ui->qwtInnerProduct->replot();
 }
 void MainWindow::UpdateParams() //slot
 {
     _parameters->SetPar(_pulseParIdx, _pulseResetValue);
+}
+void MainWindow::LoadModel()
+{
+    try
+    {
+        std::vector<ParamModelBase*> models;
+        ConditionModel* conditions = new ConditionModel(this);
+        SysFileIn in(_fileName, models, conditions);
+        in.Load();
+
+        //Have to do this before models are deleted!
+        InitModels(&models, conditions);
+        ConnectModels();
+
+        for (auto it : _cmbDelegates)
+            delete it;
+        _cmbDelegates.clear();
+        const size_t num_vars = _variables->NumPars();
+        for (size_t i=0; i<num_vars; ++i)
+            AddVarDelegate((int)i, _variables->Value(i));
+
+        ResetPhasePlotAxes();
+        UpdatePulseVList();
+        UpdateTimePlotTable();
+
+        setWindowTitle(("DynaSys " + ds::
+                        VERSION_STR + " - " + _fileName).c_str());
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
 }
 void MainWindow::ResetPhasePlotAxes()
 {

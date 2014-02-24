@@ -2,6 +2,7 @@
 #define PARSERMGR_H
 
 #include <exception>
+#include <mutex>
 
 #include <QDebug>
 
@@ -18,11 +19,10 @@ class ParserMgr
         ~ParserMgr();
 
         void AddCondModel(ConditionModel* model);
-        void AddExpression(const std::string& exprn);
+        void AddExpression(const std::string& exprn, bool use_mutex = true);
         void AddModel(ParamModelBase* model);
         bool AreModelsInitialized() const { return _areModelsInitialized; }
         void AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str);
-//        void AssignInputs();
             //Assign the source of the data for the variables
         void ClearExpressions();
         void ClearModels();
@@ -33,9 +33,10 @@ class ParserMgr
         double Maximum(const ParamModelBase* model, size_t idx) const;
         double Minimum(const ParamModelBase* model, size_t idx) const;
         void ParserCondEval();
-        void ParserEval();
+        void ParserEval(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
+        void ResetDifferentials();
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
         void SetData(const ParamModelBase* model, size_t idx, double val);
@@ -47,11 +48,13 @@ class ParserMgr
     private:
         void AssociateVars(mu::Parser& parser);
         double* Data(const ParamModelBase* model);
+        ParamModelBase* Model(const std::string& model);
 
         bool _areModelsInitialized;
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
         std::vector< std::pair<ParamModelBase*, double*> > _models;
+        mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;

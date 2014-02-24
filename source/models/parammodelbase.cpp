@@ -20,9 +20,9 @@ VecStr ParamModelBase::Expressions() const
         vs[i] = Expression(i);
     return vs;
 }
-const std::string& ParamModelBase::Key(size_t i) const
+std::string ParamModelBase::Key(size_t i) const
 {
-    return _parameters.at(i).key;
+    return headerData(i, Qt::Vertical, Qt::DisplayRole).toString().toStdString();
 }
 VecStr ParamModelBase::Keys() const
 {
@@ -58,11 +58,15 @@ const std::string& ParamModelBase::Value(const std::string& key) const
 }
 const std::string& ParamModelBase::Value(size_t i) const
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     return _parameters.at(i).value;
+        //Don't go through data, for speed
+//    return data(createIndex(i,0),Qt::DisplayRole).toString().toStdString();
 }
 
 void ParamModelBase::AddParameter(const std::string& key, const std::string& value)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     int row = (int)_parameters.size();
     QModelIndex row_index = createIndex(row, 0);
     insertRows(row, 1, QModelIndex());
@@ -101,6 +105,7 @@ int ParamModelBase::columnCount(const QModelIndex&) const
 }
 QVariant ParamModelBase::data(const QModelIndex &index, int role) const
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     QVariant value;
     switch (role)
     {
@@ -184,6 +189,7 @@ int ParamModelBase::rowCount(const QModelIndex&) const
 
 bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, int role)
 {
+    _mutex.lock();
     std::string val = value.toString().toStdString();
     switch (role)
     {
@@ -208,6 +214,7 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
             return false;
             break;
     }
+    _mutex.unlock();
     emit dataChanged(index, index);
     return true;
 }
@@ -219,6 +226,7 @@ bool ParamModelBase::setHeaderData(int section, Qt::Orientation orientation, con
 
 int ParamModelBase::KeyIndex(const std::string& par_name) const
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     auto it = std::find_if(_parameters.cbegin(), _parameters.cend(), [=](const Param& par)
     {
         return par_name == par.key;
