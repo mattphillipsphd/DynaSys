@@ -21,6 +21,27 @@
        <widget class="QComboBox" name="cmbPlotMode"/>
       </item>
       <item>
+       <widget class="QLabel" name="label_11">
+        <property name="text">
+         <string>VF Res.:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="spnVFResolution">
+        <property name="minimum">
+         <number>2</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Line" name="line">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QLabel" name="label_9">
         <property name="text">
          <string>X:</string>
@@ -100,6 +121,13 @@
            <widget class="QCheckBox" name="cboxRecord">
             <property name="text">
              <string>Record</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="cboxVectorField">
+            <property name="text">
+             <string>VF</string>
             </property>
            </widget>
           </item>

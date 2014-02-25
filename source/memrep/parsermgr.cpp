@@ -138,7 +138,7 @@ void ParserMgr::InitModels()
 
                 //Initialize
                 qDebug() << model->Key(i).c_str() << value.c_str() << ", " << atof(value.c_str());
-                if (model->Name()=="Parameters")
+                if (model->Id()==ds::PARAMETERS)
                     data[i] = atof(value.c_str()); // ###
             }
         }
@@ -215,7 +215,7 @@ double ParserMgr::Range(const ParamModelBase* model, size_t idx) const
 }
 void ParserMgr::ResetDifferentials()
 {
-    ParamModelBase* init_conds = Model("InitialConds");
+    ParamModelBase* init_conds = Model(ds::INIT_CONDS);
     const size_t num_diffs = init_conds->NumPars();
     std::string init_expr;
     for (size_t i=0; i<num_diffs; ++i)
@@ -297,7 +297,7 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
         for (auto& it : _models)
         {
             ParamModelBase* model = it.first;
-            if (model->Name()=="InitialConds") continue;
+            if (model->Id()==ds::INIT_CONDS) continue;
             double* data = it.second;
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
@@ -322,12 +322,12 @@ double* ParserMgr::Data(const ParamModelBase* model)
     });
     return it->second;
 }
-ParamModelBase* ParserMgr::Model(const std::string& model)
+ParamModelBase* ParserMgr::Model(ds::PMODEL model)
 {
     auto it = std::find_if(_models.cbegin(), _models.cend(),
                         [&](std::pair<ParamModelBase*,double*> p)
     {
-            return p.first->Name() == model;
+            return p.first->Id() == model;
     });
     return it->first;
 }

@@ -1,7 +1,7 @@
 #include "parammodelbase.h"
 
 ParamModelBase::ParamModelBase(QObject* parent, const std::string& name) :
-    QAbstractTableModel(parent), _name(name)
+    QAbstractTableModel(parent), _id(ds::Model(name))
 {
 }
 ParamModelBase::~ParamModelBase()
@@ -73,6 +73,10 @@ void ParamModelBase::AddParameter(const std::string& key, const std::string& val
     _parameters[row] = Param(key, value);
     emit dataChanged(row_index, row_index);
     emit headerDataChanged(Qt::Vertical, row, row);
+}
+std::string ParamModelBase::Name() const
+{
+    return ds::Model(_id);
 }
 void ParamModelBase::SetMaximum(size_t idx, double val)
 {

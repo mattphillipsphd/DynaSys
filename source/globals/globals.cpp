@@ -3,6 +3,34 @@
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::VERSION_STR = "0.0.4";
 
+ds::PMODEL ds::Model(const std::string& model)
+{
+    if (model=="Parameters") return PARAMETERS;
+    if (model=="Variables") return VARIABLES;
+    if (model=="Differentials") return DIFFERENTIALS;
+    if (model=="InitialConds") return INIT_CONDS;
+    if (model=="Conditions") return CONDITIONS;
+    throw ("Bad Model");
+}
+std::string ds::Model(PMODEL model)
+{
+    switch (model)
+    {
+        case PARAMETERS:
+            return "Parameters";
+        case VARIABLES:
+            return "Variables";
+        case DIFFERENTIALS:
+            return "Differentials";
+        case INIT_CONDS:
+            return "InitialConds";
+        case CONDITIONS:
+            return "Conditions";
+    }
+    throw("Bad Model");
+}
+
+
 template <typename T>
 QList<T> ds::VecToQList(const std::vector<T>& vec)
 {

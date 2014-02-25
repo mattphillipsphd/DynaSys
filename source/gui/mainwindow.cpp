@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr), _fileName(""),
-    _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
+    _isDrawing(false), _needDrawVF(false), _needInitialize(true), _needUpdateExprns(false),
     _plottingNow(false), _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _ppThread(nullptr), _vfThread(nullptr), _tpColors(InitTPColors())
 {
@@ -26,6 +26,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
     ui->sldParameter->setRange(0, SLIDER_INT_LIM);
+    ui->spnVFResolution->setValue(VF_RESOLUTION);
 
     setWindowTitle("DynaSys " + QString(ds::VERSION_STR.c_str()) + " - default model");
 
@@ -82,8 +83,8 @@ void MainWindow::on_actionLoad_triggered()
 }
 void MainWindow::on_actionReload_Current_triggered()
 {
-    if (_fileName.empty()) return;
-    LoadModel();
+    if (_fileName.empty()) InitDefaultModel();
+    else LoadModel();
 }
 
 void MainWindow::on_actionSave_Data_triggered()
@@ -141,6 +142,8 @@ void MainWindow::on_btnPulse_clicked()
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
     std::string val = ui->edPulseValue->text().toStdString();
     _parameters->SetPar(_pulseParIdx, val);
+
+    if (ui->cboxVectorField->isChecked()) _needDrawVF = true;
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
@@ -240,10 +243,10 @@ void MainWindow::on_btnRemoveVariable_clicked()
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     for (auto it : rows)
-    {
-        delete _cmbDelegates[ it.row() ];
+//    {
+//        delete _cmbDelegates[ it.row() ]; //Actually it looks like Qt does this
         _cmbDelegates[ it.row() ] = nullptr;
-    }
+//    }
     std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
@@ -272,6 +275,11 @@ void MainWindow::on_btnStart_clicked()
         ui->btnStart->setText("Start");
     }
 }
+void MainWindow::on_cboxVectorField_stateChanged(int state)
+{
+    _needDrawVF = state==Qt::Checked;
+}
+
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
     qDebug() << "MainWindow::on_cmbPlotMode_currentIndexChanged";
@@ -331,6 +339,14 @@ void MainWindow::on_spnTailLength_valueChanged(int)
         _vfThread->detach();
     }
 }
+void MainWindow::on_spnVFResolution_valueChanged(int)
+{
+    if (_plotMode==VECTOR_FIELD)
+    {
+        _vfThread = new std::thread( std::bind(&MainWindow::Draw, this) );
+        _vfThread->detach();
+    }
+}
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
 {
@@ -369,7 +385,6 @@ void MainWindow::Draw()
 //    std::lock_guard<std::mutex> lock(_mutex);
     if (_plottingNow) return;
     _plottingNow = true;
-    ui->qwtPlot->detachItems();
     switch (_plotMode)
     {
         case SINGLE:
@@ -384,6 +399,8 @@ void MainWindow::Draw()
 void MainWindow::DrawPhasePortrait()
 {
     qDebug() << "MainWindow::DrawPhasePortrait";
+    for (auto it : _ppPlotItems)
+        it->detach();
     ui->qwtInnerProduct->detachItems();
 
     //The point indicating current value
@@ -391,13 +408,16 @@ void MainWindow::DrawPhasePortrait()
         QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
     QwtPlotMarker* marker = new QwtPlotMarker();
     marker->setSymbol(symbol);
+    marker->setZ(1);
     marker->attach(ui->qwtPlot);
+    _ppPlotItems.push_back(marker);
 
     //The 'tail' of the plot
     QwtPlotCurve* curve = new QwtPlotCurve();
     curve->setPen( Qt::black, 1 );
     curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
     curve->attach(ui->qwtPlot);
+    _ppPlotItems.push_back(curve);
 
     //The time plot
     const int num_diffs = (int)_differentials->NumPars(),
@@ -442,6 +462,12 @@ void MainWindow::DrawPhasePortrait()
 
     while (_isDrawing)
     {
+        if (_needDrawVF)
+        {
+            DrawVectorField();
+            _needDrawVF = false;
+        }
+
         static auto last_step = std::chrono::system_clock::now();
         auto step_diff = std::chrono::system_clock::now() - last_step;
         auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(step_diff);
@@ -605,8 +631,6 @@ void MainWindow::DrawPhasePortrait()
         }
 
             //Get axis limits for time plot
-        auto xlims_tp = std::make_pair((const double)0, (const double)(ip.size()-1));
-        ui->qwtInnerProduct->setAxisScale( QwtPlot::xBottom, xlims_tp.first, xlims_tp.second );
         double y_tp_min(std::numeric_limits<double>::max()),
                 y_tp_max(std::numeric_limits<double>::min());
         for (int i=0; i<num_all_tplots; ++i)
@@ -636,38 +660,46 @@ void MainWindow::DrawPhasePortrait()
 }
 void MainWindow::DrawVectorField()
 {
-    qDebug() << "MainWindow::DrawVectorField 1";
+//    qDebug() << "MainWindow::DrawVectorField 1";
 //    std::lock_guard<std::mutex> lock(_mutex);
-    qDebug() << "MainWindow::DrawVectorField 2";
+//    qDebug() << "MainWindow::DrawVectorField 2";
 
     const int num_diffs = _differentials->NumPars();
     const double* diffs = _parserMgr.ConstData(_differentials);
     const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
 
+    const int vf_resolution = ui->spnVFResolution->value();
     const double xmin = _parserMgr.Minimum(_initConds, xidx),
             xmax = _parserMgr.Maximum(_initConds, xidx),
             ymin = _parserMgr.Minimum(_initConds, yidx),
             ymax = _parserMgr.Maximum(_initConds, yidx);
-    const double xinc = (xmax - xmin) / (double)(VF_RESOLUTION-1),
-            yinc = (ymax - ymin) / (double)(VF_RESOLUTION-1);
+    const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
+            yinc = (ymax - ymin) / (double)(vf_resolution-1);
+
+    for (auto it : _vfPlotItems)
+        it->detach();
+    _vfPlotItems.clear();
+    _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
     ui->qwtPlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
     ui->qwtPlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
 
-    qDebug() << "MainWindow::DrawVectorField 3";
+//    qDebug() << "MainWindow::DrawVectorField 3";
     InitParserMgr();
-    qDebug() << "MainWindow::DrawVectorField 4";
+//    qDebug() << "MainWindow::DrawVectorField 4";
     const int num_steps = std::max(1, ui->spnTailLength->value());
+    const double dval_x_orig = diffs[xidx],
+            dval_y_orig = diffs[yidx];
     try
     {
-        for (int i=0; i<VF_RESOLUTION; ++i)
-            for (int j=0; j<VF_RESOLUTION; ++j)
+        for (int i=0; i<vf_resolution; ++i)
+            for (int j=0; j<vf_resolution; ++j)
             {
                 QwtSymbol *symbol1 = new QwtSymbol( QwtSymbol::Ellipse,
                     QBrush(Qt::red), QPen(Qt::red, 2), QSize(2, 2) );
                 QwtSymbol *symbol2 = new QwtSymbol( QwtSymbol::Ellipse,
-                    QBrush(Qt::yellow), QPen(Qt::yellow, 2), QSize(2, 2) );
+                    QBrush(Qt::yellow), QPen(Qt::green, 2), QSize(2, 2) );
                 QwtPlotMarker* marker1 = new QwtPlotMarker(),
                         * marker2 = new QwtPlotMarker;
                 marker1->setSymbol(symbol1);
@@ -679,6 +711,10 @@ void MainWindow::DrawVectorField()
                 curv->setPen(Qt::blue, 1);
                 curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
                 curv->attach(ui->qwtPlot);
+
+                _vfPlotItems.push_back(marker1);
+                _vfPlotItems.push_back(marker2);
+                _vfPlotItems.push_back(curv);
 
                 QPolygonF pts(num_steps+1);
                 const double x = i*xinc + xmin,
@@ -699,23 +735,25 @@ void MainWindow::DrawVectorField()
                 }
                 marker2->setXValue(pts[num_steps].x());
                 marker2->setYValue(pts[num_steps].y());
-                marker2->setZ(1);
+                marker2->setZ(0);
 
 //                qDebug() << i << j << pts[0] << pts[1];
 
                 curv->setSamples(pts);
-                curv->setZ(0);
+                curv->setZ(-0.5);
             }
     }
     catch (std::exception& e)
     {
         qDebug() << "MainWindow::DrawVectorField" << e.what();
     }
+    _parserMgr.SetData(_differentials, xidx, dval_x_orig);
+    _parserMgr.SetData(_differentials, yidx, dval_y_orig);
 
-    qDebug() << "MainWindow::DrawVectorField 5";
+//    qDebug() << "MainWindow::DrawVectorField 5";
     emit DoReplot();
     std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
-    qDebug() << "MainWindow::DrawVectorField 6";
+//    qDebug() << "MainWindow::DrawVectorField 6";
     emit VFThreadComplete();
 }
 
@@ -881,6 +919,7 @@ void MainWindow::Replot() //slot
 void MainWindow::UpdateParams() //slot
 {
     _parameters->SetPar(_pulseParIdx, _pulseResetValue);
+    if (ui->cboxVectorField->isChecked()) _needDrawVF = true;
 }
 void MainWindow::LoadModel()
 {
@@ -961,6 +1000,7 @@ void MainWindow::UpdateResultsModel(int cond_row)
 }
 void MainWindow::UpdateTimePlotTable()
 {
+    qDebug() << "MainWindow::UpdateTimePlotTable";
     delete ui->tblTimePlot->model();
     VecStr vs,
             dkeys = _differentials->ShortKeys(),

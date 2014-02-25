@@ -27,13 +27,14 @@ class ParamModelBase : public QAbstractTableModel
             //are used to initialize the variables
         virtual std::string Expression(size_t i) const;
         virtual VecStr Expressions() const;
+        ds::PMODEL Id() const { return _id; }
         virtual VecStr Initializations() const { return VecStr(); }
         std::string Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
         double Maximum(size_t idx) const;
         double Minimum(size_t idx) const;
-        const std::string& Name() const { return _name; }
+        std::string Name() const;
         size_t NumPars() const { return _parameters.size(); }
         virtual std::string ShortKey(size_t i) const;
         virtual int ShortKeyIndex(const std::string& par_name) const;
@@ -79,8 +80,8 @@ class ParamModelBase : public QAbstractTableModel
             std::string key, max, min, value;
         };
 
+        const ds::PMODEL _id;
         mutable std::mutex _mutex;
-        const std::string _name;
         std::vector<Param> _parameters;
 };
 

@@ -22,6 +22,9 @@ namespace ds
         CONDITIONS
     };
 
+    PMODEL Model(const std::string& model);
+    std::string Model(PMODEL model);
+
     template<typename T>
     QList<T> VecToQList(const std::vector<T>& vec);
 

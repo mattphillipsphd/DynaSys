@@ -93,6 +93,8 @@ class MainWindow : public QMainWindow
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
+        void on_cboxVectorField_stateChanged(int state);
+
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
 
@@ -101,6 +103,7 @@ class MainWindow : public QMainWindow
         void on_sldParameter_valueChanged(int value);
 
         void on_spnTailLength_valueChanged(int);
+        void on_spnVFResolution_valueChanged(int);
 
         void ComboBoxChanged(const QString& text);
         void EndVFThread();
@@ -145,16 +148,18 @@ class MainWindow : public QMainWindow
         std::string _fileName;
         volatile bool _isDrawing;
         std::mutex _mutex;
-        volatile bool _needInitialize, _needUpdateExprns;
+        volatile bool _needDrawVF, _needInitialize, _needUpdateExprns;
         ParserMgr _parserMgr;
         volatile bool _plottingNow;
         PLOT_MODE _plotMode;
+        std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
         size_t _pulseParIdx;
         int _pulseStepsRemaining;
             //Consider making a little pulse struct/class
-        std::thread* _ppThread, * _vfThread;
         const std::vector<QColor> _tpColors;
+        std::vector<QwtPlotItem*> _vfPlotItems;
+        std::thread* _ppThread, * _vfThread;
 };
 
 #endif // MAINWINDOW_H

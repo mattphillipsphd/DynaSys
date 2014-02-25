@@ -48,7 +48,7 @@ class ParserMgr
     private:
         void AssociateVars(mu::Parser& parser);
         double* Data(const ParamModelBase* model);
-        ParamModelBase* Model(const std::string& model);
+        ParamModelBase* Model(ds::PMODEL model);
 
         bool _areModelsInitialized;
         ConditionModel* _conditions;
