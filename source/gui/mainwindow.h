@@ -70,7 +70,6 @@ class MainWindow : public QMainWindow
     signals:
         void DoReplot();
         void DoUpdateParams();
-        void VFThreadComplete();
 
     private slots:
         void on_actionAbout_triggered();
@@ -106,7 +105,6 @@ class MainWindow : public QMainWindow
         void on_spnVFResolution_valueChanged(int);
 
         void ComboBoxChanged(const QString& text);
-        void EndVFThread();
         void ExprnChanged(QModelIndex, QModelIndex);
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
@@ -123,6 +121,7 @@ class MainWindow : public QMainWindow
         void DrawPhasePortrait();
         void DrawVectorField();
         void InitDefaultModel();
+        void InitDraw();
         void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
                         ConditionModel* conditions = nullptr);
         void InitParserMgr();
@@ -134,6 +133,7 @@ class MainWindow : public QMainWindow
         void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
         void UpdateTimePlotTable();
+        void UpdateVectorField();
 
         AboutGui* _aboutGui;
 
@@ -145,12 +145,12 @@ class MainWindow : public QMainWindow
                 * _variables;   //Can invoke other expressions
 
         std::vector<ComboBoxDelegate*> _cmbDelegates;
+        bool _doDrawVF;
         std::string _fileName;
         volatile bool _isDrawing;
         std::mutex _mutex;
-        volatile bool _needDrawVF, _needInitialize, _needUpdateExprns;
+        volatile bool _needInitialize, _needUpdateExprns;
         ParserMgr _parserMgr;
-        volatile bool _plottingNow;
         PLOT_MODE _plotMode;
         std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
@@ -158,8 +158,9 @@ class MainWindow : public QMainWindow
         int _pulseStepsRemaining;
             //Consider making a little pulse struct/class
         const std::vector<QColor> _tpColors;
+        volatile bool _updateVFNow;
         std::vector<QwtPlotItem*> _vfPlotItems;
-        std::thread* _ppThread, * _vfThread;
+        std::thread* _worker;
 };
 
 #endif // MAINWINDOW_H
