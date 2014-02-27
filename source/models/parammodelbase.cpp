@@ -98,6 +98,11 @@ void ParamModelBase::SetPar(int i, double value)
 {
     setData( createIndex(i,0), value, Qt::EditRole );
 }
+void ParamModelBase::SetRange(size_t idx, double min, double max)
+{
+    SetMinimum(idx, min);
+    SetMaximum(idx, max);
+}
 
 int ParamModelBase::columnCount() const
 {

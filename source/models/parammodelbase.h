@@ -48,6 +48,7 @@ class ParamModelBase : public QAbstractTableModel
         void SetPar(const std::string& key, const std::string& value);
         void SetPar(int i, const std::string& value);
         void SetPar(int i, double value);
+        void SetRange(size_t idx, double min, double max);
 
         int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override;

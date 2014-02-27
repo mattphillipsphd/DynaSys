@@ -7,16 +7,18 @@ const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
 const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
 const int MainWindow::VF_RESOLUTION = 20;
+const int MainWindow::VF_SLEEP_MS = 250;
 
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _variables(nullptr), _parameters(nullptr), _doDrawVF(false), _fileName(""),
-    _isDrawing(false), _needInitialize(true), _needUpdateExprns(false),
+    _variables(nullptr), _parameters(nullptr), _fileName(""),
+    _isDrawing(false),
+    _needClearVF(false), _needInitialize(true), _needUpdateExprns(false), _needUpdateVF(false),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
-    _tpColors(InitTPColors()), _updateVFNow(false), _worker(nullptr)
+    _tpColors(InitTPColors())
 {
     ui->setupUi(this);
 
@@ -39,8 +41,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
-    connect(this, SIGNAL(VFThreadComplete()),
-            this, SLOT(EndVFThread()), Qt::QueuedConnection);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -60,13 +60,20 @@ void MainWindow::on_actionAbout_triggered()
 
 void MainWindow::on_actionClear_triggered()
 {
-    _isDrawing = false;
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_actionClear_triggered";
+#endif
+    _isDrawing = _needUpdateVF = false;
 //    std::lock_guard<std::mutex> lock(_mutex);
     InitModels();
+    UpdateLists();
 }
 
 void MainWindow::on_actionLoad_triggered()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_actionLoad_triggered";
+#endif
 //        std::lock_guard<std::mutex> lock(_mutex);
 
     std::string file_name = QFileDialog::getOpenFileName(nullptr,
@@ -82,6 +89,9 @@ void MainWindow::on_actionLoad_triggered()
 }
 void MainWindow::on_actionReload_Current_triggered()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_actionReload_Current_triggered";
+#endif
     if (_fileName.empty()) InitDefaultModel();
     else LoadModel();
 }
@@ -134,6 +144,9 @@ void MainWindow::on_btnAddCondition_clicked()
 }
 void MainWindow::on_btnPulse_clicked()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_btnPulse_clicked";
+#endif
 //    ui->btnPulse->setEnabled(false);
     _pulseParIdx = ui->cmbVariables->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
@@ -142,7 +155,7 @@ void MainWindow::on_btnPulse_clicked()
     std::string val = ui->edPulseValue->text().toStdString();
     _parameters->SetPar((int)_pulseParIdx, val);
 
-    if (_doDrawVF) _updateVFNow = true;
+    if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
@@ -252,45 +265,65 @@ void MainWindow::on_btnRemoveVariable_clicked()
 }
 void MainWindow::on_btnStart_clicked()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_btnStart_clicked";
+#endif
     if (_isDrawing)
     {
-        if (_worker)
-        {
-            _isDrawing = false;
-            ui->btnAddDiff->setEnabled(true);
-            ui->btnRemoveDiff->setEnabled(true);
-        }
+        _isDrawing = false;
+        SetButtonsEnabled(true);
         ui->btnStart->setText("Start");
     }
     else // "Stop"
     {
         _isDrawing = _needInitialize = true;
-        ui->btnAddDiff->setEnabled(false);
-        ui->btnRemoveDiff->setEnabled(false);
+        SetButtonsEnabled(false);
         ui->btnStart->setText("Stop");
         InitDraw();
     }
 }
 void MainWindow::on_cboxVectorField_stateChanged(int state)
 {
-    _doDrawVF = state==Qt::Checked;
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_cboxVectorField_stateChanged";
+#endif
+    if (state==Qt::Checked)
+    {
+        _needUpdateVF = true;
+        _needClearVF = false;
+        if (!_isDrawing) InitDraw();
+    }
+    else
+    {
+        if (_plotMode==SINGLE) _needUpdateVF = _needClearVF = true;
+    }
 }
 
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_cmbPlotMode_currentIndexChanged";
+#endif
+    ClearPlots();
+
     if (text=="Single")
+    {
         _plotMode = SINGLE;
+        ui->btnPulse->setEnabled(true);
+    }
     else if (text=="Vector field")
     {
         _plotMode = VECTOR_FIELD;
+        ui->btnPulse->setEnabled(false);
         UpdateVectorField();
     }
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
-    if (index==-1) return;
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_cmbSlidePars_currentIndexChanged";
+#endif
+    if (index==-1) return;
     const double val = std::stod( _parameters->Value(index) ),
             min = _parserMgr.Minimum(_parameters, index),
             range = _parserMgr.Range(_parameters, index);
@@ -307,7 +340,9 @@ void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 
 void MainWindow::on_sldParameter_valueChanged(int value)
 {
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_sldParameter_valueChanged";
+#endif
 //    std::lock_guard<std::mutex> lock(_mutex);
     const int index = ui->cmbSlidePars->currentIndex();
     const double range = _parserMgr.Range(_parameters, index);
@@ -316,15 +351,21 @@ void MainWindow::on_sldParameter_valueChanged(int value)
     _parameters->SetPar(index, std::to_string(dval));
     qDebug() << "MainWindow::on_sldParameter_valueChanged" << index << value << dval;
     ui->tblParameters->update();
-    if (_plotMode==VECTOR_FIELD) UpdateVectorField();
+    if (IsVFPresent()) UpdateVectorField();
 }
 void MainWindow::on_spnTailLength_valueChanged(int)
 {
-    if (_plotMode==VECTOR_FIELD) UpdateVectorField();
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_spnTailLength_valueChanged";
+#endif
+    if (IsVFPresent()) UpdateVectorField();
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
 {
-    if (_plotMode==VECTOR_FIELD) UpdateVectorField();
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_spnVFResolution_valueChanged";
+#endif
+    if (IsVFPresent()) UpdateVectorField();
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -341,6 +382,19 @@ void MainWindow::AddVarDelegate(int row)
     ui->tblVariables->setItemDelegateForRow(row, cbd);
     connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
     _cmbDelegates.push_back(cbd);
+}
+void MainWindow::ClearPlots()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ClearPlots";
+#endif
+    for (auto it : _ppPlotItems)
+        it->detach();
+    _ppPlotItems.clear();
+    for (auto it : _vfPlotItems)
+        it->detach();
+    _vfPlotItems.clear();
+    ui->qwtPhasePlot->detachItems();
 }
 void MainWindow::ConnectModels()
 {
@@ -362,20 +416,35 @@ void MainWindow::ConnectModels()
 void MainWindow::Draw()
 {
 //    std::lock_guard<std::mutex> lock(_mutex);
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::Draw()";
-    switch (_plotMode)
+#endif
+    if (_mutex.try_lock())
     {
-        case SINGLE:
-            DrawPhasePortrait();
-            break;
-        case VECTOR_FIELD:
-            DrawVectorField();
-            break;
+        try
+        {
+            switch (_plotMode)
+            {
+                case SINGLE:
+                    DrawPhasePortrait();
+                    break;
+                case VECTOR_FIELD:
+                    DrawVectorField();
+                    break;
+            }
+        }
+        catch (std::exception& e)
+        {
+            qDebug() << "MainWindow::Draw" << e.what();
+        }
+        _mutex.unlock();
     }
 }
 void MainWindow::DrawPhasePortrait()
 {
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::DrawPhasePortrait";
+#endif
     for (auto it : _ppPlotItems)
         it->detach();
     ui->qwtTimePlot->detachItems();
@@ -439,11 +508,7 @@ void MainWindow::DrawPhasePortrait()
 
     while (_isDrawing)
     {
-        if (_updateVFNow)
-        {
-            DrawVectorField();
-            _updateVFNow = false;
-        }
+        if (_needUpdateVF) DrawVectorField();
 
         static auto last_step = std::chrono::system_clock::now();
         auto step_diff = std::chrono::system_clock::now() - last_step;
@@ -637,108 +702,130 @@ void MainWindow::DrawPhasePortrait()
 }
 void MainWindow::DrawVectorField()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::DrawVectorField";
+#endif
 //    qDebug() << "MainWindow::DrawVectorField 1";
 //    std::lock_guard<std::mutex> lock(_mutex);
 //    qDebug() << "MainWindow::DrawVectorField 2";
 
-    int num_steps = 1;
-    while ((_isDrawing && _plotMode==VECTOR_FIELD) || _updateVFNow)
+    if (_needClearVF)
     {
-    const int num_diffs = _differentials->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials);
-    const int xidx = ui->cmbDiffX->currentIndex(),
-            yidx = ui->cmbDiffY->currentIndex();
+        for (auto it : _vfPlotItems)
+            it->detach();
+        _vfPlotItems.clear();
+        _needUpdateVF = _needClearVF = false;
+        return;
+    }
 
-    const int vf_resolution = ui->spnVFResolution->value();
-    const double xmin = _parserMgr.Minimum(_initConds, xidx),
-            xmax = _parserMgr.Maximum(_initConds, xidx),
-            ymin = _parserMgr.Minimum(_initConds, yidx),
-            ymax = _parserMgr.Maximum(_initConds, yidx);
-    const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
-            yinc = (ymax - ymin) / (double)(vf_resolution-1);
-
-    for (auto it : _vfPlotItems)
-        it->detach();
-    _vfPlotItems.clear();
-    _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
-
-    ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
-    ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
-
-//    qDebug() << "MainWindow::DrawVectorField 3";
-    InitParserMgr();
-//    qDebug() << "MainWindow::DrawVectorField 4";
-//    const int num_steps = std::max(1, ui->spnTailLength->value());
-    const double dval_x_orig = diffs[xidx],
-            dval_y_orig = diffs[yidx];
-    try
+    if ((_isDrawing && _plotMode==VECTOR_FIELD) || _needInitialize)
     {
-        for (int i=0; i<vf_resolution; ++i)
-            for (int j=0; j<vf_resolution; ++j)
-            {
-                QwtSymbol *symbol1 = new QwtSymbol( QwtSymbol::Ellipse,
-                    QBrush(Qt::red), QPen(Qt::red, 2), QSize(2, 2) );
-                QwtSymbol *symbol2 = new QwtSymbol( QwtSymbol::Ellipse,
-                    QBrush(Qt::yellow), QPen(Qt::green, 2), QSize(2, 2) );
-                QwtPlotMarker* marker1 = new QwtPlotMarker(),
-                        * marker2 = new QwtPlotMarker;
-                marker1->setSymbol(symbol1);
-                marker1->attach(ui->qwtPhasePlot);
-                marker2->setSymbol(symbol2);
-                marker2->attach(ui->qwtPhasePlot);
+        InitParserMgr();
+        _needInitialize = false;
+    }
 
-                QwtPlotCurve* curv = new QwtPlotCurve();
-                curv->setPen(Qt::blue, 1);
-                curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-                curv->attach(ui->qwtPhasePlot);
+    int num_steps = (_plotMode==VECTOR_FIELD && !_isDrawing)
+            ? std::max(1, ui->spnTailLength->value())
+            : 1;
+    while ((_isDrawing && _plotMode==VECTOR_FIELD) || _needUpdateVF)
+    {
+        const int num_diffs = _differentials->NumPars();
+        const double* diffs = _parserMgr.ConstData(_differentials);
+        const int xidx = ui->cmbDiffX->currentIndex(),
+                yidx = ui->cmbDiffY->currentIndex();
 
-                _vfPlotItems.push_back(marker1);
-                _vfPlotItems.push_back(marker2);
-                _vfPlotItems.push_back(curv);
+        const int vf_resolution = ui->spnVFResolution->value();
+        const double xmin = _parserMgr.Minimum(_initConds, xidx),
+                xmax = _parserMgr.Maximum(_initConds, xidx),
+                ymin = _parserMgr.Minimum(_initConds, yidx),
+                ymax = _parserMgr.Maximum(_initConds, yidx);
+        const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
+                yinc = (ymax - ymin) / (double)(vf_resolution-1);
 
-                QPolygonF pts(num_steps+1);
-                const double x = i*xinc + xmin,
-                            y = j*yinc + ymin;
-                pts[0] = QPointF(x, y);
-                marker1->setXValue(x);
-                marker1->setYValue(y);
-                marker1->setZ(-1);
+        for (auto it : _vfPlotItems)
+            it->detach();
+        _vfPlotItems.clear();
+        _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
-                if (num_diffs>2)
-                    _parserMgr.ResetDifferentials();
-                _parserMgr.SetData(_differentials, xidx, x);
-                _parserMgr.SetData(_differentials, yidx, y);
-                for (int k=1; k<=num_steps; ++k)
+        ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
+        ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
+
+    //    qDebug() << "MainWindow::DrawVectorField 3";
+    //    qDebug() << "MainWindow::DrawVectorField 4";
+        const double dval_x_orig = diffs[xidx],
+                dval_y_orig = diffs[yidx];
+        try
+        {
+            for (int i=0; i<vf_resolution; ++i)
+                for (int j=0; j<vf_resolution; ++j)
                 {
-                    _parserMgr.ParserEval(false);
-                    pts[k] = QPointF(diffs[xidx], diffs[yidx]);
+                    QwtSymbol *symbol1 = new QwtSymbol( QwtSymbol::Ellipse,
+                        QBrush(Qt::red), QPen(Qt::red, 2), QSize(2, 2) );
+                    QwtSymbol *symbol2 = new QwtSymbol( QwtSymbol::Ellipse,
+                        QBrush(Qt::yellow), QPen(Qt::green, 2), QSize(2, 2) );
+                    QwtPlotMarker* marker1 = new QwtPlotMarker(),
+                            * marker2 = new QwtPlotMarker;
+                    marker1->setSymbol(symbol1);
+                    marker1->attach(ui->qwtPhasePlot);
+                    marker2->setSymbol(symbol2);
+                    marker2->attach(ui->qwtPhasePlot);
+
+                    QwtPlotCurve* curv = new QwtPlotCurve();
+                    curv->setPen(Qt::blue, 1);
+                    curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+                    curv->attach(ui->qwtPhasePlot);
+
+                    _vfPlotItems.push_back(marker1);
+                    _vfPlotItems.push_back(marker2);
+                    _vfPlotItems.push_back(curv);
+
+                    QPolygonF pts(num_steps+1);
+                    const double x = i*xinc + xmin,
+                                y = j*yinc + ymin;
+                    pts[0] = QPointF(x, y);
+                    marker1->setXValue(x);
+                    marker1->setYValue(y);
+                    marker1->setZ(-1);
+
+                    if (num_diffs>2)
+                        _parserMgr.ResetDifferentials();
+                    _parserMgr.SetData(_differentials, xidx, x);
+                    _parserMgr.SetData(_differentials, yidx, y);
+                    for (int k=1; k<=num_steps; ++k)
+                    {
+                        _parserMgr.ParserEval(false);
+                        pts[k] = QPointF(diffs[xidx], diffs[yidx]);
+                    }
+                    marker2->setXValue(pts[num_steps].x());
+                    marker2->setYValue(pts[num_steps].y());
+                    marker2->setZ(0);
+
+    //                qDebug() << i << j << pts[0] << pts[1];
+
+                    curv->setSamples(pts);
+                    curv->setZ(-0.5);
                 }
-                marker2->setXValue(pts[num_steps].x());
-                marker2->setYValue(pts[num_steps].y());
-                marker2->setZ(0);
+            ++num_steps;
+        }
+        catch (std::exception& e)
+        {
+            qDebug() << "MainWindow::DrawVectorField" << e.what();
+        }
+        _parserMgr.SetData(_differentials, xidx, dval_x_orig);
+        _parserMgr.SetData(_differentials, yidx, dval_y_orig);
 
-//                qDebug() << i << j << pts[0] << pts[1];
+    //    qDebug() << "MainWindow::DrawVectorField 5";
+        _needUpdateVF = false;
+        if (_plotMode==VECTOR_FIELD)
+        {
+            emit DoReplot();
+            std::this_thread::sleep_for( std::chrono::milliseconds(VF_SLEEP_MS) );
+        }
+        std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
+    //    qDebug() << "MainWindow::DrawVectorField 6";
+    }
 
-                curv->setSamples(pts);
-                curv->setZ(-0.5);
-            }
-        ++num_steps;
-    }
-    catch (std::exception& e)
-    {
-        qDebug() << "MainWindow::DrawVectorField" << e.what();
-    }
-    _parserMgr.SetData(_differentials, xidx, dval_x_orig);
-    _parserMgr.SetData(_differentials, yidx, dval_y_orig);
-
-//    qDebug() << "MainWindow::DrawVectorField 5";
-    emit DoReplot();
-    _updateVFNow = false;
-    std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
-    if (_plotMode==VECTOR_FIELD)
-        std::this_thread::sleep_for( std::chrono::milliseconds(500) );
-//    qDebug() << "MainWindow::DrawVectorField 6";
-    }
+    if (_plotMode==VECTOR_FIELD) _isDrawing = false;
 }
 
 void MainWindow::InitDefaultModel()
@@ -754,14 +841,14 @@ void MainWindow::InitDefaultModel()
     AddVarDelegate(0);
     AddVarDelegate(1);
     AddVarDelegate(2);
-    UpdatePulseVList();
-    UpdateSliderPList();
 
     _differentials->AddParameter("v'", "tau*(u + a)/b");
     _differentials->AddParameter("u'", "tau*(b - v)");
 
     _initConds->AddParameter("v(0)", "1");
     _initConds->AddParameter("u(0)", "0");
+    _initConds->SetRange(0, -30, 30);
+    _initConds->SetRange(1, -30, 30);
 
     VecStr vs;
     vs.push_back("v = 1"); vs.push_back("u = 2");
@@ -769,12 +856,16 @@ void MainWindow::InitDefaultModel()
     ui->lsConditions->setModel(_conditions);
     ui->lsConditions->setModelColumn(0);
     ResetResultsList(0);
+
+    UpdateLists();
 }
 void MainWindow::InitDraw()
 {
-    if (_worker) delete _worker;
-    _worker = new std::thread( std::bind(&MainWindow::Draw, this) );
-    _worker->detach();
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::InitDraw";
+#endif
+    std::thread t( std::bind(&MainWindow::Draw, this) );
+    t.detach();
 }
 void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, ConditionModel* conditions)
 {
@@ -814,11 +905,6 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     ui->lsConditions->setModelColumn(0);
     ResetResultsList(-1);
     _parserMgr.SetCondModel(_conditions);
-
-    // ### Put these in an 'update gui' function
-    UpdatePulseVList();
-    UpdateSliderPList();
-    UpdateTimePlotTable();
 }
 void MainWindow::InitParserMgr()
 {
@@ -852,6 +938,9 @@ const std::vector<QColor> MainWindow::InitTPColors() const
 
 void MainWindow::ComboBoxChanged(const QString& text) //slot
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ComboBoxChanged";
+#endif
 //    std::lock_guard<std::mutex> lock(_mutex);
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
@@ -859,8 +948,11 @@ void MainWindow::ComboBoxChanged(const QString& text) //slot
 }
 void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ExprnChanged";
+#endif
     _needUpdateExprns = true;
-    if (_plotMode==VECTOR_FIELD) UpdateVectorField();
+    if (IsVFPresent()) UpdateVectorField();
 /*    const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
     const double xmin = _parserMgr.Minimum(_initConds,xidx),
@@ -873,13 +965,16 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 }
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ParamChanged";
+#endif
 //    std::lock_guard<std::mutex> lock(_mutex);
     int idx = topLeft.row();
     std::string exprn = _parameters->Expression(idx);
 //    ui->sldParameter->setSliderPosition(100*atof(exprn.c_str()));
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
-    if (_plotMode==VECTOR_FIELD) UpdateVectorField();
+    if (IsVFPresent()) UpdateVectorField();
 }
 void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
 {
@@ -896,13 +991,25 @@ void MainWindow::Replot() //slot
 }
 void MainWindow::UpdateParams() //slot
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::UpdateParams";
+#endif
     _parameters->SetPar((int)_pulseParIdx, _pulseResetValue);
-    if (_doDrawVF) _updateVFNow = true;
+    if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
+}
+bool MainWindow::IsVFPresent() const
+{
+    return ui->cboxVectorField->isChecked() || _plotMode==VECTOR_FIELD;
 }
 void MainWindow::LoadModel()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::LoadModel";
+#endif
     try
     {
+        ClearPlots();
+
         std::vector<ParamModelBase*> models;
         ConditionModel* conditions = new ConditionModel(this);
         SysFileIn in(_fileName, models, conditions);
@@ -920,8 +1027,7 @@ void MainWindow::LoadModel()
             AddVarDelegate((int)i, _variables->Value(i));
 
         ResetPhasePlotAxes();
-        UpdatePulseVList();
-        UpdateTimePlotTable();
+        UpdateLists();
 
         setWindowTitle(("DynaSys " + ds::
                         VERSION_STR + " - " + _fileName).c_str());
@@ -933,6 +1039,9 @@ void MainWindow::LoadModel()
 }
 void MainWindow::ResetPhasePlotAxes()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ResetPhasePlotAxes";
+#endif
     QStringList qdiffs = ds::VecStrToQSList( _differentials->ShortKeys() );
 
     ui->cmbDiffX->clear();
@@ -954,8 +1063,32 @@ void MainWindow::ResetResultsList(int cond_row)
     connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ResultsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 }
+void MainWindow::SetButtonsEnabled(bool is_enabled)
+{
+    ui->btnAddCondition->setEnabled(is_enabled);
+    ui->btnAddDiff->setEnabled(is_enabled);
+    ui->btnAddExpression->setEnabled(is_enabled);
+    ui->btnAddParameter->setEnabled(is_enabled);
+    ui->btnAddVariable->setEnabled(is_enabled);
+    ui->btnRemoveCondition->setEnabled(is_enabled);
+    ui->btnRemoveDiff->setEnabled(is_enabled);
+    ui->btnRemoveExpression->setEnabled(is_enabled);
+    ui->btnRemoveParameter->setEnabled(is_enabled);
+    ui->btnRemoveVariable->setEnabled(is_enabled);
+
+    ui->cmbPlotMode->setEnabled(is_enabled);
+}
+void MainWindow::UpdateLists()
+{
+    UpdatePulseVList();
+    UpdateSliderPList();
+    UpdateTimePlotTable();
+}
 void MainWindow::UpdatePulseVList()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::UpdatePulseVList";
+#endif
     ui->cmbVariables->clear();
     VecStr keys = _parameters->Keys(); // ### rename cmbVariables
     for (size_t i=0; i<keys.size(); ++i)
@@ -963,6 +1096,9 @@ void MainWindow::UpdatePulseVList()
 }
 void MainWindow::UpdateSliderPList()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::UpdateSliderPList";
+#endif
     ui->cmbSlidePars->clear();
     VecStr keys = _parameters->Keys();
     for (size_t i=0; i<keys.size(); ++i)
@@ -978,7 +1114,9 @@ void MainWindow::UpdateResultsModel(int cond_row)
 }
 void MainWindow::UpdateTimePlotTable()
 {
+#ifdef DEBUG_FUNC
     qDebug() << "MainWindow::UpdateTimePlotTable";
+#endif
     delete ui->tblTimePlot->model();
     VecStr vs,
             dkeys = _differentials->ShortKeys(),
@@ -1001,6 +1139,10 @@ void MainWindow::UpdateTimePlotTable()
 }
 void MainWindow::UpdateVectorField()
 {
-    _updateVFNow = true;
-    InitDraw();
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::UpdateVectorField";
+#endif
+    if (_needUpdateVF) return;
+    _needUpdateVF = true;
+    if (!_isDrawing) InitDraw();
 }

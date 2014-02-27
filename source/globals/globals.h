@@ -7,6 +7,10 @@
 #include <QList>
 #include <QStringList>
 
+#ifdef QT_DEBUG
+#define DEBUG_FUNC
+#endif
+
 typedef std::vector<std::string> VecStr;
 namespace ds
 {
