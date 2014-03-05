@@ -20,7 +20,9 @@ QWidget* ComboBoxDelegate::createEditor(QWidget* parent,
 //    connect(editor, SIGNAL(currentIndexChanged(int)), this, SIGNAL(ComboBoxChanged(int)));
     connect(editor, SIGNAL(currentTextChanged(const QString&)), this, SIGNAL(ComboBoxChanged(const QString&)));
 
+#ifdef QT_DEBUG
     std::cerr << "EDITOR CREATED" << std::endl;
+#endif
     return editor;
 }
 /*QString ComboBoxDelegate::displayText(const QVariant& value, const QLocale&) const
@@ -46,7 +48,9 @@ void ComboBoxDelegate::setEditorData(QWidget* editor,
 
     QComboBox* combo_box = static_cast<QComboBox*>(editor);
     combo_box->setCurrentText(text);
+#ifdef DEBUG_FUNC
     std::cerr << "ComboBoxDelegate::setEditorData, " << text.toStdString() << "." << std::endl;
+#endif
 }
 
 void ComboBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
@@ -56,7 +60,9 @@ void ComboBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
     QVariant text = combo_box->currentText();
 
     model->setData(index, text, Qt::EditRole);
+#ifdef DEBUG_FUNC
     std::cerr << "ComboBoxDelegate::setModelData, " << text.toString().toStdString() << "." << std::endl;
+#endif
 }
 
 void ComboBoxDelegate::updateEditorGeometry(QWidget* editor,

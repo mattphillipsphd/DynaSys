@@ -14,12 +14,15 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _variables(nullptr), _parameters(nullptr), _fileName(""),
+    _variables(nullptr), _parameters(nullptr), _fileName(""), _guiTid(std::this_thread::get_id()),
     _isDrawing(false),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false), _needUpdateVF(false),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _tpColors(InitTPColors())
 {
+    qRegisterMetaType<ViewRect>("ViewRect");
+    qRegisterMetaType<TPData>("TPData");
+
     ui->setupUi(this);
 
     QStringList modes;
@@ -31,6 +34,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->spnVFResolution->setValue(VF_RESOLUTION);
 
     setWindowTitle("DynaSys " + QString(ds::VERSION_STR.c_str()) + " - default model");
+    setWindowIcon( QIcon("Logo.ico") );
+    //Use converticon.com to quickly create icon file
 
     InitDefaultModel();
 
@@ -39,7 +44,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ConnectModels();
 
-    connect(this, SIGNAL(DoReplot()), this, SLOT(Replot()), Qt::QueuedConnection);
+    connect(this, SIGNAL(DoAttachVF()), this, SLOT(AttachVectorField()));
+    connect(this, SIGNAL(DoReplot(const ViewRect&, const ViewRect&)),
+            this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
 
     _aboutGui = new AboutGui();
@@ -310,12 +317,16 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
     {
         _plotMode = SINGLE;
         ui->btnPulse->setEnabled(true);
+        ui->qwtTimePlot->show();
+        ui->tblTimePlot->show();
     }
     else if (text=="Vector field")
     {
         _plotMode = VECTOR_FIELD;
         ui->btnPulse->setEnabled(false);
         UpdateVectorField();
+        ui->qwtTimePlot->hide();
+        ui->tblTimePlot->hide();
     }
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
@@ -349,7 +360,9 @@ void MainWindow::on_sldParameter_valueChanged(int value)
     const double pct = (double)value / (double)SLIDER_INT_LIM,
             dval = pct*range + _parserMgr.Minimum(_parameters, index);
     _parameters->SetPar(index, std::to_string(dval));
+#ifdef QT_DEBUG
     qDebug() << "MainWindow::on_sldParameter_valueChanged" << index << value << dval;
+#endif
     ui->tblParameters->update();
     if (IsVFPresent()) UpdateVectorField();
 }
@@ -388,13 +401,12 @@ void MainWindow::ClearPlots()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::ClearPlots";
 #endif
+//    ui->qwtPhasePlot->detachItems();
     for (auto it : _ppPlotItems)
         it->detach();
     _ppPlotItems.clear();
-    for (auto it : _vfPlotItems)
-        it->detach();
-    _vfPlotItems.clear();
-    ui->qwtPhasePlot->detachItems();
+    AttachVectorField(false);
+    ui->qwtTimePlot->detachItems();
 }
 void MainWindow::ConnectModels()
 {
@@ -417,7 +429,8 @@ void MainWindow::Draw()
 {
 //    std::lock_guard<std::mutex> lock(_mutex);
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::Draw()";
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "Enter MainWindow::Draw(), thread id " << s.str().c_str();
 #endif
     if (_mutex.try_lock())
     {
@@ -439,50 +452,22 @@ void MainWindow::Draw()
         }
         _mutex.unlock();
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::Draw(), thread id " << s.str().c_str();
+#endif
 }
 void MainWindow::DrawPhasePortrait()
 {
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::DrawPhasePortrait";
 #endif
-    for (auto it : _ppPlotItems)
-        it->detach();
-    ui->qwtTimePlot->detachItems();
-
-    //The point indicating current value
-    QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-        QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
-    QwtPlotMarker* marker = new QwtPlotMarker();
-    marker->setSymbol(symbol);
-    marker->setZ(1);
-    marker->attach(ui->qwtPhasePlot);
-    _ppPlotItems.push_back(marker);
-
-    //The 'tail' of the plot
-    QwtPlotCurve* curve = new QwtPlotCurve();
-    curve->setPen( Qt::black, 1 );
-    curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-    curve->attach(ui->qwtPhasePlot);
-    _ppPlotItems.push_back(curve);
-
-    //The time plot
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
-    const int num_all_tplots = 1 + num_diffs + num_vars,
-            num_colors = _tpColors.size();
-        // +1 for inner product.  The strategy is to attach all possible curves
-        //but only the enabled ones have non-empty samples.
-    std::vector<QwtPlotCurve*> curve_tp(num_all_tplots);
-    for (int i=0; i<num_all_tplots; ++i)
-    {
-        QwtPlotCurve* curv = new QwtPlotCurve();
-        curv->setPen( _tpColors.at(i%num_colors), 1 );
-        curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-        curv->attach(ui->qwtTimePlot);
-        curve_tp[i] = curv;
-    }
+//    for (auto it : _ppPlotItems)
+//        it->detach();
+//    ui->qwtTimePlot->detachItems();
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
     const double* diffs = _parserMgr.ConstData(_differentials),
             * vars = _parserMgr.ConstData(_variables);
         //variables, differential equations, and initial conditions, all of which can invoke named
@@ -615,7 +600,7 @@ void MainWindow::DrawPhasePortrait()
         //Plot the current state vector
         const int xidx = ui->cmbDiffX->currentIndex(),
                 yidx = ui->cmbDiffY->currentIndex();
-        marker->setValue(diffs[xidx], diffs[yidx]);
+        _marker->setValue(diffs[xidx], diffs[yidx]);
 
         const int num_saved_pts = (int)diff_pts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
@@ -629,16 +614,17 @@ void MainWindow::DrawPhasePortrait()
         int ct_begin = std::max(0,num_saved_pts-tail_len);
         for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
             points[k] = QPointF(diff_pts.at(xidx).at(ct), diff_pts.at(yidx).at(ct));
-        curve->setSamples(points);
+        _curve->setSamples(points);
 
         //Plot points for the inner-product graph
         const int num_tp_points = (int)ip.size();
         TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
         const int dv_start = std::max(0, (int)diff_pts.at(0).size()-num_tp_points),
                 dv_end = dv_start + num_tp_points;
+        const int num_all_tplots = 1 + num_diffs + num_vars;
         for (int i=0; i<num_all_tplots; ++i)
         {
-            QwtPlotCurve* curv = curve_tp[i];
+            QwtPlotCurve* curv = _tpCurves[i];
             if (!tp_model->IsEnabled(i))
             {
                 curv->setSamples(QPolygonF());
@@ -678,22 +664,20 @@ void MainWindow::DrawPhasePortrait()
         for (int i=0; i<num_all_tplots; ++i)
             if (tp_model->IsEnabled(i))
             {
-                QwtPlotCurve* curv = curve_tp[i];
+                QwtPlotCurve* curv = _tpCurves[i];
                 if (curv->maxYValue() > y_tp_max) y_tp_max = curv->maxYValue();
                 if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
             }
-        ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, dv_start, dv_end );
-        ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, y_tp_min, y_tp_max );
-
             //Get axis limits
         auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
                 ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, *xlims.first, *xlims.second );
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, *ylims.first, *ylims.second );
 
-        emit DoReplot();
+        ViewRect pp_data( *xlims.first, *xlims.second, *ylims.first, *ylims.second ),
+                tp_data( dv_start, dv_end, y_tp_min, y_tp_max );
+        emit DoReplot(pp_data, tp_data);
         }
         label:
+//        QThread::msleep(50);
         std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
     }
 
@@ -705,24 +689,28 @@ void MainWindow::DrawVectorField()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::DrawVectorField";
 #endif
-//    qDebug() << "MainWindow::DrawVectorField 1";
+    qDebug() << "MainWindow::DrawVectorField 1";
 //    std::lock_guard<std::mutex> lock(_mutex);
-//    qDebug() << "MainWindow::DrawVectorField 2";
 
     if (_needClearVF)
     {
-        for (auto it : _vfPlotItems)
-            it->detach();
-        _vfPlotItems.clear();
+        emit DoAttachVF(false);
+        std::this_thread::sleep_for( std::chrono::milliseconds(10) );
+//        for (auto it : _vfPlotItems)
+//            it->detach();
+//        _vfPlotItems.clear();
         _needUpdateVF = _needClearVF = false;
         return;
     }
+    qDebug() << "MainWindow::DrawVectorField 2";
 
     if ((_isDrawing && _plotMode==VECTOR_FIELD) || _needInitialize)
     {
         InitParserMgr();
         _needInitialize = false;
     }
+
+    qDebug() << "MainWindow::DrawVectorField 3";
 
     int num_steps = (_plotMode==VECTOR_FIELD && !_isDrawing)
             ? std::max(1, ui->spnTailLength->value())
@@ -742,16 +730,16 @@ void MainWindow::DrawVectorField()
         const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
                 yinc = (ymax - ymin) / (double)(vf_resolution-1);
 
-        for (auto it : _vfPlotItems)
-            it->detach();
-        _vfPlotItems.clear();
+//        for (auto it : _vfPlotItems)
+//            it->detach();
+//        _vfPlotItems.clear();
+        emit DoAttachVF(false);
+        std::this_thread::sleep_for( std::chrono::milliseconds(10) );
+        // ### Need semaphores, or otherwise restructure so that you don't have simultaneous access
+        //to _vfPlotItems
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
-
-    //    qDebug() << "MainWindow::DrawVectorField 3";
-    //    qDebug() << "MainWindow::DrawVectorField 4";
+        qDebug() << "MainWindow::DrawVectorField 4";
         const double dval_x_orig = diffs[xidx],
                 dval_y_orig = diffs[yidx];
         try
@@ -766,14 +754,14 @@ void MainWindow::DrawVectorField()
                     QwtPlotMarker* marker1 = new QwtPlotMarker(),
                             * marker2 = new QwtPlotMarker;
                     marker1->setSymbol(symbol1);
-                    marker1->attach(ui->qwtPhasePlot);
+//                    marker1->attach(ui->qwtPhasePlot);
                     marker2->setSymbol(symbol2);
-                    marker2->attach(ui->qwtPhasePlot);
+//                    marker2->attach(ui->qwtPhasePlot);
 
                     QwtPlotCurve* curv = new QwtPlotCurve();
                     curv->setPen(Qt::blue, 1);
                     curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-                    curv->attach(ui->qwtPhasePlot);
+//                    curv->attach(ui->qwtPhasePlot);
 
                     _vfPlotItems.push_back(marker1);
                     _vfPlotItems.push_back(marker2);
@@ -814,14 +802,18 @@ void MainWindow::DrawVectorField()
         _parserMgr.SetData(_differentials, xidx, dval_x_orig);
         _parserMgr.SetData(_differentials, yidx, dval_y_orig);
 
-    //    qDebug() << "MainWindow::DrawVectorField 5";
+        emit DoAttachVF();
+        std::this_thread::sleep_for( std::chrono::milliseconds(50) );
+
+        qDebug() << "MainWindow::DrawVectorField 5";
         _needUpdateVF = false;
         if (_plotMode==VECTOR_FIELD)
         {
-            emit DoReplot();
+            ViewRect pp_data(xmin, xmax, ymin, ymax);
+            emit DoReplot(pp_data, ViewRect());
+//            QThread::msleep(500);
             std::this_thread::sleep_for( std::chrono::milliseconds(VF_SLEEP_MS) );
         }
-        std::this_thread::sleep_for( std::chrono::milliseconds(SLEEP_MS) );
     //    qDebug() << "MainWindow::DrawVectorField 6";
     }
 
@@ -864,6 +856,9 @@ void MainWindow::InitDraw()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::InitDraw";
 #endif
+//    QThread t( std::bind(&MainWindow::Draw, this) );
+//    t.detach();
+    InitPlots();
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
 }
@@ -914,6 +909,60 @@ void MainWindow::InitParserMgr()
     _parserMgr.SetConditions();
     _needInitialize = false;
 }
+void MainWindow::InitPlots()
+{
+    switch (_plotMode)
+    {
+        case SINGLE:
+        {
+            //Clear old items
+            for (auto it : _ppPlotItems)
+                it->detach();
+            _ppPlotItems.clear();
+            ui->qwtTimePlot->detachItems();
+
+            //The point indicating current value
+            QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+                QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
+            _marker = new QwtPlotMarker();
+            _marker->setSymbol(symbol);
+            _marker->setZ(1);
+            _marker->attach(ui->qwtPhasePlot);
+            _ppPlotItems.push_back(_marker);
+
+            //The 'tail' of the plot
+            _curve = new QwtPlotCurve();
+            _curve->setPen( Qt::black, 1 );
+            _curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+            _curve->attach(ui->qwtPhasePlot);
+            _ppPlotItems.push_back(_curve);
+
+            //The time plot
+            const int num_diffs = (int)_differentials->NumPars(),
+                    num_vars = (int)_variables->NumPars();
+            const int num_all_tplots = 1 + num_diffs + num_vars,
+                    num_colors = _tpColors.size();
+                // +1 for inner product.  The strategy is to attach all possible curves
+                //but only the enabled ones have non-empty samples.
+            _tpCurves.resize(num_all_tplots);
+            for (int i=0; i<num_all_tplots; ++i)
+            {
+                QwtPlotCurve* curv = new QwtPlotCurve();
+                curv->setPen( _tpColors.at(i%num_colors), 1 );
+                curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+                curv->attach(ui->qwtTimePlot);
+                _tpCurves[i] = curv;
+            }
+            break;
+        }
+        case VECTOR_FIELD:
+        {
+            AttachVectorField(false);
+            _needClearVF = false;
+            break;
+        }
+    }
+}
 
 const std::vector<QColor> MainWindow::InitTPColors() const
 {
@@ -936,6 +985,27 @@ const std::vector<QColor> MainWindow::InitTPColors() const
     return vc;
 }
 
+void MainWindow::AttachVectorField(bool attach) //slot
+{
+#ifdef DEBUG_FUNC
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "Enter MainWindow::AttachVectorField" << attach << ", thread id"
+             << s.str().c_str();
+    assert(_guiTid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
+#endif
+    if (attach)
+        for (auto it : _vfPlotItems)
+            it->attach(ui->qwtPhasePlot);
+    else
+    {
+        for (auto it : _vfPlotItems)
+            it->detach();
+        _vfPlotItems.clear();
+    }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::AttachVectorField";
+#endif
+}
 void MainWindow::ComboBoxChanged(const QString& text) //slot
 {
 #ifdef DEBUG_FUNC
@@ -983,11 +1053,22 @@ void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
 }
-void MainWindow::Replot() //slot
+void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 {
 //    std::lock_guard<std::mutex> lock(_mutex);
-    ui->qwtPhasePlot->replot();
-    ui->qwtTimePlot->replot();
+    if (pp_data != ViewRect())
+    {
+        ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_data.xmin, pp_data.xmax );
+        ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_data.ymin, pp_data.ymax );
+        ui->qwtPhasePlot->replot();
+    }
+
+    if (tp_data != ViewRect())
+    {
+        ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_data.xmin, tp_data.xmax );
+        ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_data.ymin, tp_data.ymax );
+        ui->qwtTimePlot->replot();
+    }
 }
 void MainWindow::UpdateParams() //slot
 {
@@ -1075,6 +1156,12 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->btnRemoveExpression->setEnabled(is_enabled);
     ui->btnRemoveParameter->setEnabled(is_enabled);
     ui->btnRemoveVariable->setEnabled(is_enabled);
+
+    ui->actionClear->setEnabled(is_enabled);
+    ui->actionLoad->setEnabled(is_enabled);
+    ui->actionReload_Current->setEnabled(is_enabled);
+    ui->actionSave_Data->setEnabled(is_enabled);
+    ui->actionSave_Model->setEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
 }

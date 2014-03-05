@@ -137,7 +137,9 @@ void ParserMgr::InitModels()
                 AssignInput(model, i, value);
 
                 //Initialize
+#ifdef QT_DEBUG
                 qDebug() << model->Key(i).c_str() << value.c_str() << ", " << atof(value.c_str());
+#endif
                 if (model->Id()==ds::PARAMETERS)
                     data[i] = atof(value.c_str()); // ###
             }

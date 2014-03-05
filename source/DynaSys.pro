@@ -13,10 +13,13 @@ TEMPLATE = app
 
 QMAKE_CXXFLAGS += -std=c++11
 QMAKE_CXXFLAGS += -gdwarf-3
+QMAKE_CXXFLAGS += -DQWT_DLL
 
 OBJECTS_DIR = obj
 MOC_DIR = moc
 UI_DIR = ui
+
+RC_FILE = DynaSys.rc #Windows only
 
 SOURCES += main.cpp\
         gui/mainwindow.cpp \
@@ -36,7 +39,8 @@ SOURCES += main.cpp\
     globals/globals.cpp \
     models/parammodelbase.cpp \
     models/tpvtablemodel.cpp \
-    gui/checkboxdelegate.cpp
+    gui/checkboxdelegate.cpp \
+    gui/dsplot.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -55,7 +59,8 @@ HEADERS  += gui/mainwindow.h \
     globals/globals.h \
     models/parammodelbase.h \
     models/tpvtablemodel.h \
-    gui/checkboxdelegate.h
+    gui/checkboxdelegate.h \
+    gui/dsplot.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

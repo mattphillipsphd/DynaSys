@@ -5,9 +5,11 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QFile>
+#include <QIcon>
 #include <QInputDialog>
 #include <QMainWindow>
 #include <QStringListModel>
+#include <QThread> // ###
 
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
@@ -55,6 +57,32 @@ class MainWindow : public QMainWindow
             VECTOR_FIELD
         };
 
+        struct ViewRect
+        {
+            ViewRect(double xmi, double xma, double ymi, double yma)
+                : xmin(xmi), xmax(xma), ymin(ymi), ymax(yma)
+            {}
+            ViewRect() : xmin(0.0), xmax(0.0), ymin(0.0), ymax(0.0)
+            {}
+            bool operator==(const ViewRect& o) const
+            {
+                return xmin==o.xmin && xmax==o.xmax && ymin==o.ymin && ymax==o.ymax;
+            }
+            bool operator!=(const ViewRect& o) const
+            {
+                return !operator==(o);
+            }
+
+            double xmin, xmax, ymin, ymax;
+        };
+        struct TPData
+        {
+            QwtPlotCurve* curve;
+            QwtPlotMarker* marker;
+            std::vector<QwtPlotCurve*> curves;
+            double xmin, xmax, ymin, ymax;
+        };
+
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
@@ -71,8 +99,9 @@ class MainWindow : public QMainWindow
     public slots:
 
     signals:
-        void DoReplot();
+        void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
+        void DoAttachVF(bool attach = true);
 
     private slots:
         void on_actionAbout_triggered();
@@ -107,11 +136,12 @@ class MainWindow : public QMainWindow
         void on_spnTailLength_valueChanged(int);
         void on_spnVFResolution_valueChanged(int);
 
+        void AttachVectorField(bool attach = true);
         void ComboBoxChanged(const QString& text);
         void ExprnChanged(QModelIndex, QModelIndex);
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
-        void Replot();
+        void Replot(const ViewRect& pp_data, const ViewRect& tp_data);
         void UpdateParams();
 
     private:
@@ -129,6 +159,7 @@ class MainWindow : public QMainWindow
         void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
                         ConditionModel* conditions = nullptr);
         void InitParserMgr();
+        void InitPlots();
         const std::vector<QColor> InitTPColors() const;
         bool IsVFPresent() const;
         void LoadModel();
@@ -153,6 +184,7 @@ class MainWindow : public QMainWindow
 
         std::vector<ComboBoxDelegate*> _cmbDelegates;
         std::string _fileName;
+        const std::thread::id _guiTid;
         volatile bool _isDrawing;
         std::mutex _mutex;
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns, _needUpdateVF;
@@ -165,6 +197,13 @@ class MainWindow : public QMainWindow
             //Consider making a little pulse struct/class
         const std::vector<QColor> _tpColors;
         std::vector<QwtPlotItem*> _vfPlotItems;
+
+        QwtPlotCurve* _curve;
+        QwtPlotMarker* _marker;
+        std::vector<QwtPlotCurve*> _tpCurves;
 };
+
+Q_DECLARE_METATYPE(MainWindow::ViewRect)
+Q_DECLARE_METATYPE(MainWindow::TPData)
 
 #endif // MAINWINDOW_H
