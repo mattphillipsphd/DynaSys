@@ -1,6 +1,15 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <iostream>
+#include <memory>
+#include <random>
+#include <thread>
+
 #include <QColor>
 #include <QDebug>
 #include <QFileDialog>
@@ -9,7 +18,7 @@
 #include <QInputDialog>
 #include <QMainWindow>
 #include <QStringListModel>
-#include <QThread> // ###
+//#include <QThread> // ###
 
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
@@ -30,14 +39,6 @@
 #include "../memrep/parsermgr.h"
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
-
-#include <algorithm>
-#include <chrono>
-#include <deque>
-#include <iostream>
-#include <memory>
-#include <random>
-#include <thread>
 
 //#define DEBUG_FUNC
 
@@ -136,6 +137,7 @@ class MainWindow : public QMainWindow
         void on_spnTailLength_valueChanged(int);
         void on_spnVFResolution_valueChanged(int);
 
+        void AttachPhasePlot(bool attach = true);
         void AttachVectorField(bool attach = true);
         void ComboBoxChanged(const QString& text);
         void ExprnChanged(QModelIndex, QModelIndex);
@@ -183,9 +185,10 @@ class MainWindow : public QMainWindow
                 * _variables;   //Can invoke other expressions
 
         std::vector<ComboBoxDelegate*> _cmbDelegates;
+        std::condition_variable _condVar;
         std::string _fileName;
         const std::thread::id _guiTid;
-        volatile bool _isDrawing;
+        volatile bool _isDrawing, _isVFAttached;
         std::mutex _mutex;
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns, _needUpdateVF;
         ParserMgr _parserMgr;

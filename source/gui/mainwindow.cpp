@@ -15,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr), _fileName(""), _guiTid(std::this_thread::get_id()),
-    _isDrawing(false),
+    _isDrawing(false), _isVFAttached(false),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false), _needUpdateVF(false),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _tpColors(InitTPColors())
@@ -360,11 +360,8 @@ void MainWindow::on_sldParameter_valueChanged(int value)
     const double pct = (double)value / (double)SLIDER_INT_LIM,
             dval = pct*range + _parserMgr.Minimum(_parameters, index);
     _parameters->SetPar(index, std::to_string(dval));
-#ifdef QT_DEBUG
-    qDebug() << "MainWindow::on_sldParameter_valueChanged" << index << value << dval;
-#endif
     ui->tblParameters->update();
-    if (IsVFPresent()) UpdateVectorField();
+//    if (IsVFPresent()) UpdateVectorField();
 }
 void MainWindow::on_spnTailLength_valueChanged(int)
 {
@@ -401,10 +398,7 @@ void MainWindow::ClearPlots()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::ClearPlots";
 #endif
-//    ui->qwtPhasePlot->detachItems();
-    for (auto it : _ppPlotItems)
-        it->detach();
-    _ppPlotItems.clear();
+    AttachPhasePlot(false);
     AttachVectorField(false);
     ui->qwtTimePlot->detachItems();
 }
@@ -432,25 +426,21 @@ void MainWindow::Draw()
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "Enter MainWindow::Draw(), thread id " << s.str().c_str();
 #endif
-    if (_mutex.try_lock())
+    try
     {
-        try
+        switch (_plotMode)
         {
-            switch (_plotMode)
-            {
-                case SINGLE:
-                    DrawPhasePortrait();
-                    break;
-                case VECTOR_FIELD:
-                    DrawVectorField();
-                    break;
-            }
+            case SINGLE:
+                DrawPhasePortrait();
+                break;
+            case VECTOR_FIELD:
+                DrawVectorField();
+                break;
         }
-        catch (std::exception& e)
-        {
-            qDebug() << "MainWindow::Draw" << e.what();
-        }
-        _mutex.unlock();
+    }
+    catch (std::exception& e)
+    {
+        qDebug() << "MainWindow::Draw" << e.what();
     }
 #ifdef DEBUG_FUNC
     qDebug() << "Exit MainWindow::Draw(), thread id " << s.str().c_str();
@@ -461,9 +451,6 @@ void MainWindow::DrawPhasePortrait()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::DrawPhasePortrait";
 #endif
-//    for (auto it : _ppPlotItems)
-//        it->detach();
-//    ui->qwtTimePlot->detachItems();
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
     const int num_diffs = (int)_differentials->NumPars(),
@@ -695,10 +682,8 @@ void MainWindow::DrawVectorField()
     if (_needClearVF)
     {
         emit DoAttachVF(false);
-        std::this_thread::sleep_for( std::chrono::milliseconds(10) );
-//        for (auto it : _vfPlotItems)
-//            it->detach();
-//        _vfPlotItems.clear();
+        std::unique_lock<std::mutex> lock(_mutex);
+        _condVar.wait(lock, [&]{ return _vfPlotItems.empty(); });
         _needUpdateVF = _needClearVF = false;
         return;
     }
@@ -717,7 +702,9 @@ void MainWindow::DrawVectorField()
             : 1;
     while ((_isDrawing && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
-        const int num_diffs = _differentials->NumPars();
+        auto loop_begin = std::chrono::system_clock::now();
+
+        const int num_diffs = (int)_differentials->NumPars();
         const double* diffs = _parserMgr.ConstData(_differentials);
         const int xidx = ui->cmbDiffX->currentIndex(),
                 yidx = ui->cmbDiffY->currentIndex();
@@ -730,13 +717,12 @@ void MainWindow::DrawVectorField()
         const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
                 yinc = (ymax - ymin) / (double)(vf_resolution-1);
 
-//        for (auto it : _vfPlotItems)
-//            it->detach();
-//        _vfPlotItems.clear();
         emit DoAttachVF(false);
-        std::this_thread::sleep_for( std::chrono::milliseconds(10) );
-        // ### Need semaphores, or otherwise restructure so that you don't have simultaneous access
-        //to _vfPlotItems
+        qDebug() << "MainWindow::DrawVectorField 3.2";
+        std::unique_lock<std::mutex> lock(_mutex);
+        qDebug() << "MainWindow::DrawVectorField 3.5";
+        _condVar.wait(lock, [&]{ return _vfPlotItems.empty(); });
+
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
         qDebug() << "MainWindow::DrawVectorField 4";
@@ -799,11 +785,15 @@ void MainWindow::DrawVectorField()
         {
             qDebug() << "MainWindow::DrawVectorField" << e.what();
         }
+        lock.unlock();
         _parserMgr.SetData(_differentials, xidx, dval_x_orig);
         _parserMgr.SetData(_differentials, yidx, dval_y_orig);
 
+        _isVFAttached = false;
         emit DoAttachVF();
-        std::this_thread::sleep_for( std::chrono::milliseconds(50) );
+        std::unique_lock<std::mutex> lock2(_mutex);
+        _condVar.wait(lock2, [&]{ return _isVFAttached; });
+        lock2.unlock();
 
         qDebug() << "MainWindow::DrawVectorField 5";
         _needUpdateVF = false;
@@ -812,7 +802,10 @@ void MainWindow::DrawVectorField()
             ViewRect pp_data(xmin, xmax, ymin, ymax);
             emit DoReplot(pp_data, ViewRect());
 //            QThread::msleep(500);
-            std::this_thread::sleep_for( std::chrono::milliseconds(VF_SLEEP_MS) );
+            auto loop_dur = std::chrono::system_clock::now() - loop_begin;
+            int dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(loop_dur).count(),
+                    sleep_time = std::max(10, VF_SLEEP_MS-dur_ms);
+            std::this_thread::sleep_for( std::chrono::milliseconds(sleep_time) );
         }
     //    qDebug() << "MainWindow::DrawVectorField 6";
     }
@@ -911,14 +904,15 @@ void MainWindow::InitParserMgr()
 }
 void MainWindow::InitPlots()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::InitPlots";
+#endif
     switch (_plotMode)
     {
         case SINGLE:
         {
             //Clear old items
-            for (auto it : _ppPlotItems)
-                it->detach();
-            _ppPlotItems.clear();
+            AttachPhasePlot(false);
             ui->qwtTimePlot->detachItems();
 
             //The point indicating current value
@@ -941,7 +935,7 @@ void MainWindow::InitPlots()
             const int num_diffs = (int)_differentials->NumPars(),
                     num_vars = (int)_variables->NumPars();
             const int num_all_tplots = 1 + num_diffs + num_vars,
-                    num_colors = _tpColors.size();
+                    num_colors = (int)_tpColors.size();
                 // +1 for inner product.  The strategy is to attach all possible curves
                 //but only the enabled ones have non-empty samples.
             _tpCurves.resize(num_all_tplots);
@@ -985,6 +979,28 @@ const std::vector<QColor> MainWindow::InitTPColors() const
     return vc;
 }
 
+void MainWindow::AttachPhasePlot(bool attach) //slot
+{
+#ifdef DEBUG_FUNC
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "Enter MainWindow::AttachPhasePlot" << attach << ", thread id"
+             << s.str().c_str();
+    assert(_guiTid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
+#endif
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (attach)
+        for (auto it : _vfPlotItems)
+            it->attach(ui->qwtPhasePlot);
+    else
+    {
+        for (auto it : _ppPlotItems)
+            it->detach();
+        _ppPlotItems.clear();
+    }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::AttachPhasePlot";
+#endif
+}
 void MainWindow::AttachVectorField(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
@@ -993,15 +1009,20 @@ void MainWindow::AttachVectorField(bool attach) //slot
              << s.str().c_str();
     assert(_guiTid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     if (attach)
+    {
         for (auto it : _vfPlotItems)
             it->attach(ui->qwtPhasePlot);
+        _isVFAttached = true;
+    }
     else
     {
         for (auto it : _vfPlotItems)
             it->detach();
         _vfPlotItems.clear();
     }
+    _condVar.notify_one();
 #ifdef DEBUG_FUNC
     qDebug() << "Exit MainWindow::AttachVectorField";
 #endif
@@ -1227,7 +1248,9 @@ void MainWindow::UpdateTimePlotTable()
 void MainWindow::UpdateVectorField()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::UpdateVectorField";
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "MainWindow::UpdateVectorField(), thread id " << s.str().c_str()
+                << _needUpdateVF << _isDrawing;
 #endif
     if (_needUpdateVF) return;
     _needUpdateVF = true;

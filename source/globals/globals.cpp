@@ -1,7 +1,7 @@
 #include "globals.h"
 
 const std::string ds::TEMP_FILE = ".temp.txt";
-const std::string ds::VERSION_STR = "0.1.0";
+const std::string ds::VERSION_STR = "0.1.1";
 
 ds::PMODEL ds::Model(const std::string& model)
 {
