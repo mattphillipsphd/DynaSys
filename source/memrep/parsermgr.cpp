@@ -65,8 +65,6 @@ void ParserMgr::ClearExpressions()
 }
 void ParserMgr::ClearModels()
 {
-    for (auto it : _models)
-        delete it.second;
     _models.clear();
     _areModelsInitialized = false;
 }

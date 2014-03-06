@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -18,8 +19,8 @@
 #include <QInputDialog>
 #include <QMainWindow>
 #include <QStringListModel>
-//#include <QThread> // ###
 
+#include <qwt_scale_div.h>
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_marker.h>
@@ -76,13 +77,6 @@ class MainWindow : public QMainWindow
 
             double xmin, xmax, ymin, ymax;
         };
-        struct TPData
-        {
-            QwtPlotCurve* curve;
-            QwtPlotMarker* marker;
-            std::vector<QwtPlotCurve*> curves;
-            double xmin, xmax, ymin, ymax;
-        };
 
         static const int MAX_BUF_SIZE,
                         SLEEP_MS,
@@ -102,7 +96,7 @@ class MainWindow : public QMainWindow
     signals:
         void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
-        void DoAttachVF(bool attach = true);
+        void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
 
     private slots:
         void on_actionAbout_triggered();
@@ -118,6 +112,7 @@ class MainWindow : public QMainWindow
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
+        void on_btnFitVF_clicked();
         void on_btnRemoveCondition_clicked();
         void on_btnRemoveExpression_clicked();
         void on_btnRemoveDiff_clicked();
@@ -138,6 +133,7 @@ class MainWindow : public QMainWindow
         void on_spnVFResolution_valueChanged(int);
 
         void AttachPhasePlot(bool attach = true);
+        void AttachTimePlot(bool attach = true);
         void AttachVectorField(bool attach = true);
         void ComboBoxChanged(const QString& text);
         void ExprnChanged(QModelIndex, QModelIndex);
@@ -187,6 +183,7 @@ class MainWindow : public QMainWindow
         std::vector<ComboBoxDelegate*> _cmbDelegates;
         std::condition_variable _condVar;
         std::string _fileName;
+        volatile bool _finishedReplot;
         const std::thread::id _guiTid;
         volatile bool _isDrawing, _isVFAttached;
         std::mutex _mutex;
@@ -207,6 +204,5 @@ class MainWindow : public QMainWindow
 };
 
 Q_DECLARE_METATYPE(MainWindow::ViewRect)
-Q_DECLARE_METATYPE(MainWindow::TPData)
 
 #endif // MAINWINDOW_H

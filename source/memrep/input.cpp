@@ -60,21 +60,21 @@ void Input::GenerateInput(TYPE type)
         {
             std::uniform_real_distribution<double> uni_rand;
             GenerateRandInput(uni_rand);
-            std::cerr << "UNI_RAND" << std::endl;
+//            std::cerr << "UNI_RAND" << std::endl;
             break;
         }
         case GAMMA_RAND:
         {
             std::gamma_distribution<double> gamma_rand;
             GenerateRandInput(gamma_rand);
-            std::cerr << "GAMMA_RAND" << std::endl;
+//            std::cerr << "GAMMA_RAND" << std::endl;
             break;
         }
         case NORM_RAND:
         {
             std::normal_distribution<double> norm_rand;
             GenerateRandInput(norm_rand);
-            std::cerr << "NORM_RAND" << std::endl;
+//            std::cerr << "NORM_RAND" << std::endl;
             break;
         }
         case TXT_FILE:

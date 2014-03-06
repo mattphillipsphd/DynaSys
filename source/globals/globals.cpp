@@ -1,5 +1,7 @@
 #include "globals.h"
 
+const double ds::PI = 3.14159265358979;
+
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::VERSION_STR = "0.1.1";
 

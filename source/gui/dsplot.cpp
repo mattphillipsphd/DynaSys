@@ -12,8 +12,10 @@
 DSPlot::DSPlot(QWidget *parent) :
     QwtPlot(parent), _tid(std::this_thread::get_id())
 {
+#ifdef DEBUG_FUNC
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
+#endif
 }
 DSPlot::DSPlot( const QwtText &title, QWidget *parent ):
     QwtPlot(title, parent), _tid(std::this_thread::get_id())
