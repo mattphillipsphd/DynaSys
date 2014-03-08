@@ -12,7 +12,8 @@ AboutGui::AboutGui(QWidget *parent) :
     ui->txtAbout->setText(std::string(
                 "DynaSys " + ds::VERSION_STR + "\n\n"
                 "Matt Phillips, mattphillipsphd@gmail.com\n\n"
-                "Created with Qt, Qwt, and Ingo Berg's muParser."
+                "Created with Qt, Qwt, and Ingo Berg's muParser.\n\n"
+                "DynaSys is licensed under the terms of the GPLv3, http://www.gnu.org/licenses/licenses.html#GPL."
                 ).c_str());
 }
 
