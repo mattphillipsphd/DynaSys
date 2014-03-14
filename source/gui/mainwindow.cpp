@@ -1,6 +1,10 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+const int MainWindow::DEFAULT_SINGLE_STEP = 100;
+const int MainWindow::DEFAULT_SINGLE_TAIL = -1;
+const int MainWindow::DEFAULT_VF_STEP = 1;
+const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
@@ -18,7 +22,9 @@ MainWindow::MainWindow(QWidget *parent) :
     _isDrawing(false), _isVFAttached(false),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false), _needUpdateVF(false),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
-    _tpColors(InitTPColors())
+    _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
+    _tpColors(InitTPColors()),
+    _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
     qRegisterMetaType<ViewRect>("ViewRect");
 
@@ -31,6 +37,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
     ui->sldParameter->setRange(0, SLIDER_INT_LIM);
     ui->spnVFResolution->setValue(VF_RESOLUTION);
+    ui->spnStepsPerSec->setValue(_singleStepsSec);
+    ui->spnTailLength->setValue(_singleTailLen);
 
     ui->qwtPhasePlot->setAutoDelete(false);
     ui->qwtTimePlot->setAutoDelete(false);
@@ -313,6 +321,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         ui->btnPulse->setEnabled(true);
         ui->qwtTimePlot->show();
         ui->tblTimePlot->show();
+        ui->spnStepsPerSec->setValue(_singleStepsSec);
+        ui->spnTailLength->setValue(_singleTailLen);
     }
     else if (text=="Vector field")
     {
@@ -321,6 +331,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         UpdateVectorField();
         ui->qwtTimePlot->hide();
         ui->tblTimePlot->hide();
+        ui->spnStepsPerSec->setValue(_vfStepsSec);
+        ui->spnTailLength->setValue(_vfTailLen);
     }
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
@@ -354,12 +366,36 @@ void MainWindow::on_sldParameter_valueChanged(int value)
     _parameters->SetPar(index, std::to_string(dval));
     ui->tblParameters->update();
 }
-void MainWindow::on_spnTailLength_valueChanged(int)
+void MainWindow::on_spnStepsPerSec_valueChanged(int value)
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_spnStepsPerSec_valueChanged";
+#endif
+    switch (_plotMode)
+    {
+        case SINGLE:
+            _singleStepsSec = value;
+            break;
+        case VECTOR_FIELD:
+            _vfStepsSec = value;
+            break;
+    }
+}
+void MainWindow::on_spnTailLength_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_spnTailLength_valueChanged";
 #endif
-    if (IsVFPresent()) UpdateVectorField();
+    switch (_plotMode)
+    {
+        case SINGLE:
+            _singleTailLen = value;
+            break;
+        case VECTOR_FIELD:
+            _vfTailLen = value;
+            UpdateVectorField();
+            break;
+    }
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
 {

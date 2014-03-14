@@ -78,7 +78,11 @@ class MainWindow : public QMainWindow
             double xmin, xmax, ymin, ymax;
         };
 
-        static const int MAX_BUF_SIZE,
+        static const int DEFAULT_SINGLE_STEP,
+                        DEFAULT_SINGLE_TAIL,
+                        DEFAULT_VF_STEP,
+                        DEFAULT_VF_TAIL,
+                        MAX_BUF_SIZE,
                         SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         IP_SAMPLES_SHOWN,
@@ -129,7 +133,8 @@ class MainWindow : public QMainWindow
 
         void on_sldParameter_valueChanged(int value);
 
-        void on_spnTailLength_valueChanged(int);
+        void on_spnStepsPerSec_valueChanged(int value);
+        void on_spnTailLength_valueChanged(int value);
         void on_spnVFResolution_valueChanged(int);
 
         void AttachPhasePlot(bool attach = true);
@@ -193,10 +198,12 @@ class MainWindow : public QMainWindow
         std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
         size_t _pulseParIdx;
-        int _pulseStepsRemaining;
+        int _pulseStepsRemaining,
             //Consider making a little pulse struct/class
+            _singleStepsSec, _singleTailLen;
         const std::vector<QColor> _tpColors;
         std::vector<QwtPlotItem*> _vfPlotItems;
+        int _vfStepsSec, _vfTailLen;
 
         QwtPlotCurve* _curve;
         QwtPlotMarker* _marker;
