@@ -30,6 +30,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
+#ifdef DEBUG_FUNC
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "MainWindow::MainWindow, thread id:" << s.str().c_str();
+#endif
+
     QStringList modes;
     modes << "Single" << "Vector field";
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
@@ -55,6 +60,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ConnectModels();
 
     connect(this, SIGNAL(DoAttachVF(bool)), this, SLOT(AttachVectorField(bool)), Qt::QueuedConnection);
+    connect(this, SIGNAL(DoInitParserMgr()), this, SLOT(InitParserMgr()), Qt::QueuedConnection);
     connect(this, SIGNAL(DoReplot(const ViewRect&, const ViewRect&)),
             this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::QueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
@@ -288,6 +294,7 @@ void MainWindow::on_btnStart_clicked()
         _isDrawing = _needInitialize = true;
         SetButtonsEnabled(false);
         ui->btnStart->setText("Stop");
+        if (_plotMode==VECTOR_FIELD) _vfTailLen = 1;
         InitDraw();
     }
 }
@@ -371,6 +378,7 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_spnStepsPerSec_valueChanged";
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     switch (_plotMode)
     {
         case SINGLE:
@@ -386,6 +394,7 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_spnTailLength_valueChanged";
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     switch (_plotMode)
     {
         case SINGLE:
@@ -393,6 +402,7 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             break;
         case VECTOR_FIELD:
             _vfTailLen = value;
+            _mutex.unlock();
             UpdateVectorField();
             break;
     }
@@ -535,7 +545,12 @@ void MainWindow::DrawPhasePortrait()
             //Go through each expression and evaluate them
         try
         {
-            if (_needInitialize) InitParserMgr();
+            if (_needInitialize)
+            {
+                emit DoInitParserMgr();
+                std::unique_lock<std::mutex> lock(_mutex);
+                _condVar.wait(lock, [&]{ return !_needInitialize; });
+            }
             if (_needUpdateExprns)
             {
                 _parserMgr.SetExpressions();
@@ -695,7 +710,7 @@ void MainWindow::DrawVectorField()
 #ifdef DEBUG_FUNC
     qDebug() << "Enter MainWindow::DrawVectorField";
 #endif
-//    qDebug() << "MainWindow::DrawVectorField 1";
+    qDebug() << "MainWindow::DrawVectorField 1";
 
     if (_needClearVF)
     {
@@ -705,19 +720,17 @@ void MainWindow::DrawVectorField()
         _needUpdateVF = _needClearVF = false;
         return;
     }
-//    qDebug() << "MainWindow::DrawVectorField 2";
+    qDebug() << "MainWindow::DrawVectorField 2";
 
     if ((_isDrawing && _plotMode==VECTOR_FIELD) || _needInitialize)
     {
-        InitParserMgr();
-        _needInitialize = false;
+        emit DoInitParserMgr();
+        std::unique_lock<std::mutex> lock(_mutex);
+        _condVar.wait(lock, [&]{ return !_needInitialize; });
     }
 
-//    qDebug() << "MainWindow::DrawVectorField 3";
+    qDebug() << "MainWindow::DrawVectorField 3";
 
-    int num_steps = (_plotMode==VECTOR_FIELD && !_isDrawing)
-            ? std::max(1, ui->spnTailLength->value())
-            : 1;
     while ((_isDrawing && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
         auto loop_begin = std::chrono::system_clock::now();
@@ -738,14 +751,14 @@ void MainWindow::DrawVectorField()
 
         _isVFAttached = true;
         emit DoAttachVF(false);
-//        qDebug() << "MainWindow::DrawVectorField 3.2";
+        qDebug() << "MainWindow::DrawVectorField 4";
         std::unique_lock<std::mutex> lock(_mutex);
-//        qDebug() << "MainWindow::DrawVectorField 3.5";
+        qDebug() << "MainWindow::DrawVectorField 5";
         _condVar.wait(lock, [&]{ return !_isVFAttached; });
 
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
-//        qDebug() << "MainWindow::DrawVectorField 4";
+        qDebug() << "MainWindow::DrawVectorField 6";
         std::vector<double> dvals_orig(num_diffs);
         for (int i=0; i<num_diffs; ++i)
             dvals_orig[i] = diffs[i];
@@ -770,7 +783,7 @@ void MainWindow::DrawVectorField()
                     _vfPlotItems.push_back(curv);
                     _vfPlotItems.push_back(arrow);
 
-                    QPolygonF pts(num_steps+1);
+                    QPolygonF pts(_vfTailLen+1);
                     const double x = i*xinc + xmin,
                                 y = j*yinc + ymin;
                     pts[0] = QPointF(x, y);
@@ -782,18 +795,18 @@ void MainWindow::DrawVectorField()
                         _parserMgr.ResetDifferentials();
                     _parserMgr.SetData(_differentials, xidx, x);
                     _parserMgr.SetData(_differentials, yidx, y);
-                    for (int k=1; k<=num_steps; ++k)
+                    for (int k=1; k<=_vfTailLen; ++k)
                     {
                         _parserMgr.ParserEval(false);
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
 
                     QPolygonF arrow_pts(3);
-                    const double lastx = pts[num_steps].x(),
-                            lasty = pts[num_steps].y();
+                    const double lastx = pts[_vfTailLen].x(),
+                            lasty = pts[_vfTailLen].y();
                     arrow_pts[1] = QPointF(lastx, lasty);
-                    const double dx = pts[num_steps-1].x() - lastx,
-                            dy = pts[num_steps-1].y() - lasty;
+                    const double dx = pts[_vfTailLen-1].x() - lastx,
+                            dy = pts[_vfTailLen-1].y() - lasty;
                     const double theta = std::atan2(dy, dx);
                     const double p1x = lastx + arrow_leg*cos(theta + ds::PI/8),
                             p1y = lasty + arrow_leg*sin(theta + ds::PI/8),
@@ -807,7 +820,7 @@ void MainWindow::DrawVectorField()
                     curv->setSamples(pts);
                     curv->setZ(-0.5);
                 }
-            ++num_steps;
+            _vfTailLen += _vfStepsSec;
         }
         catch (std::exception& e)
         {
@@ -823,7 +836,7 @@ void MainWindow::DrawVectorField()
         _condVar.wait(lock2, [&]{ return _isVFAttached; });
         lock2.unlock();
 
-//        qDebug() << "MainWindow::DrawVectorField 5";
+        qDebug() << "MainWindow::DrawVectorField 7";
         _needUpdateVF = false;
         if (_plotMode==VECTOR_FIELD)
         {
@@ -840,7 +853,7 @@ void MainWindow::DrawVectorField()
                     sleep_time = std::max(10, VF_SLEEP_MS-dur_ms);
             std::this_thread::sleep_for( std::chrono::milliseconds(sleep_time) );
         }
-//        qDebug() << "MainWindow::DrawVectorField 6";
+        qDebug() << "MainWindow::DrawVectorField 8";
     }
 
     if (_plotMode==VECTOR_FIELD) _isDrawing = false;
@@ -927,14 +940,6 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     ui->lsConditions->setModelColumn(0);
     ResetResultsList(-1);
     _parserMgr.SetCondModel(_conditions);
-}
-void MainWindow::InitParserMgr()
-{
-    _parserMgr.InitModels();
-    _parserMgr.InitParsers();
-    _parserMgr.SetExpressions();
-    _parserMgr.SetConditions();
-    _needInitialize = false;
 }
 void MainWindow::InitPlots()
 {
@@ -1111,6 +1116,25 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
     _needUpdateExprns = true;
     if (IsVFPresent()) UpdateVectorField();
 }
+void MainWindow::InitParserMgr() //slot
+{
+#ifdef DEBUG_FUNC
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "Enter MainWindow::InitParserMgr" << ", thread id"
+             << s.str().c_str();
+    assert(_guiTid == std::this_thread::get_id() && "InitParserMgr called from worker thread!");
+#endif
+    std::lock_guard<std::mutex> lock(_mutex);
+    _parserMgr.InitModels();
+    _parserMgr.InitParsers();
+    _parserMgr.SetExpressions();
+    _parserMgr.SetConditions();
+    _needInitialize = false;
+    _condVar.notify_one();
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::InitParserMgr";
+#endif
+}
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
 #ifdef DEBUG_FUNC
@@ -1133,7 +1157,7 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 #ifdef DEBUG_FUNC
     assert(std::this_thread::get_id()==_guiTid && "Thread error: MainWindow::Replot");
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
 
     if (pp_data != ViewRect())
     {
@@ -1151,6 +1175,10 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 
     _finishedReplot = true;
     _condVar.notify_one();
+
+//    lock.unlock();
+//    if (_plotMode==VECTOR_FIELD)
+//        ui->spnTailLength->setValue(_vfTailLen);
 }
 void MainWindow::UpdateParams() //slot
 {

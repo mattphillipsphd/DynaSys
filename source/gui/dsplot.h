@@ -11,6 +11,11 @@
 #include "../globals/globals.h"
 #include <qwt_plot.h>
 
+#ifdef DEBUG_FUNC
+#define DEBUG_FUNC_DSPLOT
+#endif
+#undef DEBUG_FUNC_DSPLOT
+
 class DSPlot : public QwtPlot
 {
     Q_OBJECT

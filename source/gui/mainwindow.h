@@ -98,9 +98,10 @@ class MainWindow : public QMainWindow
     public slots:
 
     signals:
+        void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
+        void DoInitParserMgr();
         void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
-        void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
 
     private slots:
         void on_actionAbout_triggered();
@@ -142,6 +143,7 @@ class MainWindow : public QMainWindow
         void AttachVectorField(bool attach = true);
         void ComboBoxChanged(const QString& text);
         void ExprnChanged(QModelIndex, QModelIndex);
+        void InitParserMgr();
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
         void Replot(const ViewRect& pp_data, const ViewRect& tp_data);
@@ -161,7 +163,6 @@ class MainWindow : public QMainWindow
         void InitDraw();
         void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
                         ConditionModel* conditions = nullptr);
-        void InitParserMgr();
         void InitPlots();
         const std::vector<QColor> InitTPColors() const;
         bool IsVFPresent() const;

@@ -12,7 +12,7 @@
 DSPlot::DSPlot(QWidget *parent) :
     QwtPlot(parent), _tid(std::this_thread::get_id())
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
 #endif
@@ -27,7 +27,7 @@ DSPlot::~DSPlot()
 
 QwtScaleMap DSPlot::canvasMap( int axisId ) const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::canvasMap: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -37,7 +37,7 @@ QwtScaleMap DSPlot::canvasMap( int axisId ) const
 
 QSize DSPlot::sizeHint() const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::sizeHint: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -46,7 +46,7 @@ QSize DSPlot::sizeHint() const
 }
 QSize DSPlot::minimumSizeHint() const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::minimumSizeHint: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -56,7 +56,7 @@ QSize DSPlot::minimumSizeHint() const
 
 void DSPlot::updateLayout()
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::updateLayout: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -65,7 +65,7 @@ void DSPlot::updateLayout()
 }
 void DSPlot::drawCanvas( QPainter * painter)
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::drawCanvas: " << painter << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -78,7 +78,7 @@ void DSPlot::getCanvasMarginsHint(
     const QwtScaleMap maps[], const QRectF &canvasRect,
     double &left, double &top, double &right, double &bottom) const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::getCanvasMarginsHint: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -88,7 +88,7 @@ void DSPlot::getCanvasMarginsHint(
 
 bool DSPlot::event( QEvent * event)
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::event: " << event << event->type();
     //12 is QEvent::Paint
@@ -101,7 +101,7 @@ bool DSPlot::event( QEvent * event)
 
 bool DSPlot::eventFilter( QObject *object, QEvent * event)
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::eventFilter: " << object << event << event->type();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -113,7 +113,7 @@ bool DSPlot::eventFilter( QObject *object, QEvent * event)
 void DSPlot::drawItems( QPainter *painter, const QRectF &canvasRect,
                         const QwtScaleMap maps[axisCnt]) const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::drawItems: " << painter << canvasRect << axisCnt << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -124,7 +124,7 @@ void DSPlot::drawItems( QPainter *painter, const QRectF &canvasRect,
 
 QVariant DSPlot::itemToInfo( QwtPlotItem * plotItem) const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::itemToInfo: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -134,7 +134,7 @@ QVariant DSPlot::itemToInfo( QwtPlotItem * plotItem) const
 
 QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::infoToItem: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -144,7 +144,7 @@ QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
 
 void DSPlot::replot()
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::replot: " << s.str().c_str();
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
@@ -154,7 +154,7 @@ void DSPlot::replot()
 
 void DSPlot::resizeEvent( QResizeEvent *e )
 {
-#ifdef DEBUG_FUNC
+#ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::resizeEvent: " << e;
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread ");
