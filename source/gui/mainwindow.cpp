@@ -59,11 +59,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ConnectModels();
 
-    connect(this, SIGNAL(DoAttachVF(bool)), this, SLOT(AttachVectorField(bool)), Qt::QueuedConnection);
-    connect(this, SIGNAL(DoInitParserMgr()), this, SLOT(InitParserMgr()), Qt::QueuedConnection);
+    connect(this, SIGNAL(DoAttachVF(bool)), this, SLOT(AttachVectorField(bool)), Qt::BlockingQueuedConnection);
+    connect(this, SIGNAL(DoInitParserMgr()), this, SLOT(InitParserMgr()), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoReplot(const ViewRect&, const ViewRect&)),
-            this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::QueuedConnection);
-    connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::QueuedConnection);
+            this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::BlockingQueuedConnection);
+    connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
 
     _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
@@ -162,7 +162,7 @@ void MainWindow::on_btnPulse_clicked()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_btnPulse_clicked";
 #endif
-    _pulseParIdx = ui->cmbVariables->currentIndex();
+    _pulseParIdx = ui->cmbPulsePars->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
     _pulseResetValue = _parameters->Value(_pulseParIdx);
     _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
@@ -318,7 +318,7 @@ void MainWindow::on_cboxVectorField_stateChanged(int state)
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_cmbPlotMode_currentIndexChanged";
+    qDebug() << "Enter MainWindow::on_cmbPlotMode_currentIndexChanged";
 #endif
     ClearPlots();
 
@@ -335,12 +335,15 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
     {
         _plotMode = VECTOR_FIELD;
         ui->btnPulse->setEnabled(false);
-        UpdateVectorField();
+//        UpdateVectorField();
         ui->qwtTimePlot->hide();
         ui->tblTimePlot->hide();
         ui->spnStepsPerSec->setValue(_vfStepsSec);
-        ui->spnTailLength->setValue(_vfTailLen);
+        ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::on_cmbPlotMode_currentIndexChanged";
+#endif
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
@@ -376,7 +379,7 @@ void MainWindow::on_sldParameter_valueChanged(int value)
 void MainWindow::on_spnStepsPerSec_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_spnStepsPerSec_valueChanged";
+    qDebug() << "Enter MainWindow::on_spnStepsPerSec_valueChanged";
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     switch (_plotMode)
@@ -388,13 +391,16 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
             _vfStepsSec = value;
             break;
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::on_spnStepsPerSec_valueChanged";
+#endif
 }
 void MainWindow::on_spnTailLength_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_spnTailLength_valueChanged";
+    qDebug() << "Enter MainWindow::on_spnTailLength_valueChanged";
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::unique_lock<std::mutex> lock(_mutex);
     switch (_plotMode)
     {
         case SINGLE:
@@ -402,10 +408,13 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             break;
         case VECTOR_FIELD:
             _vfTailLen = value;
-            _mutex.unlock();
+            lock.unlock();
             UpdateVectorField();
             break;
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::on_spnTailLength_valueChanged";
+#endif
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
 {
@@ -896,11 +905,14 @@ void MainWindow::InitDefaultModel()
 void MainWindow::InitDraw()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::InitDraw";
+    qDebug() << "Enter MainWindow::InitDraw";
 #endif
     InitPlots();
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::InitDraw";
+#endif
 }
 void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, ConditionModel* conditions)
 {
@@ -1288,10 +1300,10 @@ void MainWindow::UpdatePulseVList()
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::UpdatePulseVList";
 #endif
-    ui->cmbVariables->clear();
-    VecStr keys = _parameters->Keys(); // ### rename cmbVariables
+    ui->cmbPulsePars->clear();
+    VecStr keys = _parameters->Keys();
     for (size_t i=0; i<keys.size(); ++i)
-        ui->cmbVariables->insertItem((int)i, keys.at(i).c_str());
+        ui->cmbPulsePars->insertItem((int)i, keys.at(i).c_str());
 }
 void MainWindow::UpdateSliderPList()
 {
@@ -1340,10 +1352,13 @@ void MainWindow::UpdateVectorField()
 {
 #ifdef DEBUG_FUNC
     std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "MainWindow::UpdateVectorField(), thread id " << s.str().c_str()
-                << _needUpdateVF << _isDrawing;
+    qDebug() << "Enter MainWindow::UpdateVectorField(), thread id " << s.str().c_str()
+             << " _needUpdateVF: " << _needUpdateVF << " _isDrawing: " << _isDrawing;
 #endif
     if (_needUpdateVF) return;
     _needUpdateVF = true;
     if (!_isDrawing) InitDraw();
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::UpdateVectorField()";
+#endif
 }

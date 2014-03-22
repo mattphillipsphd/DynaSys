@@ -91,7 +91,15 @@ bool DSPlot::event( QEvent * event)
 #ifdef DEBUG_FUNC_DSPLOT
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::event: " << event << event->type();
+    //8 is QEvent::FocusIn
+    //9 is QEvent::FocusOut
+    //10 is QEvent::Enter
+    //11 is QEvent::Leave
     //12 is QEvent::Paint
+    //13 is QEvent::Move
+    //14 is QEvent::Resize
+    //18 is QEvent::Hide
+    //27 is QEvent::HideToParent
     //76 is QEvent::LayoutRequest
     //78 is QEvent::UpdateLater
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread ");

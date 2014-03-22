@@ -196,7 +196,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="cmbVariables"/>
+           <widget class="QComboBox" name="cmbPulsePars"/>
           </item>
           <item>
            <widget class="QLabel" name="label_7">
@@ -452,7 +452,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
