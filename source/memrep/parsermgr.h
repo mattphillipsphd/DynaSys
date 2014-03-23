@@ -44,16 +44,18 @@ class ParserMgr
         void SetExpression(const std::string& exprn);
         void SetExpression(const VecStr& exprns);
         void SetExpressions();
+        void TempEval();
 
     private:
         void AssociateVars(mu::Parser& parser);
         double* Data(const ParamModelBase* model);
         ParamModelBase* Model(ds::PMODEL model);
+        double* TempData(const ParamModelBase* model);
 
         bool _areModelsInitialized;
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
-        std::vector< std::pair<ParamModelBase*, double*> > _models;
+        std::vector< std::tuple<ParamModelBase*, double*, double*> > _models;
         mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied

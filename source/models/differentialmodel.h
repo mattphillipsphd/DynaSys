@@ -12,10 +12,9 @@ class DifferentialModel : public ParamModelBase
 
         virtual bool DoEvaluate() const override { return true; }
         virtual bool DoInitialize() const override { return false; }
-        virtual std::string Expression(size_t idx) const override;
-        virtual VecStr Expressions() const override;
         virtual std::string ShortKey(size_t idx) const override;
         virtual int ShortKeyIndex(const std::string& par_name) const override;
+        virtual std::string TempExpression(size_t idx) const override;
 };
 
 #endif // DIFFERENTIALMODEL_H

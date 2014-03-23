@@ -9,7 +9,7 @@ const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::IP_SAMPLES_SHOWN = 10000;
-const int MainWindow::XY_SAMPLES_SHOWN = 16 * 1024;
+const int MainWindow::XY_SAMPLES_SHOWN = 64 * 1024;
 const int MainWindow::VF_RESOLUTION = 20;
 const int MainWindow::VF_SLEEP_MS = 250;
 
@@ -719,7 +719,7 @@ void MainWindow::DrawVectorField()
 #ifdef DEBUG_FUNC
     qDebug() << "Enter MainWindow::DrawVectorField";
 #endif
-    qDebug() << "MainWindow::DrawVectorField 1";
+//    qDebug() << "MainWindow::DrawVectorField 1";
 
     if (_needClearVF)
     {
@@ -729,7 +729,7 @@ void MainWindow::DrawVectorField()
         _needUpdateVF = _needClearVF = false;
         return;
     }
-    qDebug() << "MainWindow::DrawVectorField 2";
+//    qDebug() << "MainWindow::DrawVectorField 2";
 
     if ((_isDrawing && _plotMode==VECTOR_FIELD) || _needInitialize)
     {
@@ -738,7 +738,7 @@ void MainWindow::DrawVectorField()
         _condVar.wait(lock, [&]{ return !_needInitialize; });
     }
 
-    qDebug() << "MainWindow::DrawVectorField 3";
+//    qDebug() << "MainWindow::DrawVectorField 3";
 
     while ((_isDrawing && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
@@ -760,14 +760,14 @@ void MainWindow::DrawVectorField()
 
         _isVFAttached = true;
         emit DoAttachVF(false);
-        qDebug() << "MainWindow::DrawVectorField 4";
+//        qDebug() << "MainWindow::DrawVectorField 4";
         std::unique_lock<std::mutex> lock(_mutex);
-        qDebug() << "MainWindow::DrawVectorField 5";
+//        qDebug() << "MainWindow::DrawVectorField 5";
         _condVar.wait(lock, [&]{ return !_isVFAttached; });
 
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
-        qDebug() << "MainWindow::DrawVectorField 6";
+//        qDebug() << "MainWindow::DrawVectorField 6";
         std::vector<double> dvals_orig(num_diffs);
         for (int i=0; i<num_diffs; ++i)
             dvals_orig[i] = diffs[i];
@@ -845,7 +845,7 @@ void MainWindow::DrawVectorField()
         _condVar.wait(lock2, [&]{ return _isVFAttached; });
         lock2.unlock();
 
-        qDebug() << "MainWindow::DrawVectorField 7";
+//        qDebug() << "MainWindow::DrawVectorField 7";
         _needUpdateVF = false;
         if (_plotMode==VECTOR_FIELD)
         {
@@ -862,7 +862,7 @@ void MainWindow::DrawVectorField()
                     sleep_time = std::max(10, VF_SLEEP_MS-dur_ms);
             std::this_thread::sleep_for( std::chrono::milliseconds(sleep_time) );
         }
-        qDebug() << "MainWindow::DrawVectorField 8";
+//        qDebug() << "MainWindow::DrawVectorField 8";
     }
 
     if (_plotMode==VECTOR_FIELD) _isDrawing = false;

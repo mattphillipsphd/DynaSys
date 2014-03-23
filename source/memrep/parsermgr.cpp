@@ -22,13 +22,14 @@ void ParserMgr::AddExpression(const std::string& exprn, bool use_mutex)
 }
 void ParserMgr::AddModel(ParamModelBase* model)
 {
-    double* data = new double[model->NumPars()];
-    _models.push_back( std::make_pair(model, data) );
+    double* data = new double[model->NumPars()],
+            * temp = new double[model->NumPars()];
+    _models.push_back( std::make_tuple(model, data, temp) );
 }
 void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str)
 {
     Input::TYPE type = Input::Type(type_str);
-    double* data = Data(model);
+    double* data = TempData(model);
     switch (type)
     {
         case Input::UNI_RAND:
@@ -76,12 +77,15 @@ const double* ParserMgr::ConstData(const ParamModelBase* model) const
 
 void ParserMgr::InitParsers()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "Enter ParserMgr::InitParsers";
+#endif
     try
     {
         VecStr initializations, expressions;
         for (auto& it : _models)
         {
-            ParamModelBase* model = it.first;
+            ParamModelBase* model = std::get<0>(it);
             if (model->DoInitialize())
             {
                 VecStr model_inits = model->Initializations();
@@ -108,9 +112,15 @@ void ParserMgr::InitParsers()
     {
         std::cerr << e.GetMsg() << std::endl;
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit ParserMgr::InitParsers";
+#endif
 }
 void ParserMgr::InitModels()
 {
+#ifdef DEBUG_FUNC
+    qDebug() << "Enter ParserMgr::InitModels";
+#endif
     std::lock_guard<std::mutex> lock(_mutex);
     try
     {
@@ -123,9 +133,9 @@ void ParserMgr::InitModels()
 
         for (auto& it : _models)
         {
-            ParamModelBase* model = it.first;
+            ParamModelBase* model = std::get<0>(it);
             if (!model->DoInitialize()) continue;
-            double* data = it.second;
+            double* data = std::get<1>(it);
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
             {
@@ -138,8 +148,8 @@ void ParserMgr::InitModels()
 #ifdef QT_DEBUG
                 qDebug() << model->Key(i).c_str() << value.c_str() << ", " << atof(value.c_str());
 #endif
-                if (model->Id()==ds::PARAMETERS)
-                    data[i] = atof(value.c_str()); // ###
+                if (model->Id()==ds::PARAMETERS) // ###
+                    data[i] = atof(value.c_str());
             }
         }
         _areModelsInitialized = true;
@@ -149,6 +159,9 @@ void ParserMgr::InitModels()
         std::cerr << e.GetMsg() << std::endl;
         qDebug() << e.GetMsg().c_str();
     }
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit ParserMgr::InitModels";
+#endif
 }
 
 void ParserMgr::InputEval(int idx)
@@ -193,6 +206,7 @@ void ParserMgr::ParserEval(bool eval_input)
     {
 //        qDebug() << _parser.GetExpr().c_str();
         _parser.Eval();
+        TempEval();
         if (eval_input) InputEval();
     }
     catch (mu::ParserError& e)
@@ -251,11 +265,11 @@ void ParserMgr::SetData(const ParamModelBase* model, size_t idx, double val)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     auto it = std::find_if(_models.begin(), _models.end(),
-                        [&](std::pair<ParamModelBase*,double*> p)
+                        [&](std::tuple<ParamModelBase*,double*,double*> p)
     {
-            return p.first == model;
+            return std::get<0>(p) == model;
     });
-    *(it->second + idx) = val;
+    *(std::get<1>(*it) + idx) = val;
 }
 void ParserMgr::SetExpression(const std::string& exprn)
 {
@@ -276,17 +290,38 @@ void ParserMgr::SetExpressions()
         ClearExpressions();
         for (auto& it : _models)
         {
-            ParamModelBase* model = it.first;
+            ParamModelBase* model = std::get<0>(it);
             if (!model->DoEvaluate()) continue;
-            VecStr expressions = model->Expressions();
-            for (const auto& it : expressions)
+            VecStr temp_expressions = model->TempExpressions();
+            for (const auto& it : temp_expressions)
                 AddExpression(it);
+            if (model->Id()==ds::VARIABLES) // ### Really need separate parsers for both here
+            {
+                const size_t num_pars = model->NumPars();
+                for (size_t i=0; i<num_pars; ++i)
+                    AddExpression(model->Key(i) + " = " + model->TempKey(i));
+            }
         }
     }
     catch (mu::ParserError& e)
     {
         std::cerr << e.GetMsg() << std::endl;
         qDebug() << e.GetMsg().c_str();
+    }
+}
+void ParserMgr::TempEval()
+{
+    for (auto& it : _models)
+    {
+        const ParamModelBase* model = std::get<0>(it);
+        if ( model->DoEvaluate() )
+        {
+            const size_t num_pars = model->NumPars();
+            double* data = std::get<1>(it);
+            const double* temp = std::get<2>(it);
+            for (size_t i=0; i<num_pars; ++i)
+                data[i] = temp[i];
+        }
     }
 }
 
@@ -296,14 +331,17 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
     {
         for (auto& it : _models)
         {
-            ParamModelBase* model = it.first;
+            ParamModelBase* model = std::get<0>(it);
             if (model->Id()==ds::INIT_CONDS) continue;
-            double* data = it.second;
+            double* data = std::get<1>(it),
+                    * temp_data = std::get<2>(it);
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
             {
                 const std::string& key = model->ShortKey(i);
                 parser.DefineVar(key, &data[i]);
+                if (model->DoEvaluate())
+                    parser.DefineVar(model->TempKey(i), &temp_data[i]);
             }
         }
     }
@@ -316,19 +354,28 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
 double* ParserMgr::Data(const ParamModelBase* model)
 {
     auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::pair<ParamModelBase*,double*> p)
+                        [&](std::tuple<ParamModelBase*,double*,double*> p)
     {
-            return p.first == model;
+            return std::get<0>(p) == model;
     });
-    return it->second;
+    return std::get<1>(*it);
 }
 ParamModelBase* ParserMgr::Model(ds::PMODEL model)
 {
     auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::pair<ParamModelBase*,double*> p)
+                        [&](std::tuple<ParamModelBase*,double*,double*> p)
     {
-            return p.first->Id() == model;
+            return std::get<0>(p)->Id() == model;
     });
-    return it->first;
+    return std::get<0>(*it);
+}
+double* ParserMgr::TempData(const ParamModelBase* model)
+{
+    auto it = std::find_if(_models.cbegin(), _models.cend(),
+                        [&](std::tuple<ParamModelBase*,double*,double*> p)
+    {
+            return std::get<0>(p) == model;
+    });
+    return std::get<2>(*it);
 }
 
