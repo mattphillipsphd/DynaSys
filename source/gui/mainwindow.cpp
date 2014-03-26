@@ -314,6 +314,19 @@ void MainWindow::on_cboxVectorField_stateChanged(int state)
         if (_plotMode==SINGLE) _needUpdateVF = _needClearVF = true;
     }
 }
+void MainWindow::on_cboxNullclines_stateChanged(int state)
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "Enter MainWindow::on_cboxNullclines_stateChanged";
+#endif
+    if (state==Qt::Checked)
+        DrawNullclines();
+//    else
+//        ui->qwtPhasePlot->detachItems();
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::on_cboxNullclines_stateChanged";
+#endif
+}
 
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
@@ -489,6 +502,173 @@ void MainWindow::Draw()
     }
 #ifdef DEBUG_FUNC
     qDebug() << "Exit MainWindow::Draw(), thread id " << s.str().c_str();
+#endif
+}
+void MainWindow::DrawNullclines()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "Enter MainWindow::DrawNullclines";
+#endif
+    const int num_diffs = (int)_differentials->NumPars();
+    const double* diffs = _parserMgr.ConstData(_differentials);
+    const int xidx = ui->cmbDiffX->currentIndex(),
+            yidx = ui->cmbDiffY->currentIndex();
+
+    const int vf_resolution = ui->spnVFResolution->value();
+    const double xmin = _parserMgr.Minimum(_initConds, xidx),
+            xmax = _parserMgr.Maximum(_initConds, xidx),
+            ymin = _parserMgr.Minimum(_initConds, yidx),
+            ymax = _parserMgr.Maximum(_initConds, yidx);
+    const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
+            yinc = (ymax - ymin) / (double)(vf_resolution-1);
+
+    double* x = new double[vf_resolution*vf_resolution],
+            * y = new double[vf_resolution*vf_resolution],
+            * xdiff = new double[vf_resolution*vf_resolution],
+            * ydiff = new double[vf_resolution*vf_resolution];
+
+    if (_needInitialize) InitParserMgr();
+
+    std::vector<double> dvals_orig(num_diffs);
+    for (int i=0; i<num_diffs; ++i)
+        dvals_orig[i] = diffs[i];
+    try
+    {
+        for (int i=0; i<vf_resolution; ++i)
+            for (int j=0; j<vf_resolution; ++j)
+            {
+                const double xij = i*xinc + xmin,
+                            yij = j*yinc + ymin;
+                const int idx = i*vf_resolution+j;
+                x[idx] = xij;
+                y[idx] = yij;
+
+                if (num_diffs>2)
+                    _parserMgr.ResetDifferentials();
+                _parserMgr.SetData(_differentials, xidx, xij);
+                _parserMgr.SetData(_differentials, yidx, yij);
+                _parserMgr.ParserEval(false);
+                xdiff[idx] = diffs[xidx];
+                ydiff[idx] = diffs[yidx];
+            }
+    }
+    catch (std::exception& e)
+    {
+        qDebug() << "MainWindow::DrawNullclines" << e.what();
+    }
+    for (int i=0; i<num_diffs; ++i)
+        _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
+
+    double lastx, lasty;
+    std::vector< std::pair<int,int> > xcross, ycross;
+    for (int j=0; j<vf_resolution; ++j)
+    {
+        lastx = xdiff[j*vf_resolution];
+        for (int i=0; i<vf_resolution; ++i)
+        {
+            const int idx = i*vf_resolution+j;
+            if (ds::sgn(lastx) != ds::sgn(xdiff[idx]))
+            {
+                xcross.push_back( std::make_pair(i,j) );
+//                qDebug() << i << j << idx << lastx << xdiff[idx];
+            }
+            lastx = xdiff[idx];
+        }
+    }
+    qDebug() << "\n\n";
+        //Switch indices so as to search row-wise
+    for (int i=0; i<vf_resolution; ++i)
+    {
+        lasty = ydiff[i*vf_resolution];
+        for (int j=0; j<vf_resolution; ++j)
+        {
+            const int idx = i*vf_resolution+j;
+            if (ds::sgn(lasty) != ds::sgn(ydiff[idx]))
+            {
+                ycross.push_back( std::make_pair(i,j) );
+                qDebug() << i << j << idx
+                         << "\t" << y[idx-1] << y[idx] << "\t" << lasty << ydiff[idx];
+            }
+            lasty = ydiff[idx];
+        }
+    }
+    //The grid is being searched *column-wise*
+
+    //Now interpolate
+    const size_t xnum_pts = xcross.size();
+    QPolygonF xpts(xnum_pts);
+    for (size_t ct=0; ct<xnum_pts; ++ct)
+    {
+        int i = xcross.at(ct).first,
+                j = xcross.at(ct).second,
+                idx = i*vf_resolution+j;
+        double xval = xinc*xdiff[idx-1]/std::abs(xdiff[idx]-xdiff[idx-1]) + x[idx-1];
+        xpts[ct] = QPointF(xval, y[idx]);
+//        qDebug() << i << j << idx << xpts[ct];
+    }
+    qDebug() << "\n\n";
+    const size_t ynum_pts = ycross.size();
+    QPolygonF ypts(ynum_pts);
+    for (size_t ct=0; ct<ynum_pts; ++ct)
+    {
+        int i = ycross.at(ct).first,
+                j = ycross.at(ct).second,
+                idx = i*vf_resolution+j;
+        double yval = yinc*ydiff[idx-1]/std::abs(ydiff[idx]-ydiff[idx-1]) + y[idx-1];
+//        assert( yval>=y[idx-1] && yval<=y[idx] );
+        ypts[ct] = QPointF(x[idx], yval);
+        qDebug() << i << j << idx << ypts[ct];
+    }
+
+    QColor xcolor = _tpColors.at(xidx+1);
+    for (size_t i=0; i<xnum_pts; ++i)
+    {
+        QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+            QBrush(xcolor), QPen(xcolor, 2), QSize(5, 5) );
+        QwtPlotMarker* marker = new QwtPlotMarker();
+        marker->setSymbol(symbol);
+//        marker->setValue(xpts[i]);
+        marker->setXValue(x[xcross.at(i).first]);
+        marker->setYValue(y[xcross.at(i).second]);
+        marker->setZ(-1);
+        marker->attach(ui->qwtPhasePlot);
+    }
+
+    QColor ycolor = _tpColors.at(yidx+1);
+    for (size_t i=0; i<ynum_pts; ++i)
+    {
+        QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+            QBrush(ycolor), QPen(ycolor, 2), QSize(5, 5) );
+        QwtPlotMarker* marker = new QwtPlotMarker();
+        marker->setSymbol(symbol);
+        marker->setValue(ypts[i]);
+        marker->setZ(-1);
+        marker->attach(ui->qwtPhasePlot);
+    }
+
+    delete[] x;
+    delete[] y;
+    delete[] xdiff;
+    delete[] ydiff;
+/*
+    QwtPlotCurve* xcurve = new QwtPlotCurve();
+    xcurve->setPen( _tpColors.at(xidx+1), 2 );
+    xcurve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+    xcurve->setSamples(xpts);
+    xcurve->attach(ui->qwtPhasePlot);
+
+    QwtPlotCurve* ycurve = new QwtPlotCurve();
+    ycurve->setPen( _tpColors.at(yidx+1), 2 );
+    ycurve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+    ycurve->setSamples(ypts);
+    ycurve->attach(ui->qwtPhasePlot);
+*/
+    ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
+    ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
+    ui->qwtPhasePlot->replot();
+
+#ifdef DEBUG_FUNC
+    qDebug() << "Exit MainWindow::DrawNullclines";
 #endif
 }
 void MainWindow::DrawPhasePortrait()

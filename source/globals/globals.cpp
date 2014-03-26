@@ -32,6 +32,11 @@ std::string ds::Model(PMODEL model)
     throw("Bad Model");
 }
 
+double ds::sgn(double val)
+{
+    return (val<0) ? -1.0 : (val>0.0); //Thanks SO
+        //http://stackoverflow.com/questions/1903954
+}
 
 template <typename T>
 QList<T> ds::VecToQList(const std::vector<T>& vec)

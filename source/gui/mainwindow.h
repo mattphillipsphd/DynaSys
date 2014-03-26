@@ -126,6 +126,7 @@ class MainWindow : public QMainWindow
         void on_btnStart_clicked();
 
         void on_cboxVectorField_stateChanged(int state);
+        void on_cboxNullclines_stateChanged(int state);
 
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
@@ -157,6 +158,7 @@ class MainWindow : public QMainWindow
         void ClearPlots();
         void ConnectModels();
         void Draw();
+        void DrawNullclines();
         void DrawPhasePortrait();
         void DrawVectorField();
         void InitDefaultModel();

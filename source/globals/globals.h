@@ -31,6 +31,8 @@ namespace ds
     PMODEL Model(const std::string& model);
     std::string Model(PMODEL model);
 
+    double sgn(double val);
+
     template<typename T>
     QList<T> VecToQList(const std::vector<T>& vec);
 
