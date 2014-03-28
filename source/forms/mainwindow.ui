@@ -35,9 +35,16 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="btnFitVF">
+       <widget class="QPushButton" name="btnFitView">
         <property name="text">
-         <string>Fit VF</string>
+         <string>Fit to view</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="cboxFitLimits">
+        <property name="text">
+         <string>Fit Limits</string>
         </property>
        </widget>
       </item>
@@ -167,6 +174,12 @@
           </item>
           <item>
            <widget class="QSpinBox" name="spnTailLength">
+            <property name="minimumSize">
+             <size>
+              <width>70</width>
+              <height>0</height>
+             </size>
+            </property>
             <property name="minimum">
              <number>-1</number>
             </property>
@@ -203,7 +216,14 @@
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="cmbPulsePars"/>
+           <widget class="QComboBox" name="cmbPulsePars">
+            <property name="minimumSize">
+             <size>
+              <width>70</width>
+              <height>0</height>
+             </size>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QLabel" name="label_7">
@@ -459,7 +479,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

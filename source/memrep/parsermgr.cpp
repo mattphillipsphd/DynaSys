@@ -107,6 +107,8 @@ void ParserMgr::InitParsers()
 
         SetExpression(expressions);
             //Note that the expressions are not actually evaluated
+
+//        ResetVarInitVals();
     }
     catch (mu::ParserError& e)
     {
@@ -229,19 +231,38 @@ double ParserMgr::Range(const ParamModelBase* model, size_t idx) const
 }
 void ParserMgr::ResetDifferentials()
 {
-    ParamModelBase* init_conds = Model(ds::INIT_CONDS);
-    const size_t num_diffs = init_conds->NumPars();
-    std::string init_expr;
+    ParamModelBase* ic_model = Model(ds::INIT_CONDS);
+    const size_t num_diffs = ic_model->NumPars();
+    const double* init_conds = Data(ic_model);
+    double* diffs = Data( Model(ds::DIFFERENTIALS) );
     for (size_t i=0; i<num_diffs; ++i)
-    {
-        const std::string d = init_conds->ShortKey(i),
-                    expr = init_conds->Value(i);
-        if (i>0) init_expr += ", ";
-        init_expr += d + " = " + expr;
-    }
-    QuickEval(init_expr);
+        diffs[i] = init_conds[i];
 }
+/*void ParserMgr::ResetValues()
+{
+    ResetDifferentials();
+    ParamModelBase* var_model = Model(ds::VARIABLES);
+    const size_t num_vars = var_model->NumPars();
+    double* vars = Data(var_model);
+    for (size_t i=0; i<num_vars; ++i)
+        vars[i] = _varInitVals.at(i);
+}
+void ParserMgr::ResetVarInitVals()
+{
+    _varInitVals.clear();
 
+    ResetDifferentials();
+
+    ParamModelBase* var_model = Model(ds::VARIABLES);
+    VecStr expressions = var_model->Expressions();
+    for (const auto& it : expressions)
+        QuickEval(it);
+    const size_t num_vars = var_model->NumPars();
+    const double* vars = Data(var_model);
+    for (size_t i=0; i<num_vars; ++i)
+        _varInitVals.push_back( vars[i] );
+}
+*/
 void ParserMgr::SetConditions()
 {
     std::lock_guard<std::mutex> lock(_mutex);

@@ -10,6 +10,7 @@
 #include <memory>
 #include <random>
 #include <thread>
+#include <unordered_set>
 
 #include <QColor>
 #include <QDebug>
@@ -117,7 +118,7 @@ class MainWindow : public QMainWindow
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
-        void on_btnFitVF_clicked();
+        void on_btnFitView_clicked();
         void on_btnRemoveCondition_clicked();
         void on_btnRemoveExpression_clicked();
         void on_btnRemoveDiff_clicked();
@@ -173,6 +174,7 @@ class MainWindow : public QMainWindow
         void ResetResultsList(int cond_row);
         void SetButtonsEnabled(bool is_enabled);
         void UpdateLists();
+        void UpdateNullclines();
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
         void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
@@ -195,7 +197,9 @@ class MainWindow : public QMainWindow
         const std::thread::id _guiTid;
         volatile bool _isDrawing, _isVFAttached;
         std::mutex _mutex;
-        volatile bool _needClearVF, _needInitialize, _needUpdateExprns, _needUpdateVF;
+        volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
+                    _needUpdateNullclines, _needUpdateVF;
+        std::vector<QwtPlotItem*> _ncPlotItems;
         ParserMgr _parserMgr;
         PLOT_MODE _plotMode;
         std::vector<QwtPlotItem*> _ppPlotItems;

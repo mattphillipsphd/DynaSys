@@ -20,7 +20,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr), _fileName(""), _guiTid(std::this_thread::get_id()),
     _isDrawing(false), _isVFAttached(false),
-    _needClearVF(false), _needInitialize(true), _needUpdateExprns(false), _needUpdateVF(false),
+    _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
+    _needUpdateNullclines(false), _needUpdateVF(false),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
     _tpColors(InitTPColors()),
@@ -170,6 +171,7 @@ void MainWindow::on_btnPulse_clicked()
     _parameters->SetPar((int)_pulseParIdx, val);
 
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
@@ -221,9 +223,10 @@ void MainWindow::on_btnAddVariable_clicked()
         UpdateTimePlotTable();
     }
 }
-void MainWindow::on_btnFitVF_clicked()
+void MainWindow::on_btnFitView_clicked()
 {
-    const int xidx = ui->cmbDiffX->currentIndex(),
+    ui->cboxFitLimits->setChecked(false);
+    const size_t xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
     _initConds->SetMinimum(xidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).lowerBound());
     _initConds->SetMaximum(xidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).upperBound());
@@ -231,6 +234,7 @@ void MainWindow::on_btnFitVF_clicked()
     _initConds->SetMaximum(yidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).upperBound());
     ui->tblInitConds->update();
     if (IsVFPresent()) UpdateVectorField();
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
@@ -321,8 +325,15 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
 #endif
     if (state==Qt::Checked)
         DrawNullclines();
-//    else
-//        ui->qwtPhasePlot->detachItems();
+    else
+    {
+        for (auto it : _ncPlotItems)
+        {
+            it->detach();
+            delete it;
+        }
+        _ncPlotItems.clear();
+    }
 #ifdef DEBUG_FUNC
     qDebug() << "Exit MainWindow::on_cboxNullclines_stateChanged";
 #endif
@@ -342,16 +353,17 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         ui->qwtTimePlot->show();
         ui->tblTimePlot->show();
         ui->spnStepsPerSec->setValue(_singleStepsSec);
+        ui->spnStepsPerSec->setMinimum(-1);
         ui->spnTailLength->setValue(_singleTailLen);
     }
     else if (text=="Vector field")
     {
         _plotMode = VECTOR_FIELD;
         ui->btnPulse->setEnabled(false);
-//        UpdateVectorField();
         ui->qwtTimePlot->hide();
         ui->tblTimePlot->hide();
         ui->spnStepsPerSec->setValue(_vfStepsSec);
+        ui->spnStepsPerSec->setMinimum(1);
         ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
     }
 #ifdef DEBUG_FUNC
@@ -388,6 +400,7 @@ void MainWindow::on_sldParameter_valueChanged(int value)
             dval = pct*range + _parserMgr.Minimum(_parameters, index);
     _parameters->SetPar(index, std::to_string(dval));
     ui->tblParameters->update();
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 void MainWindow::on_spnStepsPerSec_valueChanged(int value)
 {
@@ -435,6 +448,7 @@ void MainWindow::on_spnVFResolution_valueChanged(int)
     qDebug() << "MainWindow::on_spnVFResolution_valueChanged";
 #endif
     if (IsVFPresent()) UpdateVectorField();
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
@@ -509,12 +523,21 @@ void MainWindow::DrawNullclines()
 #ifdef DEBUG_FUNC
     qDebug() << "Enter MainWindow::DrawNullclines";
 #endif
-    const int num_diffs = (int)_differentials->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials);
+    for (auto it : _ncPlotItems)
+    {
+        it->detach();
+        delete it;
+    }
+    _ncPlotItems.clear();
+
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
+    const double* diffs = _parserMgr.ConstData(_differentials),
+            * vars = _parserMgr.ConstData(_variables);
     const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
 
-    const int vf_resolution = ui->spnVFResolution->value();
+    const int vf_resolution = ui->spnVFResolution->value()*2;
     const double xmin = _parserMgr.Minimum(_initConds, xidx),
             xmax = _parserMgr.Maximum(_initConds, xidx),
             ymin = _parserMgr.Minimum(_initConds, yidx),
@@ -527,84 +550,111 @@ void MainWindow::DrawNullclines()
             * xdiff = new double[vf_resolution*vf_resolution],
             * ydiff = new double[vf_resolution*vf_resolution];
 
-    if (_needInitialize) InitParserMgr();
+//    const int RES_FACTOR = 4;
+//    const double xinc_hi = xinc/RES_FACTOR,
+//            yinc_hi = yinc/RES_FACTOR;
 
-    std::vector<double> dvals_orig(num_diffs);
-    for (int i=0; i<num_diffs; ++i)
-        dvals_orig[i] = diffs[i];
     try
     {
+        if (_needInitialize) InitParserMgr();
+
+        std::lock_guard<std::mutex> lock(_mutex);
+
+        std::vector<double> dvals_orig(num_diffs),
+                vars_orig(num_vars);
+        for (int i=0; i<num_diffs; ++i)
+            dvals_orig[i] = diffs[i];
+        for (int i=0; i<num_vars; ++i)
+            vars_orig[i] = vars[i];
+
         for (int i=0; i<vf_resolution; ++i)
             for (int j=0; j<vf_resolution; ++j)
             {
                 const double xij = i*xinc + xmin,
                             yij = j*yinc + ymin;
                 const int idx = i*vf_resolution+j;
-                x[idx] = xij;
-                y[idx] = yij;
 
                 if (num_diffs>2)
                     _parserMgr.ResetDifferentials();
                 _parserMgr.SetData(_differentials, xidx, xij);
                 _parserMgr.SetData(_differentials, yidx, yij);
                 _parserMgr.ParserEval(false);
-                xdiff[idx] = diffs[xidx];
-                ydiff[idx] = diffs[yidx];
+                xdiff[idx] = diffs[xidx] - xij;
+                ydiff[idx] = diffs[yidx] - yij;
+
+                x[idx] = xij;
+                y[idx] = yij;
             }
+
+        for (int i=0; i<num_diffs; ++i)
+            _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
+        for (int i=0; i<num_vars; ++i)
+            _parserMgr.SetData(_variables, i, vars_orig.at(i));
     }
     catch (std::exception& e)
     {
         qDebug() << "MainWindow::DrawNullclines" << e.what();
     }
-    for (int i=0; i<num_diffs; ++i)
-        _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
 
     double lastx, lasty;
-    std::vector< std::pair<int,int> > xcross, ycross;
+    std::vector< std::pair<int,int> > xcross_h, xcross_v, ycross_h, ycross_v;
+    std::unordered_set<int> xidx_set, yidx_set; //To avoid duplicates;
+    //The grid is being searched *column-wise*
     for (int j=0; j<vf_resolution; ++j)
     {
-        lastx = xdiff[j*vf_resolution];
+        lastx = xdiff[j];
+        lasty = ydiff[j];
         for (int i=0; i<vf_resolution; ++i)
         {
             const int idx = i*vf_resolution+j;
             if (ds::sgn(lastx) != ds::sgn(xdiff[idx]))
             {
-                xcross.push_back( std::make_pair(i,j) );
-//                qDebug() << i << j << idx << lastx << xdiff[idx];
+                xcross_v.push_back( std::make_pair(i,j) );
+                xidx_set.insert(idx);
             }
             lastx = xdiff[idx];
-        }
-    }
-    qDebug() << "\n\n";
-        //Switch indices so as to search row-wise
-    for (int i=0; i<vf_resolution; ++i)
-    {
-        lasty = ydiff[i*vf_resolution];
-        for (int j=0; j<vf_resolution; ++j)
-        {
-            const int idx = i*vf_resolution+j;
+
             if (ds::sgn(lasty) != ds::sgn(ydiff[idx]))
             {
-                ycross.push_back( std::make_pair(i,j) );
-                qDebug() << i << j << idx
-                         << "\t" << y[idx-1] << y[idx] << "\t" << lasty << ydiff[idx];
+                ycross_v.push_back( std::make_pair(i,j) );
+                yidx_set.insert(idx);
             }
             lasty = ydiff[idx];
         }
     }
-    //The grid is being searched *column-wise*
 
-    //Now interpolate
-    const size_t xnum_pts = xcross.size();
+    //Switch indices so as to search row-wise
+    for (int i=0; i<vf_resolution; ++i)
+    {
+        lastx = xdiff[i*vf_resolution];
+        lasty = ydiff[i*vf_resolution];
+        for (int j=0; j<vf_resolution; ++j)
+        {
+            const int idx = i*vf_resolution+j;
+            if (ds::sgn(lastx) != ds::sgn(xdiff[idx]) && xidx_set.count(idx)==0)
+                xcross_h.push_back( std::make_pair(i,j) );
+            lastx = xdiff[idx];
+
+            if (ds::sgn(lasty) != ds::sgn(ydiff[idx]) && yidx_set.count(idx)==0)
+                ycross_h.push_back( std::make_pair(i,j) );
+            lasty = ydiff[idx];
+        }
+    }
+
+    const size_t xnum_pts_h = xcross_h.size(),
+            xnum_pts_v = xcross_v.size(),
+            ynum_pts_h = ycross_h.size(),
+            ynum_pts_v = ycross_v.size();
+/*    //Now interpolate
     QPolygonF xpts(xnum_pts);
     for (size_t ct=0; ct<xnum_pts; ++ct)
     {
         int i = xcross.at(ct).first,
                 j = xcross.at(ct).second,
                 idx = i*vf_resolution+j;
-        double xval = xinc*xdiff[idx-1]/std::abs(xdiff[idx]-xdiff[idx-1]) + x[idx-1];
+        double xval = xinc*xdiff[idx-1]/std::abs(xdiff[idx]-xdiff[idx-vf_resolution])
+                + x[idx-vf_resolution];
         xpts[ct] = QPointF(xval, y[idx]);
-//        qDebug() << i << j << idx << xpts[ct];
     }
     qDebug() << "\n\n";
     const size_t ynum_pts = ycross.size();
@@ -615,35 +665,93 @@ void MainWindow::DrawNullclines()
                 j = ycross.at(ct).second,
                 idx = i*vf_resolution+j;
         double yval = yinc*ydiff[idx-1]/std::abs(ydiff[idx]-ydiff[idx-1]) + y[idx-1];
-//        assert( yval>=y[idx-1] && yval<=y[idx] );
         ypts[ct] = QPointF(x[idx], yval);
-        qDebug() << i << j << idx << ypts[ct];
     }
+*/
+/*    qDebug() << "x:";
+    for (int i=0; i<vf_resolution; ++i)
+    {
+        std::string line;
+        for (int j=0; j<vf_resolution; ++j)
+        {
+            const int idx = i*vf_resolution+j;
+            line += std::to_string(xdiff[idx]) + "\t";
+//            line += std::to_string(x[idx]) + "\t";
+//            line += std::to_string(xcross[idx].first) + "\t";
+        }
+        qDebug() << line.c_str();
+    }
+    qDebug() << "\n\n";
+    qDebug() << "y:";
+    for (int i=0; i<vf_resolution; ++i)
+    {
+        std::string line;
+        for (int j=0; j<vf_resolution; ++j)
+        {
+            const int idx = i*vf_resolution+j;
+            line += std::to_string(ydiff[idx]) + "\t";
+//            line += std::to_string(y[idx]) + "\t";
+//            line += std::to_string(xcross[idx].second) + "\t";
+        }
+        qDebug() << line.c_str();
+    }
+    qDebug() << "\n\n";
+*/
 
     QColor xcolor = _tpColors.at(xidx+1);
-    for (size_t i=0; i<xnum_pts; ++i)
+    for (size_t i=0; i<xnum_pts_h; ++i)
     {
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
             QBrush(xcolor), QPen(xcolor, 2), QSize(5, 5) );
         QwtPlotMarker* marker = new QwtPlotMarker();
         marker->setSymbol(symbol);
 //        marker->setValue(xpts[i]);
-        marker->setXValue(x[xcross.at(i).first]);
-        marker->setYValue(y[xcross.at(i).second]);
+        const int idx = xcross_h.at(i).first*vf_resolution + xcross_h.at(i).second;
+        marker->setXValue(x[idx] + xinc/2.0);
+        marker->setYValue(y[idx]);
         marker->setZ(-1);
-        marker->attach(ui->qwtPhasePlot);
+        _ncPlotItems.push_back(marker);
+    }
+    for (size_t i=0; i<xnum_pts_v; ++i)
+    {
+        QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+            QBrush(xcolor), QPen(xcolor, 2), QSize(5, 5) );
+        QwtPlotMarker* marker = new QwtPlotMarker();
+        marker->setSymbol(symbol);
+//        marker->setValue(xpts[i]);
+        const int idx = xcross_v.at(i).first*vf_resolution + xcross_v.at(i).second;
+        marker->setXValue(x[idx]);
+        marker->setYValue(y[idx] + yinc/2.0);
+        marker->setZ(-1);
+        _ncPlotItems.push_back(marker);
     }
 
     QColor ycolor = _tpColors.at(yidx+1);
-    for (size_t i=0; i<ynum_pts; ++i)
+    for (size_t i=0; i<ynum_pts_h; ++i)
     {
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
             QBrush(ycolor), QPen(ycolor, 2), QSize(5, 5) );
         QwtPlotMarker* marker = new QwtPlotMarker();
         marker->setSymbol(symbol);
-        marker->setValue(ypts[i]);
+//        marker->setValue(ypts[i]);
+        const int idx = ycross_h.at(i).first*vf_resolution + ycross_h.at(i).second;
+        marker->setXValue(x[idx] + xinc/2.0);
+        marker->setYValue(y[idx]);
         marker->setZ(-1);
-        marker->attach(ui->qwtPhasePlot);
+        _ncPlotItems.push_back(marker);
+    }
+    for (size_t i=0; i<ynum_pts_v; ++i)
+    {
+        QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+            QBrush(ycolor), QPen(ycolor, 2), QSize(5, 5) );
+        QwtPlotMarker* marker = new QwtPlotMarker();
+        marker->setSymbol(symbol);
+//        marker->setValue(ypts[i]);
+        const int idx = ycross_v.at(i).first*vf_resolution + ycross_v.at(i).second;
+        marker->setXValue(x[idx]);
+        marker->setYValue(y[idx] + yinc/2.0);
+        marker->setZ(-1);
+        _ncPlotItems.push_back(marker);
     }
 
     delete[] x;
@@ -665,7 +773,9 @@ void MainWindow::DrawNullclines()
 */
     ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, xmin, xmax );
     ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
-    ui->qwtPhasePlot->replot();
+    for (auto it : _ncPlotItems)
+        it->attach(ui->qwtPhasePlot);
+    if (!_isDrawing) ui->qwtPhasePlot->replot();
 
 #ifdef DEBUG_FUNC
     qDebug() << "Exit MainWindow::DrawNullclines";
@@ -706,6 +816,11 @@ void MainWindow::DrawPhasePortrait()
     while (_isDrawing)
     {
         if (_needUpdateVF) DrawVectorField();
+        if (_needUpdateNullclines)
+        {
+            DrawNullclines();
+            _needUpdateNullclines = false;
+        }
 
         static auto last_step = std::chrono::system_clock::now();
         auto step_diff = std::chrono::system_clock::now() - last_step;
@@ -759,6 +874,7 @@ void MainWindow::DrawPhasePortrait()
                     ui->tblParameters->update();
                     _pulseStepsRemaining = -1;
                 }
+                // ### Somehow this isn't working if the (cumulative) pulse is longer than steps per second
 
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
@@ -873,10 +989,25 @@ void MainWindow::DrawPhasePortrait()
                 if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
             }
             //Get axis limits
-        auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
-                ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
+        double xmin, xmax, ymin, ymax;
+        if (ui->cboxFitLimits->isChecked())
+        {
+            xmin = _initConds->Minimum(xidx);
+            xmax = _initConds->Maximum(xidx);
+            ymin = _initConds->Minimum(yidx);
+            ymax = _initConds->Maximum(yidx);
+        }
+        else
+        {
+            auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
+                    ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
+            xmin = *xlims.first;
+            xmax = *xlims.second;
+            ymin = *ylims.first;
+            ymax = *ylims.second;
+        }
 
-        ViewRect pp_data( *xlims.first, *xlims.second, *ylims.first, *ylims.second ),
+        ViewRect pp_data(xmin, xmax, ymin, ymax),
                 tp_data( dv_start, dv_end, y_tp_min, y_tp_max );
         _finishedReplot = false;
         emit DoReplot(pp_data, tp_data);
@@ -924,8 +1055,10 @@ void MainWindow::DrawVectorField()
     {
         auto loop_begin = std::chrono::system_clock::now();
 
-        const int num_diffs = (int)_differentials->NumPars();
-        const double* diffs = _parserMgr.ConstData(_differentials);
+        const int num_diffs = (int)_differentials->NumPars(),
+                num_vars = (int)_variables->NumPars();
+        const double* diffs = _parserMgr.ConstData(_differentials),
+                * vars = _parserMgr.ConstData(_variables);
         const int xidx = ui->cmbDiffX->currentIndex(),
                 yidx = ui->cmbDiffY->currentIndex();
 
@@ -948,9 +1081,12 @@ void MainWindow::DrawVectorField()
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
 //        qDebug() << "MainWindow::DrawVectorField 6";
-        std::vector<double> dvals_orig(num_diffs);
+        std::vector<double> dvals_orig(num_diffs),
+                vars_orig(num_vars);
         for (int i=0; i<num_diffs; ++i)
             dvals_orig[i] = diffs[i];
+        for (int i=0; i<num_diffs; ++i)
+            vars_orig[i] = vars[i];
         try
         {
             for (int i=0; i<vf_resolution; ++i)
@@ -1009,15 +1145,18 @@ void MainWindow::DrawVectorField()
                     curv->setSamples(pts);
                     curv->setZ(-0.5);
                 }
-            _vfTailLen += _vfStepsSec;
+            if (_isDrawing && _plotMode==VECTOR_FIELD) _vfTailLen += _vfStepsSec;
+
+            for (int i=0; i<num_diffs; ++i)
+                _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
+            for (int i=0; i<num_vars; ++i)
+                _parserMgr.SetData(_variables, i, vars_orig.at(i));
         }
         catch (std::exception& e)
         {
             qDebug() << "MainWindow::DrawVectorField" << e.what();
         }
         lock.unlock();
-        for (int i=0; i<num_diffs; ++i)
-            _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
 
         _isVFAttached = false;
         emit DoAttachVF(true);
@@ -1305,8 +1444,10 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::ExprnChanged";
 #endif
+//    _parserMgr.ResetVarInitVals();
     _needUpdateExprns = true;
     if (IsVFPresent()) UpdateVectorField();
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 void MainWindow::InitParserMgr() //slot
 {
@@ -1337,6 +1478,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
     if (IsVFPresent()) UpdateVectorField();
+    if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
 {
@@ -1474,6 +1616,13 @@ void MainWindow::UpdateLists()
     UpdatePulseVList();
     UpdateSliderPList();
     UpdateTimePlotTable();
+}
+void MainWindow::UpdateNullclines()
+{
+    if (_isDrawing)
+        _needUpdateNullclines = true;
+    else
+        DrawNullclines();
 }
 void MainWindow::UpdatePulseVList()
 {

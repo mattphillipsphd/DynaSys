@@ -37,6 +37,8 @@ class ParserMgr
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
         void ResetDifferentials();
+//        void ResetValues();
+//        void ResetVarInitVals();
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
         void SetData(const ParamModelBase* model, size_t idx, double val);
@@ -56,10 +58,14 @@ class ParserMgr
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
         std::vector< std::tuple<ParamModelBase*, double*, double*> > _models;
+            //Model evaluation happens in a two-step process so that all variables and differentials
+            //can be updated simultaneously; the third element is a temporary that is used for
+            //this purpose.
         mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
+        std::vector<double> _varInitVals; //For temporary model resets
 };
 
 #endif // PARSERMGR_H
