@@ -16,6 +16,8 @@ DSPlot::DSPlot(QWidget *parent) :
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
 #endif
+
+    setMouseTracking(true);
 }
 DSPlot::DSPlot( const QwtText &title, QWidget *parent ):
     QwtPlot(title, parent), _tid(std::this_thread::get_id())
@@ -148,6 +150,16 @@ QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::infoToItem(itemInfo);
+}
+void DSPlot::mouseMoveEvent(QMouseEvent* event)
+{
+    const double xmin = axisScaleDiv(xBottom).lowerBound(),
+            xmax = axisScaleDiv(xBottom).upperBound(),
+            ymin = axisScaleDiv(yLeft).lowerBound(),
+            ymax = axisScaleDiv(yLeft).upperBound();
+    double xpos = (xmax - xmin) * (double)event->x()/width() + xmin,
+            ypos = (ymax - ymin) * (double)(height() - event->y())/height() + ymin;
+    qDebug() << xpos << ypos;
 }
 
 void DSPlot::replot()

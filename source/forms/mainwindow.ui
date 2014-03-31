@@ -76,6 +76,20 @@
        <widget class="QComboBox" name="cmbDiffY"/>
       </item>
       <item>
+       <widget class="QLabel" name="lblX">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblY">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -176,7 +190,7 @@
            <widget class="QSpinBox" name="spnTailLength">
             <property name="minimumSize">
              <size>
-              <width>70</width>
+              <width>50</width>
               <height>0</height>
              </size>
             </property>
@@ -219,7 +233,7 @@
            <widget class="QComboBox" name="cmbPulsePars">
             <property name="minimumSize">
              <size>
-              <width>70</width>
+              <width>80</width>
               <height>0</height>
              </size>
             </property>
@@ -292,7 +306,14 @@
          </widget>
         </item>
         <item>
-         <widget class="QComboBox" name="cmbSlidePars"/>
+         <widget class="QComboBox" name="cmbSlidePars">
+          <property name="minimumSize">
+           <size>
+            <width>70</width>
+            <height>0</height>
+           </size>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -479,7 +500,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

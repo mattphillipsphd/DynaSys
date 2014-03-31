@@ -7,6 +7,7 @@
 
 #include <QDebug>
 #include <QEvent>
+#include <QMouseEvent>
 
 #include "../globals/globals.h"
 #include <qwt_plot.h>
@@ -51,6 +52,8 @@ class DSPlot : public QwtPlot
 
     public Q_SLOTS:
         virtual void replot() override;
+
+        virtual void mouseMoveEvent(QMouseEvent* event) override;
 
     protected:
         virtual void resizeEvent( QResizeEvent *e ) override;
