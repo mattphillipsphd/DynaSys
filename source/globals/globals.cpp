@@ -5,7 +5,7 @@ const double ds::PI = 3.14159265358979;
 
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
-const std::string ds::VERSION_STR = "0.1.3";
+const std::string ds::VERSION_STR = "0.1.4";
 
 ds::PMODEL ds::Model(const std::string& model)
 {
