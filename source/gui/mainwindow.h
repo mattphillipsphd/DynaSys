@@ -25,6 +25,7 @@
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_marker.h>
+#include <qwt_plot_renderer.h>
 #include <qwt_symbol.h>
 
 #include <muParser.h>
@@ -32,6 +33,8 @@
 #include "aboutgui.h"
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
+#include "notesgui.h"
+#include "parameditor.h"
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
@@ -86,10 +89,11 @@ class MainWindow : public QMainWindow
                         MAX_BUF_SIZE,
                         SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
-                        IP_SAMPLES_SHOWN,
+                        TP_SAMPLES_SHOWN,
                         XY_SAMPLES_SHOWN,
                         VF_RESOLUTION,
                         VF_SLEEP_MS;
+        static const double MIN_MODEL_STEP;
             //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
             //error
 
@@ -97,6 +101,13 @@ class MainWindow : public QMainWindow
         ~MainWindow();
 
     public slots:
+        void LoadTempModel(void* models);
+        void ParamEditorClosed();
+        void SaveNotes();
+        void UpdateMousePos(QPointF pos);
+
+    protected:
+        virtual void closeEvent(QCloseEvent *) override;
 
     signals:
         void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
@@ -108,9 +119,15 @@ class MainWindow : public QMainWindow
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionLoad_triggered();
+        void on_actionNotes_triggered();
+        void on_actionParameters_triggered();
         void on_actionReload_Current_triggered();
         void on_actionSave_Data_triggered();
         void on_actionSave_Model_triggered();
+        void on_actionSave_Model_As_triggered();
+        void on_actionSave_Phase_Plot_triggered();
+        void on_actionSave_Time_Plot_triggered();
+        void on_actionSave_Vector_Field_triggered();
 
         void on_btnAddCondition_clicked();
         void on_btnPulse_clicked();
@@ -131,6 +148,9 @@ class MainWindow : public QMainWindow
 
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
+
+        void on_edModelStep_editingFinished();
+        void on_edNumTPSamples_editingFinished();
 
         void on_lsConditions_clicked(const QModelIndex& index);
 
@@ -169,12 +189,16 @@ class MainWindow : public QMainWindow
         void InitPlots();
         const std::vector<QColor> InitTPColors() const;
         bool IsVFPresent() const;
-        void LoadModel();
+        void LoadModel(const std::string& file_name);
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
+        void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;
+        void SaveModel(const std::string& file_name);
         void SetButtonsEnabled(bool is_enabled);
         void UpdateLists();
+        void UpdateNotes();
         void UpdateNullclines();
+        void UpdateParamEditor();
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
         void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
@@ -182,6 +206,8 @@ class MainWindow : public QMainWindow
         void UpdateVectorField();
 
         AboutGui* _aboutGui;
+        NotesGui* _notesGui;
+        ParamEditor* _paramEditor;
 
         // ### Get rid of all of these, store in ParserMgr, just refer to them by name
         ConditionModel* _conditions;
@@ -200,6 +226,7 @@ class MainWindow : public QMainWindow
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;
         std::vector<QwtPlotItem*> _ncPlotItems;
+        int _numTPSamples;
         ParserMgr _parserMgr;
         PLOT_MODE _plotMode;
         std::vector<QwtPlotItem*> _ppPlotItems;

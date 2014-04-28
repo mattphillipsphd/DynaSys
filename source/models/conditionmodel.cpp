@@ -36,6 +36,13 @@ const std::string ConditionModel::Condition(int row) const
     QStandardItem* cond = item(row);
     return cond->text().toStdString();
 }
+std::string ConditionModel::EdString() const
+{
+    std::string s = String();
+    s.erase(0, s.find_first_of('\n')+1 );
+    s = "#Conditions\n" + s;
+    return s;
+}
 const VecStr ConditionModel::Expressions(int row) const
 {
     VecStr vstr;
@@ -48,7 +55,14 @@ const VecStr ConditionModel::Expressions(int row) const
     }
     return vstr;
 }
-void ConditionModel::Read(std::ifstream& in)
+std::string ConditionModel::String() const
+{
+    std::stringstream s;
+    Write(s);
+    return s.str();
+}
+
+void ConditionModel::Read(std::istream& in)
 {
     clear();
     std::string line;
@@ -72,7 +86,7 @@ void ConditionModel::Read(std::ifstream& in)
         AddCondition(cond, results);
     }
 }
-void ConditionModel::Write(std::ofstream& out) const
+void ConditionModel::Write(std::ostream& out) const
 {
     const int row_count = rowCount();
     out << "Conditions\t" << row_count << std::endl;

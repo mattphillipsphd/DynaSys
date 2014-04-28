@@ -32,6 +32,7 @@ class ParserMgr
         void InputEval(int idx = -1);
         double Maximum(const ParamModelBase* model, size_t idx) const;
         double Minimum(const ParamModelBase* model, size_t idx) const;
+        inline double ModelStep() const { return _modelStep; }
         void ParserCondEval();
         void ParserEval(bool eval_input = true);
         void QuickEval(const std::string& exprn);
@@ -46,6 +47,7 @@ class ParserMgr
         void SetExpression(const std::string& exprn);
         void SetExpression(const VecStr& exprns);
         void SetExpressions();
+        void SetModelStep(double step);
         void TempEval();
 
     private:
@@ -61,10 +63,12 @@ class ParserMgr
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
+        double _modelStep;
         mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
+        int _stepCt;
         std::vector<double> _varInitVals; //For temporary model resets
 };
 

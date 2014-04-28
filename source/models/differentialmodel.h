@@ -10,11 +10,16 @@ class DifferentialModel : public ParamModelBase
     public:
         explicit DifferentialModel(QObject *parent, const std::string& name);
 
+        void SetModelStep(const std::string& step) { _modelStep = step; }
+
         virtual bool DoEvaluate() const override { return true; }
         virtual bool DoInitialize() const override { return false; }
         virtual std::string ShortKey(size_t idx) const override;
         virtual int ShortKeyIndex(const std::string& par_name) const override;
         virtual std::string TempExpression(size_t idx) const override;
+
+    private:
+        std::string _modelStep;
 };
 
 #endif // DIFFERENTIALMODEL_H

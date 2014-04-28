@@ -76,16 +76,16 @@
        <widget class="QComboBox" name="cmbDiffY"/>
       </item>
       <item>
-       <widget class="QLabel" name="lblX">
+       <widget class="QLabel" name="lblMouseX">
         <property name="text">
-         <string/>
+         <string>0.0</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="lblY">
+       <widget class="QLabel" name="lblMouseY">
         <property name="text">
-         <string/>
+         <string>0.0</string>
         </property>
        </widget>
       </item>
@@ -190,7 +190,7 @@
            <widget class="QSpinBox" name="spnTailLength">
             <property name="minimumSize">
              <size>
-              <width>50</width>
+              <width>75</width>
               <height>0</height>
              </size>
             </property>
@@ -318,7 +318,7 @@
        </layout>
       </item>
       <item>
-       <layout class="QGridLayout" name="gridLayout" rowstretch="0,1,0,0,1,0">
+       <layout class="QGridLayout" name="gridLayout" rowstretch="0,1,0,0,1,0,0">
         <item row="2" column="1">
          <widget class="QPushButton" name="btnRemoveParameter">
           <property name="text">
@@ -333,13 +333,6 @@
           </property>
          </widget>
         </item>
-        <item row="5" column="1">
-         <widget class="QPushButton" name="btnRemoveVariable">
-          <property name="text">
-           <string>Remove Variable</string>
-          </property>
-         </widget>
-        </item>
         <item row="5" column="0">
          <widget class="QPushButton" name="btnAddVariable">
           <property name="text">
@@ -347,8 +340,30 @@
           </property>
          </widget>
         </item>
+        <item row="5" column="1">
+         <widget class="QPushButton" name="btnRemoveVariable">
+          <property name="text">
+           <string>Remove Variable</string>
+          </property>
+         </widget>
+        </item>
         <item row="4" column="0" colspan="2">
          <widget class="QTableView" name="tblVariables"/>
+        </item>
+        <item row="0" column="0" colspan="2">
+         <widget class="QLabel" name="label_4">
+          <property name="font">
+           <font>
+            <pointsize>10</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>Input Parameters</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
         </item>
         <item row="1" column="0" colspan="2">
          <widget class="QTableView" name="tblParameters"/>
@@ -368,25 +383,24 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="2">
-         <widget class="QLabel" name="label_4">
-          <property name="font">
-           <font>
-            <pointsize>10</pointsize>
-           </font>
-          </property>
+        <item row="6" column="0">
+         <widget class="QLabel" name="label_12">
           <property name="text">
-           <string>Parameters</string>
+           <string>Model step:</string>
           </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="QLineEdit" name="edModelStep">
+          <property name="text">
+           <string>0.01</string>
           </property>
          </widget>
         </item>
        </layout>
       </item>
       <item>
-       <layout class="QGridLayout" name="gridLayout_2">
+       <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,2,2,0,0,1,0" rowminimumheight="0,0,0,0,0,0,0">
         <item row="6" column="3">
          <widget class="QPushButton" name="btnRemoveExpression">
           <property name="text">
@@ -481,14 +495,28 @@
        <widget class="DSPlot" name="qwtTimePlot" native="true"/>
       </item>
       <item>
-       <widget class="QTableView" name="tblTimePlot">
-        <property name="maximumSize">
-         <size>
-          <width>150</width>
-          <height>16777215</height>
-         </size>
-        </property>
-       </widget>
+       <layout class="QGridLayout" name="gridLayout_3">
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="edNumTPSamples"/>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_13">
+          <property name="text">
+           <string>N:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="2">
+         <widget class="QTableView" name="tblTimePlot">
+          <property name="maximumSize">
+           <size>
+            <width>150</width>
+            <height>16777215</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </item>
@@ -500,7 +528,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -511,7 +539,11 @@
     <addaction name="actionReload_Current"/>
     <addaction name="actionClear"/>
     <addaction name="actionSave_Model"/>
+    <addaction name="actionSave_Model_As"/>
     <addaction name="actionSave_Data"/>
+    <addaction name="actionSave_Phase_Plot"/>
+    <addaction name="actionSave_Time_Plot"/>
+    <addaction name="actionSave_Vector_Field"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -519,7 +551,15 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionParameters"/>
+    <addaction name="actionNotes"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
@@ -559,6 +599,46 @@
   <action name="actionReload_Current">
    <property name="text">
     <string>Reload Current</string>
+   </property>
+  </action>
+  <action name="actionSave_Model_As">
+   <property name="text">
+    <string>Save Model As</string>
+   </property>
+  </action>
+  <action name="actionParameters">
+   <property name="text">
+    <string>Parameters</string>
+   </property>
+  </action>
+  <action name="actionSave_Phase_Plot">
+   <property name="text">
+    <string>Save Phase Plot</string>
+   </property>
+  </action>
+  <action name="actionSave_Time_Plot">
+   <property name="text">
+    <string>Save Time Plot</string>
+   </property>
+  </action>
+  <action name="actionSave_Vector_Field">
+   <property name="text">
+    <string>Save Vector Field</string>
+   </property>
+  </action>
+  <action name="actionLog">
+   <property name="text">
+    <string>Log</string>
+   </property>
+  </action>
+  <action name="actionLog_2">
+   <property name="text">
+    <string>Log</string>
+   </property>
+  </action>
+  <action name="actionNotes">
+   <property name="text">
+    <string>Notes</string>
    </property>
   </action>
  </widget>

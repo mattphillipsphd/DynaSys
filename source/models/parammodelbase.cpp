@@ -52,6 +52,15 @@ VecStr ParamModelBase::ShortKeys() const
         vs.push_back(ShortKey(i));
     return vs;
 }
+std::string ParamModelBase::String() const
+{
+    std::string str;
+    str += "#" + ds::Model(_id) + "\n";
+    for (auto it : _parameters)
+        str += it.key + "\t" + it.value + "\t" + it.min + "\t" + it.max + "\n";
+    str += "\n";
+    return str;
+}
 std::string ParamModelBase::TempExpression(size_t i) const
 {
     return Expression(i);

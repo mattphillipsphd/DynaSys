@@ -17,6 +17,7 @@ DSPlot::DSPlot(QWidget *parent) :
     qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
 #endif
 
+    canvas()->setMouseTracking(true);
     setMouseTracking(true);
 }
 DSPlot::DSPlot( const QwtText &title, QWidget *parent ):
@@ -153,13 +154,10 @@ QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
 }
 void DSPlot::mouseMoveEvent(QMouseEvent* event)
 {
-    const double xmin = axisScaleDiv(xBottom).lowerBound(),
-            xmax = axisScaleDiv(xBottom).upperBound(),
-            ymin = axisScaleDiv(yLeft).lowerBound(),
-            ymax = axisScaleDiv(yLeft).upperBound();
-    double xpos = (xmax - xmin) * (double)event->x()/width() + xmin,
-            ypos = (ymax - ymin) * (double)(height() - event->y())/height() + ymin;
-    qDebug() << xpos << ypos;
+    QwtScaleMap mapx = canvasMap(xBottom),
+             mapy = canvasMap(yLeft);
+    emit MousePos( QPointF(mapx.invTransform(event->x() - canvas()->pos().x()),
+                           mapy.invTransform(event->y() - canvas()->pos().y())));
 }
 
 void DSPlot::replot()

@@ -39,6 +39,7 @@ class ParamModelBase : public QAbstractTableModel
         virtual std::string ShortKey(size_t i) const;
         virtual int ShortKeyIndex(const std::string& par_name) const;
         VecStr ShortKeys() const;
+        std::string String() const;
         virtual std::string TempExpression(size_t i) const;
         virtual VecStr TempExpressions() const;
         std::string TempKey(size_t i) const;

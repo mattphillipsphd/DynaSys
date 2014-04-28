@@ -40,7 +40,11 @@ SOURCES += main.cpp\
     models/parammodelbase.cpp \
     models/tpvtablemodel.cpp \
     gui/checkboxdelegate.cpp \
-    gui/dsplot.cpp
+    gui/dsplot.cpp \
+    gui/parameditor.cpp \
+    memrep/notes.cpp \
+    gui/notesgui.cpp \
+    gui/ptextedit.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -60,11 +64,17 @@ HEADERS  += gui/mainwindow.h \
     models/parammodelbase.h \
     models/tpvtablemodel.h \
     gui/checkboxdelegate.h \
-    gui/dsplot.h
+    gui/dsplot.h \
+    gui/parameditor.h \
+    memrep/notes.h \
+    gui/notesgui.h \
+    gui/ptextedit.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
-    forms/variablegui.ui
+    forms/variablegui.ui \
+    forms/parameditor.ui \
+    forms/notesgui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

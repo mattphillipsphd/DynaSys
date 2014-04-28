@@ -1,14 +1,15 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-const int MainWindow::DEFAULT_SINGLE_STEP = 100;
+const int MainWindow::DEFAULT_SINGLE_STEP = 10;
 const int MainWindow::DEFAULT_SINGLE_TAIL = -1;
 const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
+const double MainWindow::MIN_MODEL_STEP = 1e-7;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
-const int MainWindow::IP_SAMPLES_SHOWN = 10000;
+const int MainWindow::TP_SAMPLES_SHOWN = 1000;
 const int MainWindow::XY_SAMPLES_SHOWN = 64 * 1024;
 const int MainWindow::VF_RESOLUTION = 20;
 const int MainWindow::VF_SLEEP_MS = 250;
@@ -17,34 +18,38 @@ const int MainWindow::VF_SLEEP_MS = 250;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
+    _aboutGui(new AboutGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr), _fileName(""), _guiTid(std::this_thread::get_id()),
     _isDrawing(false), _isVFAttached(false),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
-    _needUpdateNullclines(false), _needUpdateVF(false),
+    _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_SAMPLES_SHOWN),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
     _tpColors(InitTPColors()),
     _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
+#ifdef DEBUG_FUNC
+    std::stringstream s; s << std::this_thread::get_id();
+    qDebug() << "Enter MainWindow::MainWindow, thread id:" << s.str().c_str();
+#endif
+
     qRegisterMetaType<ViewRect>("ViewRect");
 
     ui->setupUi(this);
-
-#ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "MainWindow::MainWindow, thread id:" << s.str().c_str();
-#endif
 
     QStringList modes;
     modes << "Single" << "Vector field";
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
 
+    ui->edModelStep->setText( QString("%1").arg(ds::DEFAULT_MODEL_STEP) );
+    ui->edNumTPSamples->setText( std::to_string(TP_SAMPLES_SHOWN).c_str() );
     ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
     ui->sldParameter->setRange(0, SLIDER_INT_LIM);
     ui->spnVFResolution->setValue(VF_RESOLUTION);
     ui->spnStepsPerSec->setValue(_singleStepsSec);
     ui->spnTailLength->setValue(_singleTailLen);
+    ui->spnTailLength->setMaximum(XY_SAMPLES_SHOWN);
 
     ui->qwtPhasePlot->setAutoDelete(false);
     ui->qwtTimePlot->setAutoDelete(false);
@@ -66,15 +71,66 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
 
-    _aboutGui = new AboutGui();
     _aboutGui->setWindowModality(Qt::ApplicationModal);
-}
 
+    connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)),
+            this, SLOT(UpdateMousePos(QPointF)));
+    connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
+
+    _paramEditor->setWindowModality(Qt::ApplicationModal);
+    connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
+    connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
+}
 MainWindow::~MainWindow()
 {
     delete ui;
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
+}
+void MainWindow::LoadTempModel(void* models)
+{
+    SysFileOut out(ds::TEMP_MODEL_FILE);
+    out.Save(*(static_cast<VecStr*>(models)), _parserMgr.ModelStep(), _notesGui->GetNotes());
+
+    LoadModel(ds::TEMP_MODEL_FILE);
+    SaveModel(_fileName);
+}
+void MainWindow::ParamEditorClosed()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::ParamEditorClosed";
+#endif
+    setEnabled(true);
+}
+void MainWindow::SaveNotes()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::SaveNotes";
+#endif
+    SysFileIn in(_fileName);
+    std::vector<ParamModelBase*> models;
+    ConditionModel* conditions = new ConditionModel(this);
+    std::string model_step;
+    in.Load(models, model_step, conditions, nullptr);
+
+    SysFileOut out(_fileName);
+    std::vector<const ParamModelBase*> cmodels;
+    for (auto it : models)
+        cmodels.push_back(it);
+    const Notes* notes = _notesGui->GetNotes();
+    out.Save(cmodels, std::atof(model_step.c_str()),
+             conditions, notes);
+}
+void MainWindow::UpdateMousePos(QPointF pos)
+{
+    ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
+    ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
+}
+
+void MainWindow::closeEvent(QCloseEvent *)
+{
+    _aboutGui->close();
+    _notesGui->close();
 }
 
 void MainWindow::on_actionAbout_triggered()
@@ -106,15 +162,30 @@ void MainWindow::on_actionLoad_triggered()
 #endif
     if (file_name.empty()) return;
     _fileName = file_name;
-    LoadModel();
+    LoadModel(_fileName);
 }
+void MainWindow::on_actionNotes_triggered()
+{
+    _notesGui->show();
+}
+void MainWindow::on_actionParameters_triggered()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "MainWindow::on_actionParameters_triggered";
+#endif
+    SaveModel(ds::TEMP_MODEL_FILE);
+    setEnabled(false);
+    _paramEditor->SetFileName(_fileName);
+    _paramEditor->show();
+}
+
 void MainWindow::on_actionReload_Current_triggered()
 {
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::on_actionReload_Current_triggered";
 #endif
     if (_fileName.empty()) InitDefaultModel();
-    else LoadModel();
+    else LoadModel(_fileName);
 }
 
 void MainWindow::on_actionSave_Data_triggered()
@@ -130,6 +201,11 @@ void MainWindow::on_actionSave_Data_triggered()
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
+    if (_fileName.empty()) return;
+    SaveModel(_fileName);
+}
+void MainWindow::on_actionSave_Model_As_triggered()
+{
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save dynamical system",
                                                          "").toStdString();
@@ -137,14 +213,20 @@ void MainWindow::on_actionSave_Model_triggered()
 
     _fileName = file_name;
 
-    std::vector<const ParamModelBase*> models;
-    models.push_back(_parameters);
-    models.push_back(_variables);
-    models.push_back(_differentials);
-    models.push_back(_initConds);
-    SysFileOut out(file_name, models, _conditions);
-    out.Save();
+    SaveModel(file_name);
     setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
+}
+void MainWindow::on_actionSave_Phase_Plot_triggered()
+{
+    SaveFigure(ui->qwtPhasePlot, "phase plot", QSizeF(100, 100));
+}
+void MainWindow::on_actionSave_Time_Plot_triggered()
+{
+    SaveFigure(ui->qwtTimePlot, "time plot", QSizeF(200, 75));
+}
+void MainWindow::on_actionSave_Vector_Field_triggered()
+{
+    SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
 }
 
 void MainWindow::on_btnAddCondition_clicked()
@@ -166,7 +248,7 @@ void MainWindow::on_btnPulse_clicked()
     _pulseParIdx = ui->cmbPulsePars->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
     _pulseResetValue = _parameters->Value(_pulseParIdx);
-    _pulseStepsRemaining = ui->edPulseDuration->text().toInt();
+    _pulseStepsRemaining = (int)( ui->edPulseDuration->text().toDouble() / _parserMgr.ModelStep() );
     std::string val = ui->edPulseValue->text().toStdString();
     _parameters->SetPar((int)_pulseParIdx, val);
 
@@ -381,6 +463,24 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
             range = _parserMgr.Range(_parameters, index);
     const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
     ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
+}
+
+void MainWindow::on_edModelStep_editingFinished()
+{
+    std::string text = ui->edModelStep->text().toStdString();
+    size_t pos;
+    double step = std::stod(text, &pos);
+    if (pos>0)
+    {
+        _parserMgr.SetModelStep(step);
+        static_cast<DifferentialModel*>(_differentials)->SetModelStep(text);
+        _parserMgr.SetExpressions();
+        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+    }
+}
+void MainWindow::on_edNumTPSamples_editingFinished()
+{
+    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
@@ -825,14 +925,14 @@ void MainWindow::DrawPhasePortrait()
         static auto last_step = std::chrono::system_clock::now();
         auto step_diff = std::chrono::system_clock::now() - last_step;
         auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(step_diff);
-        bool need_new_step = diff_ms.count() > 1000.0 / (double)ui->spnStepsPerSec->value();
+        bool need_new_step = diff_ms.count() > 1000.0/((double)_singleStepsSec/_parserMgr.ModelStep());
         if (!need_new_step)
             goto label;
         last_step = std::chrono::system_clock::now();
         {
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
-        int num_steps = (double)ui->spnStepsPerSec->value() / (double)SLEEP_MS + 0.5;
+        int num_steps = ((double)_singleStepsSec/_parserMgr.ModelStep()) / (double)SLEEP_MS + 0.5;
         if (num_steps==0) num_steps = 1;
 
             //Shrink the buffer if need be
@@ -843,7 +943,7 @@ void MainWindow::DrawPhasePortrait()
             for (int i=0; i<num_vars; ++i)
                 var_pts[i].pop_front();
         }
-        while (ip.size() + num_steps > IP_SAMPLES_SHOWN)
+        while (ip.size() + num_steps > _numTPSamples)
             ip.pop_front();
 
             //Go through each expression and evaluate them
@@ -955,7 +1055,7 @@ void MainWindow::DrawPhasePortrait()
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=0; k<num_tp_points; ++k)
-                    points_tp[k] = QPointF(dv_start+k, ip[k]);
+                    points_tp[k] = QPointF((dv_start+k)*_parserMgr.ModelStep(), ip[k]);
                 curv->setSamples(points_tp);
                 continue;
             }
@@ -964,7 +1064,7 @@ void MainWindow::DrawPhasePortrait()
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(k, diff_pts.at(didx).at(k));
+                    points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), diff_pts.at(didx).at(k));
                 curv->setSamples(points_tp);
                 continue;
             }
@@ -973,7 +1073,7 @@ void MainWindow::DrawPhasePortrait()
             {
                 QPolygonF points_tp(num_tp_points);
                 for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(k, var_pts.at(vidx).at(k));
+                    points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), var_pts.at(vidx).at(k));
                 curv->setSamples(points_tp);
             }
         }
@@ -1008,7 +1108,7 @@ void MainWindow::DrawPhasePortrait()
         }
 
         ViewRect pp_data(xmin, xmax, ymin, ymax),
-                tp_data( dv_start, dv_end, y_tp_min, y_tp_max );
+                tp_data( dv_start*_parserMgr.ModelStep(), dv_end*_parserMgr.ModelStep(), y_tp_min, y_tp_max );
         _finishedReplot = false;
         emit DoReplot(pp_data, tp_data);
         std::unique_lock<std::mutex> lock(_mutex);
@@ -1199,13 +1299,11 @@ void MainWindow::InitDefaultModel()
 
     _variables->AddParameter("q", Input::NORM_RAND_STR);
     _variables->AddParameter("r", "u*v");
-    _variables->AddParameter("tau", "0.1");
     AddVarDelegate(0);
     AddVarDelegate(1);
-    AddVarDelegate(2);
 
-    _differentials->AddParameter("v'", "tau*(u + a)/b");
-    _differentials->AddParameter("u'", "tau*(b - v)");
+    _differentials->AddParameter("v'", "(u + r + a)/b");
+    _differentials->AddParameter("u'", "q*(b - v)");
 
     _initConds->AddParameter("v(0)", "1");
     _initConds->AddParameter("u(0)", "0");
@@ -1219,7 +1317,11 @@ void MainWindow::InitDefaultModel()
     ui->lsConditions->setModelColumn(0);
     ResetResultsList(0);
 
+    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+
     UpdateLists();
+
+    SaveModel(ds::TEMP_MODEL_FILE);
 }
 void MainWindow::InitDraw()
 {
@@ -1238,13 +1340,13 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     _parserMgr.ClearModels();
 
     if (_parameters) delete _parameters;
-    _parameters = (models) ? (*models)[0] : new ParamModel(this, "Parameters");
+    _parameters = (models) ? (*models)[0] : new ParamModel(this, ds::Model(ds::INPUTS));
     ui->tblParameters->setModel(_parameters);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_parameters);
 
     if (_variables) delete _variables;
-    _variables = (models) ? (*models)[1] : new VariableModel(this, "Variables");
+    _variables = (models) ? (*models)[1] : new VariableModel(this, ds::Model(ds::VARIABLES));
     ui->tblVariables->setModel(_variables);
     ui->tblVariables->setColumnHidden(1,true);
     ui->tblVariables->setColumnHidden(2,true);
@@ -1252,7 +1354,7 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     _parserMgr.AddModel(_variables);
 
     if (_differentials) delete _differentials;
-    _differentials =(models) ? (*models)[2] :  new DifferentialModel(this, "Differentials");
+    _differentials =(models) ? (*models)[2] :  new DifferentialModel(this, ds::Model(ds::DIFFERENTIALS));
     ui->tblDifferentials->setModel(_differentials);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
     ui->tblDifferentials->setColumnHidden(1,true);
@@ -1260,7 +1362,7 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     _parserMgr.AddModel(_differentials);
 
     if (_initConds) delete _initConds;
-    _initConds = (models) ? (*models)[3] : new InitialCondModel(this, "InitialConds");
+    _initConds = (models) ? (*models)[3] : new InitialCondModel(this, ds::Model(ds::INIT_CONDS));
     ui->tblInitConds->setModel(_initConds);
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_initConds);
@@ -1526,7 +1628,7 @@ bool MainWindow::IsVFPresent() const
 {
     return ui->cboxVectorField->isChecked() || _plotMode==VECTOR_FIELD;
 }
-void MainWindow::LoadModel()
+void MainWindow::LoadModel(const std::string& file_name)
 {
 #ifdef DEBUG_FUNC
     qDebug() << "MainWindow::LoadModel";
@@ -1535,16 +1637,21 @@ void MainWindow::LoadModel()
     {
         ClearPlots();
 
+        SysFileIn in(file_name);
         std::vector<ParamModelBase*> models;
         ConditionModel* conditions = new ConditionModel(this);
-        SysFileIn in(_fileName, models, conditions);
-        in.Load();
+        std::string model_step;
+        Notes* notes = _notesGui->GetNotes();
+        in.Load(models, model_step, conditions, notes);
 
         _parserMgr.ClearExpressions();
 
         //Have to do this before models are deleted!
         InitModels(&models, conditions);
         ConnectModels();
+
+        ui->edModelStep->setText( model_step.c_str() );
+        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
 
         for (auto it : _cmbDelegates)
             delete it;
@@ -1555,6 +1662,8 @@ void MainWindow::LoadModel()
 
         ResetPhasePlotAxes();
         UpdateLists();
+        UpdateNotes();
+        UpdateParamEditor();
 
         setWindowTitle(("DynaSys " + ds::
                         VERSION_STR + " - " + _fileName).c_str());
@@ -1590,6 +1699,29 @@ void MainWindow::ResetResultsList(int cond_row)
     connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ResultsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
 }
+void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const
+{
+    QString suff = name;
+    suff.replace(' ', '_');
+    QString file_name = QFileDialog::getSaveFileName(nullptr,
+                                                     "Save " + name + " figure",
+                                                     QString(_fileName.c_str()) + suff + ".pdf");
+    if (file_name.isEmpty()) return;
+    QwtPlotRenderer renderer;
+    renderer.renderDocument(fig, file_name, "pdf", size);
+}
+void MainWindow::SaveModel(const std::string& file_name)
+{
+    std::vector<const ParamModelBase*> models;
+    models.push_back(_parameters);
+    models.push_back(_variables);
+    models.push_back(_differentials);
+    models.push_back(_initConds);
+    double model_step = _parserMgr.ModelStep();
+    const Notes* notes = _notesGui->GetNotes();
+    SysFileOut out(file_name);
+    out.Save(models, model_step, _conditions, notes);
+}
 void MainWindow::SetButtonsEnabled(bool is_enabled)
 {
     ui->btnAddCondition->setEnabled(is_enabled);
@@ -1607,7 +1739,6 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->actionLoad->setEnabled(is_enabled);
     ui->actionReload_Current->setEnabled(is_enabled);
     ui->actionSave_Data->setEnabled(is_enabled);
-    ui->actionSave_Model->setEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
 }
@@ -1617,12 +1748,23 @@ void MainWindow::UpdateLists()
     UpdateSliderPList();
     UpdateTimePlotTable();
 }
+void MainWindow::UpdateNotes()
+{
+    _notesGui->SetFileName(_fileName);
+    _notesGui->UpdateNotes();
+}
 void MainWindow::UpdateNullclines()
 {
     if (_isDrawing)
         _needUpdateNullclines = true;
     else
         DrawNullclines();
+}
+void MainWindow::UpdateParamEditor()
+{
+    SaveModel(ds::TEMP_MODEL_FILE);
+    _paramEditor->SetFileName(_fileName);
+    _paramEditor->UpdateParameters();
 }
 void MainWindow::UpdatePulseVList()
 {

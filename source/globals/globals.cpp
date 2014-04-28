@@ -1,13 +1,15 @@
 #include "globals.h"
 
+const double ds::DEFAULT_MODEL_STEP = 0.001;
 const double ds::PI = 3.14159265358979;
 
 const std::string ds::TEMP_FILE = ".temp.txt";
-const std::string ds::VERSION_STR = "0.1.2";
+const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
+const std::string ds::VERSION_STR = "0.1.3";
 
 ds::PMODEL ds::Model(const std::string& model)
 {
-    if (model=="Parameters") return PARAMETERS;
+    if (model=="Inputs") return INPUTS;
     if (model=="Variables") return VARIABLES;
     if (model=="Differentials") return DIFFERENTIALS;
     if (model=="InitialConds") return INIT_CONDS;
@@ -18,8 +20,8 @@ std::string ds::Model(PMODEL model)
 {
     switch (model)
     {
-        case PARAMETERS:
-            return "Parameters";
+        case INPUTS:
+            return "Inputs";
         case VARIABLES:
             return "Variables";
         case DIFFERENTIALS:
@@ -28,6 +30,8 @@ std::string ds::Model(PMODEL model)
             return "InitialConds";
         case CONDITIONS:
             return "Conditions";
+        case NUM_MODELS:
+            throw("Not a model");
     }
     throw("Bad Model");
 }

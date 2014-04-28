@@ -26,7 +26,8 @@ Input::Input(double* const value)
     : _ct(0), _input(nullptr), _value(value), _type(UNKNOWN)
 {
 }
-Input::Input(const Input& other) : _ct(other._ct), _value(other._value), _type(other._type)
+Input::Input(const Input& other)
+    : _ct(other._ct), _input(nullptr), _value(other._value), _type(other._type)
 {
     DeepCopy(other);
 }
@@ -96,17 +97,17 @@ void Input::LoadInput(const std::string& file_name)
         std::string line;
         std::getline(file, line);
 
-        const int num_elts = std::stoi(line);
+        const int num_elts = std::stof(line);
         _input = new double[INPUT_SIZE];
         size_t input_ct = 0;
         for (int i=0; i<num_elts; ++i)
         {
             std::getline(file, line);
-            _input[input_ct++] = std::stoi(line);
+            _input[input_ct++] = std::stof(line);
         }
         while (input_ct<INPUT_SIZE)
         {
-            _input[input_ct] = _input[input_ct-num_elts];
+            _input[input_ct] = _input[input_ct%num_elts];
             ++input_ct;
         }
 
@@ -129,6 +130,7 @@ void Input::NextInput(int n)
 
 void Input::DeepCopy(const Input& other)
 {
+    if (!other._input) return;
     _input = new double[INPUT_SIZE];
     memcpy(_input,  other._input, INPUT_SIZE*sizeof(_input[0]));
 }

@@ -1,23 +1,38 @@
 #include "sysfilein.h"
 
-SysFileIn::SysFileIn(const std::string& name,
-                     std::vector<ParamModelBase*>& models, ConditionModel* conditions)
-    : _conditions(conditions), _models(models), _name(name)
+SysFileIn::SysFileIn(const std::string& name)
+    : _name(name)
 {
 }
 
-void SysFileIn::Load()
+void SysFileIn::Load(std::vector<ParamModelBase*>& models,
+                     std::string& model_step,
+                     ConditionModel* conditions,
+                     Notes* notes)
 {
     _in.open(_name);
     std::string line;
 
     std::getline(_in, line);
     int version = ds::VersionNum(line);
-    bool has_minmax = (version>=4); //I.e. >= 0.0.4
+    bool has_minmax = (version>=4), //I.e. >= 0.0.4
+            has_model_step = (version>=103);
+
+    if (has_model_step)
+    {
+        std::getline(_in, line);
+        size_t pos = line.find_last_of(':');
+        model_step = line.substr(pos+1);
+        model_step.erase( std::remove_if(
+                        model_step.begin(), model_step.end(), ::isspace ),
+                          model_step.end() );
+    }
+    else
+        model_step = "1.0";
 
     std::getline(_in, line);
-
     const int num_models = std::stoi(line);
+
     for (int i=0; i<num_models; ++i)
     {
         std::getline(_in, line);
@@ -26,15 +41,26 @@ void SysFileIn::Load()
                 num = line.substr(tab+1);
         const int num_pars = std::stoi(num);
         ParamModelBase* model;
-        if (name=="Parameters")
-            model = new ParamModel(nullptr, name);
-        else if (name=="Variables")
-            model = new VariableModel(nullptr, name);
-        else if (name=="Differentials")
-            model = new DifferentialModel(nullptr, name);
-        else if (name=="InitialConds")
-            model = new InitialCondModel(nullptr, name);
-        _models.push_back(model);
+        if (name=="Parameters") name = "Inputs"; // ###
+        switch (ds::Model(name))
+        {
+            case ds::INPUTS:
+                model = new ParamModel(nullptr, name);
+                break;
+            case ds::VARIABLES:
+                model = new VariableModel(nullptr, name);
+                break;
+            case ds::DIFFERENTIALS:
+                model = new DifferentialModel(nullptr, name);
+                break;
+            case ds::INIT_CONDS:
+                model = new InitialCondModel(nullptr, name);
+                break;
+            default:
+                throw("Bad model name");
+        }
+            // ### Should create a proper factory
+        models.push_back(model);
 
         for (int j=0; j<num_pars; ++j)
         {
@@ -63,7 +89,30 @@ void SysFileIn::Load()
         std::getline(_in, line);
     }
 
-    _conditions->Read(_in);
+    conditions->Read(_in);
+
+    if (notes) notes->Read(_in);
 
     _in.close();
+}
+void SysFileIn::Load(VecStr& vmodels)
+{
+    std::vector<ParamModelBase*> models;
+    std::string model_step;
+    ConditionModel* conditions = new ConditionModel();
+    Notes* notes = new Notes();
+
+    Load(models, model_step, conditions, notes);
+
+    for (auto it : models)
+    {
+        std::string model_str = it->String();
+        vmodels.push_back(model_str);
+    }
+    vmodels.push_back( conditions->EdString() );
+
+    for (auto it : models)
+        delete it;
+    delete conditions;
+    delete notes;
 }

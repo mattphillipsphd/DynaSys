@@ -1,7 +1,7 @@
 #include "differentialmodel.h"
 
 DifferentialModel::DifferentialModel(QObject *parent, const std::string& name) :
-    ParamModelBase(parent, name)
+    ParamModelBase(parent, name), _modelStep(std::to_string(ds::DEFAULT_MODEL_STEP))
 {
 }
 
@@ -21,5 +21,6 @@ std::string DifferentialModel::TempExpression(size_t idx) const
     const std::string& temp = TempKey(idx),
             & key = ShortKey(idx),
             & value = Value(idx);
-    return temp + " = " + key + " + " + value;
+    return temp + " = " + key + " + "
+            + _modelStep + "*(" + value + ")";
 }

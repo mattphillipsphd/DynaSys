@@ -5,22 +5,26 @@
 #include <fstream>
 
 #include "../globals/globals.h"
+#include "../memrep/notes.h"
 #include "../models/parammodelbase.h"
 #include "../models/conditionmodel.h"
 
 class SysFileOut
 {
     public:
-        SysFileOut(const std::string& name,
-                   const std::vector<const ParamModelBase*>& models, const ConditionModel* conditions);
+        SysFileOut(const std::string& name);
 
-        void Save();
+        void Save(const std::vector<const ParamModelBase*>& models,
+                  double model_step,
+                  const ConditionModel* conditions,
+                  const Notes* notes) const;
+        void Save(const VecStr& vmodels, double model_step, const Notes* notes) const;
 
     private:
-        const ConditionModel* _conditions;
-        const std::vector<const ParamModelBase*>& _models;
+        void SaveHeader(double model_step) const;
+
         const std::string _name;
-        std::ofstream _out;
+        mutable std::ofstream _out;
 };
 
 #endif // SYSFILEOUT_H

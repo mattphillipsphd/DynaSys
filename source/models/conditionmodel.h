@@ -4,10 +4,11 @@
 #include <QStandardItem>
 #include <QStandardItemModel>
 
-#include <fstream>
+#include <iostream>
 #include <map>
-#include <vector>
 #include <string>
+#include <sstream>
+#include <vector>
 
 typedef std::vector<std::string> VecStr;
 
@@ -20,8 +21,8 @@ class ConditionModel : public QStandardItemModel
     public:
         explicit ConditionModel(QObject *parent = 0);
 
-        void Read(std::ifstream& in);
-        void Write(std::ofstream& out) const;
+        void Read(std::istream& in);
+        void Write(std::ostream& out) const;
 
         void AddCondition(const std::string& condition, const VecStr& exprns = VecStr());
         void AddExpression(int row, const std::string& exprn);
@@ -29,8 +30,10 @@ class ConditionModel : public QStandardItemModel
         void SetExpressions(int row, const VecStr& exprns);
 
         const std::string Condition(int row) const;
+        std::string EdString() const;
         const VecStr Expressions(int row) const;
         size_t NumPars() const { return rowCount(); }
+        std::string String() const;
 
     signals:
 

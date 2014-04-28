@@ -14,18 +14,21 @@
 typedef std::vector<std::string> VecStr;
 namespace ds
 {
+    extern const double DEFAULT_MODEL_STEP;
     extern const double PI;
 
     extern const std::string TEMP_FILE;
+    extern const std::string TEMP_MODEL_FILE;
     extern const std::string VERSION_STR;
 
     enum PMODEL
     {
-        PARAMETERS = 0,
+        INPUTS = 0,
         VARIABLES,
         DIFFERENTIALS,
         INIT_CONDS,
-        CONDITIONS
+        CONDITIONS,
+        NUM_MODELS //Nice trick from SO
     };
 
     PMODEL Model(const std::string& model);

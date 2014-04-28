@@ -1,6 +1,7 @@
 #include "parsermgr.h"
 
-ParserMgr::ParserMgr() : _areModelsInitialized(false)
+ParserMgr::ParserMgr() : _areModelsInitialized(false),
+    _modelStep(ds::DEFAULT_MODEL_STEP)
 {
 }
 ParserMgr::~ParserMgr()
@@ -45,10 +46,12 @@ void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::st
         {
             Input input(&data[i]);
             std::string file_name = model->Value(i);
-            std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
-            {
-                return c=='"';
-            });
+            file_name.erase(
+                std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
+                {
+                    return c=='"';
+                }),
+                    file_name.end());
             input.LoadInput(file_name);
             _inputs.push_back(input);
             break;
@@ -108,6 +111,8 @@ void ParserMgr::InitParsers()
         SetExpression(expressions);
             //Note that the expressions are not actually evaluated
 
+        _stepCt = std::numeric_limits<int>::max() - 1;
+
 //        ResetVarInitVals();
     }
     catch (mu::ParserError& e)
@@ -150,8 +155,8 @@ void ParserMgr::InitModels()
 #ifdef QT_DEBUG
                 qDebug() << model->Key(i).c_str() << value.c_str() << ", " << atof(value.c_str());
 #endif
-                if (model->Id()==ds::PARAMETERS) // ###
-                    data[i] = atof(value.c_str());
+                if (model->Id()==ds::INPUTS) // ###
+                    data[i] = std::atof(value.c_str());
             }
         }
         _areModelsInitialized = true;
@@ -209,7 +214,11 @@ void ParserMgr::ParserEval(bool eval_input)
 //        qDebug() << _parser.GetExpr().c_str();
         _parser.Eval();
         TempEval();
-        if (eval_input) InputEval();
+        if (eval_input && ++_stepCt*_modelStep>1.0)
+        {
+            _stepCt = 0;
+            InputEval();
+        }
     }
     catch (mu::ParserError& e)
     {
@@ -329,6 +338,10 @@ void ParserMgr::SetExpressions()
         std::cerr << e.GetMsg() << std::endl;
         qDebug() << e.GetMsg().c_str();
     }
+}
+void ParserMgr::SetModelStep(double step)
+{
+    _modelStep = step;
 }
 void ParserMgr::TempEval()
 {
