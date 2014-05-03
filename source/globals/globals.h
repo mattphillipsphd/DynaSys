@@ -1,9 +1,12 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <map>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include <QColor>
 #include <QList>
 #include <QStringList>
 
@@ -16,10 +19,13 @@ namespace ds
 {
     extern const double DEFAULT_MODEL_STEP;
     extern const double PI;
+    extern const int TABLEN;
 
     extern const std::string TEMP_FILE;
     extern const std::string TEMP_MODEL_FILE;
     extern const std::string VERSION_STR;
+
+    extern const std::vector<QColor> THREAD_COLORS;
 
     enum PMODEL
     {
@@ -31,10 +37,19 @@ namespace ds
         NUM_MODELS //Nice trick from SO
     };
 
+    extern int thread_ct;
+    extern std::map<std::thread::id, QColor> thread_map;
+
+    void AddThread(std::thread::id tid);
+
     PMODEL Model(const std::string& model);
     std::string Model(PMODEL model);
 
+    void RemoveThread(std::thread::id tid);
+
     double sgn(double val);
+
+    QColor ThreadColor(std::thread::id tid);
 
     template<typename T>
     QList<T> VecToQList(const std::vector<T>& vec);

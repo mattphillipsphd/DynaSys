@@ -2,10 +2,22 @@
 
 const double ds::DEFAULT_MODEL_STEP = 0.001;
 const double ds::PI = 3.14159265358979;
+const int ds::TABLEN = 4;
 
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
 const std::string ds::VERSION_STR = "0.1.4";
+
+const std::vector<QColor> ds::THREAD_COLORS = {Qt::black, Qt::red, Qt::green, Qt::gray, Qt::blue };
+
+int ds::thread_ct = 0;
+std::map<std::thread::id, QColor> ds::thread_map;
+
+void ds::AddThread(std::thread::id tid)
+{
+    thread_map[tid] = THREAD_COLORS.at( thread_ct % THREAD_COLORS.size() );
+    ++thread_ct;
+}
 
 ds::PMODEL ds::Model(const std::string& model)
 {
@@ -36,10 +48,21 @@ std::string ds::Model(PMODEL model)
     throw("Bad Model");
 }
 
+void ds::RemoveThread(std::thread::id tid)
+{
+    thread_map.equal_range(tid);
+    --thread_ct;
+}
+
 double ds::sgn(double val)
 {
     return (val<0) ? -1.0 : (val>0.0); //Thanks SO
         //http://stackoverflow.com/questions/1903954
+}
+
+QColor ds::ThreadColor(std::thread::id tid)
+{
+    return thread_map[tid];
 }
 
 template <typename T>

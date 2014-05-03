@@ -7,8 +7,12 @@ ParamEditor::ParamEditor(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::ParamEditor),
     _buffer(std::pair<int,std::string>(std::numeric_limits<int>::max(), "")),
-    _editors(std::vector<PTextEdit*>(NUM_EDITORS))
+    _editors(std::vector<PTextEdit*>(NUM_EDITORS)),
+    _log(Log::Instance()), _tid(std::this_thread::get_id())
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamEditor::ParamEditor", _tid);
+#endif
     ui->setupUi(this);
     _editors[0] = ui->edAllPars;
     connect(_editors[0], SIGNAL(KeyRelease()), this, SLOT(TabTextChanged()));
@@ -30,12 +34,18 @@ ParamEditor::ParamEditor(QWidget *parent) :
 
 ParamEditor::~ParamEditor()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamEditor::~ParamEditor", _tid);
+#endif
     delete ui;
     for (auto it : _editors) delete it;
 }
 
 void ParamEditor::UpdateParameters()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamEditor::UpdateParameters", _tid);
+#endif
     setWindowTitle( ("Parameters for " + _fileName).c_str() );
     LoadModel();
 }
@@ -43,7 +53,7 @@ void ParamEditor::UpdateParameters()
 void ParamEditor::on_btnSave_clicked()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::on_btnSave_clicked";
+    ScopeTracker st("ParamEditor::on_btnSave_clicked", _tid);
 #endif
     VecStr models(ds::NUM_MODELS);
     for (int i=0; i<ds::NUM_MODELS; ++i)
@@ -72,7 +82,7 @@ void ParamEditor::on_btnSave_clicked()
 void ParamEditor::on_btnSave_Close_clicked()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::on_btnSave_Close_clicked";
+    ScopeTracker st("ParamEditor::on_btnSave_Close_clicked", _tid);
 #endif
     on_btnSave_clicked();
     close();
@@ -80,7 +90,7 @@ void ParamEditor::on_btnSave_Close_clicked()
 void ParamEditor::on_tbwParameters_currentChanged(int)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::on_tbwParameters_currentChanged";
+    ScopeTracker st("ParamEditor::on_tbwParameters_currentChanged", _tid);
 #endif
     UpdateEditors();
 }
@@ -88,7 +98,7 @@ void ParamEditor::on_tbwParameters_currentChanged(int)
 void ParamEditor::closeEvent(QCloseEvent* event)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::closeEvent";
+    ScopeTracker st("ParamEditor::closeEvent", _tid);
 #endif
     emit CloseEditor();
     QWidget::closeEvent(event);
@@ -96,7 +106,7 @@ void ParamEditor::closeEvent(QCloseEvent* event)
 void ParamEditor::showEvent(QShowEvent* event)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::showEvent";
+    ScopeTracker st("ParamEditor::showEvent", _tid);
 #endif
     UpdateParameters();
     QWidget::showEvent(event);
@@ -105,7 +115,7 @@ void ParamEditor::showEvent(QShowEvent* event)
 void ParamEditor::LoadModel()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::LoadModel";
+    ScopeTracker st("ParamEditor::LoadModel", _tid);
 #endif
     SysFileIn in(ds::TEMP_MODEL_FILE);
     _models.clear();
@@ -116,7 +126,7 @@ void ParamEditor::LoadModel()
 void ParamEditor::TabTextChanged()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::TabTextChanged";
+    ScopeTracker st("ParamEditor::TabTextChanged", _tid);
 #endif
     int idx = ui->tbwParameters->currentIndex();
     UpdateBuffer(idx);
@@ -125,12 +135,18 @@ void ParamEditor::TabTextChanged()
 
 void ParamEditor::TrimNewlines(std::string& text)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamEditor::TrimNewlines", _tid);
+#endif
     while (*(text.end()-1) == '\n')
         text.erase( text.end()-1 );
     text += "\n\n";
 }
 void ParamEditor::UpdateBuffer(int idx)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamEditor::UpdateBuffer", _tid);
+#endif
     std::string text = _editors.at(idx)->document()->toPlainText().toStdString();
     TrimNewlines(text);
     if ((ds::PMODEL)(idx-1)==ds::VARIABLES || (ds::PMODEL)(idx-1)==ds::DIFFERENTIALS)
@@ -152,7 +168,7 @@ void ParamEditor::UpdateBuffer(int idx)
 void ParamEditor::UpdateEditors()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::UpdateEditors";
+    ScopeTracker st("ParamEditor::UpdateEditors", _tid);
 #endif
     for (auto it : _editors) it->clear();
     for (int i=1; i<NUM_EDITORS; ++i)
@@ -186,7 +202,7 @@ void ParamEditor::UpdateEditors()
 void ParamEditor::WriteBuffer()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::WriteBuffer";
+    ScopeTracker st("ParamEditor::WriteBuffer", _tid);
 #endif
     try
     {
@@ -220,6 +236,6 @@ void ParamEditor::WriteBuffer()
     }
     catch (std::exception& e)
     {
-        qDebug() << e.what();
+        _log->AddExcept("ParamEditor::WriteBuffer, " + std::string(e.what()));
     }
 }

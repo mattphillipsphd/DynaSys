@@ -550,6 +550,7 @@
      <string>Help</string>
     </property>
     <addaction name="actionAbout"/>
+    <addaction name="actionLog"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -626,19 +627,14 @@
     <string>Save Vector Field</string>
    </property>
   </action>
-  <action name="actionLog">
-   <property name="text">
-    <string>Log</string>
-   </property>
-  </action>
-  <action name="actionLog_2">
-   <property name="text">
-    <string>Log</string>
-   </property>
-  </action>
   <action name="actionNotes">
    <property name="text">
     <string>Notes</string>
+   </property>
+  </action>
+  <action name="actionLog">
+   <property name="text">
+    <string>Log</string>
    </property>
   </action>
  </widget>

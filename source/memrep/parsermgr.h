@@ -8,6 +8,7 @@
 
 #include <muParser.h>
 
+#include "../globals/scopetracker.h"
 #include "../memrep/input.h"
 #include "../models/conditionmodel.h"
 #include "../models/parammodelbase.h"
@@ -34,6 +35,7 @@ class ParserMgr
         double Minimum(const ParamModelBase* model, size_t idx) const;
         inline double ModelStep() const { return _modelStep; }
         void ParserCondEval();
+        const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
@@ -59,6 +61,7 @@ class ParserMgr
         bool _areModelsInitialized;
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
+        Log* _log;
         std::vector< std::tuple<ParamModelBase*, double*, double*> > _models;
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for

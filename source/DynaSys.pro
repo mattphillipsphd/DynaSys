@@ -44,7 +44,10 @@ SOURCES += main.cpp\
     gui/parameditor.cpp \
     memrep/notes.cpp \
     gui/notesgui.cpp \
-    gui/ptextedit.cpp
+    gui/ptextedit.cpp \
+    globals/log.cpp \
+    gui/loggui.cpp \
+    globals/scopetracker.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -68,13 +71,17 @@ HEADERS  += gui/mainwindow.h \
     gui/parameditor.h \
     memrep/notes.h \
     gui/notesgui.h \
-    gui/ptextedit.h
+    gui/ptextedit.h \
+    globals/log.h \
+    gui/loggui.h \
+    globals/scopetracker.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
     forms/variablegui.ui \
     forms/parameditor.ui \
-    forms/notesgui.ui
+    forms/notesgui.ui \
+    forms/loggui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

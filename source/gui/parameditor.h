@@ -1,12 +1,15 @@
 #ifndef PARAMEDITOR_H
 #define PARAMEDITOR_H
 
+#include <thread>
+
 #include <QPlainTextEdit>
 #include <QWidget>
 
 #include "ptextedit.h"
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
+#include "../globals/log.h"
 #include "../memrep/parsermgr.h"
 
 namespace Ui {
@@ -56,7 +59,9 @@ class ParamEditor : public QWidget
         std::pair<int, std::string> _buffer;
         std::vector<PTextEdit*> _editors;
         std::string _fileName;
+        Log* _log;
         VecStr _models;
+        std::thread::id _tid;
 };
 
 #endif // PARAMEDITOR_H

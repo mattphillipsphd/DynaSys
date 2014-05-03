@@ -33,8 +33,12 @@
 #include "aboutgui.h"
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
+#include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "../file/sysfilein.h"
+#include "../file/sysfileout.h"
+#include "../globals/scopetracker.h"
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
@@ -42,11 +46,8 @@
 #include "../models/tpvtablemodel.h"
 #include "../models/variablemodel.h"
 #include "../memrep/parsermgr.h"
-#include "../file/sysfilein.h"
-#include "../file/sysfileout.h"
 
-//#define DEBUG_FUNC
-
+#define DEBUG_FUNC
 
 namespace Ui {
 class MainWindow;
@@ -103,6 +104,7 @@ class MainWindow : public QMainWindow
     public slots:
         void LoadTempModel(void* models);
         void ParamEditorClosed();
+        void ParserToLog();
         void SaveNotes();
         void UpdateMousePos(QPointF pos);
 
@@ -119,6 +121,7 @@ class MainWindow : public QMainWindow
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionLoad_triggered();
+        void on_actionLog_triggered();
         void on_actionNotes_triggered();
         void on_actionParameters_triggered();
         void on_actionReload_Current_triggered();
@@ -206,6 +209,7 @@ class MainWindow : public QMainWindow
         void UpdateVectorField();
 
         AboutGui* _aboutGui;
+        LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
 
@@ -220,8 +224,8 @@ class MainWindow : public QMainWindow
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;
-        const std::thread::id _guiTid;
         volatile bool _isDrawing, _isVFAttached;
+        Log* _log;
         std::mutex _mutex;
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;
@@ -235,6 +239,7 @@ class MainWindow : public QMainWindow
         int _pulseStepsRemaining,
             //Consider making a little pulse struct/class
             _singleStepsSec, _singleTailLen;
+        const std::thread::id _tid;
         const std::vector<QColor> _tpColors;
         std::vector<QwtPlotItem*> _vfPlotItems;
         int _vfStepsSec, _vfTailLen;

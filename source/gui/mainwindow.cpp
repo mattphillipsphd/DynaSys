@@ -18,20 +18,25 @@ const int MainWindow::VF_SLEEP_MS = 250;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    _aboutGui(new AboutGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _aboutGui(new AboutGui()), _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _variables(nullptr), _parameters(nullptr), _fileName(""), _guiTid(std::this_thread::get_id()),
+    _variables(nullptr), _parameters(nullptr), _fileName(""),
     _isDrawing(false), _isVFAttached(false),
+    _log(Log::Instance()),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
     _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_SAMPLES_SHOWN),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
+    _tid(std::this_thread::get_id()),
     _tpColors(InitTPColors()),
     _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
+    ds::AddThread(_tid);
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
+    ScopeTracker::InitThread(std::this_thread::get_id());
+    std::stringstream s; s << _tid;
     qDebug() << "Enter MainWindow::MainWindow, thread id:" << s.str().c_str();
+    ScopeTracker st("MainWindow::MainWindow", _tid);
 #endif
 
     qRegisterMetaType<ViewRect>("ViewRect");
@@ -73,6 +78,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     _aboutGui->setWindowModality(Qt::ApplicationModal);
 
+    connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
+
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)),
             this, SLOT(UpdateMousePos(QPointF)));
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
@@ -83,12 +90,18 @@ MainWindow::MainWindow(QWidget *parent) :
 }
 MainWindow::~MainWindow()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::~MainWindow", _tid);
+#endif
     delete ui;
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
 void MainWindow::LoadTempModel(void* models)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::LoadTempModel", _tid);
+#endif
     try
     {
         SysFileOut out(ds::TEMP_MODEL_FILE);
@@ -99,20 +112,29 @@ void MainWindow::LoadTempModel(void* models)
     }
     catch (std::exception& e)
     {
-        qDebug() << "MainWindow::LoadTempModel" << e.what();
+        _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
     }
 }
 void MainWindow::ParamEditorClosed()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ParamEditorClosed";
+    ScopeTracker st("MainWindow::ParamEditorClosed", _tid);
 #endif
     setEnabled(true);
+}
+void MainWindow::ParserToLog()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ParserToLog", _tid);
+#endif
+    std::string parser = _parserMgr.ParserContents();
+    std::replace(parser.begin(), parser.end(), ',', '\n');
+    _log->AddMesg(parser);
 }
 void MainWindow::SaveNotes()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::SaveNotes";
+    ScopeTracker st("MainWindow::SaveNotes", _tid);
 #endif
     SysFileIn in(_fileName);
     std::vector<ParamModelBase*> models;
@@ -130,25 +152,35 @@ void MainWindow::SaveNotes()
 }
 void MainWindow::UpdateMousePos(QPointF pos)
 {
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("MainWindow::UpdateMousePos", _tid);
+//#endif
     ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
 }
 
 void MainWindow::closeEvent(QCloseEvent *)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::closeEvent", _tid);
+#endif
     _aboutGui->close();
+    _logGui->close();
     _notesGui->close();
 }
 
 void MainWindow::on_actionAbout_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionAbout_triggered", _tid);
+#endif
     _aboutGui->show();
 }
 
 void MainWindow::on_actionClear_triggered()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_actionClear_triggered";
+    ScopeTracker st("MainWindow::on_actionClear_triggered", _tid);
 #endif
     _isDrawing = _needUpdateVF = false;
     InitModels();
@@ -158,7 +190,7 @@ void MainWindow::on_actionClear_triggered()
 void MainWindow::on_actionLoad_triggered()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_actionLoad_triggered";
+    ScopeTracker st("MainWindow::on_actionLoad_triggered", _tid);
 #endif
     std::string file_name = QFileDialog::getOpenFileName(nullptr,
                                                              "Load dynamical system",
@@ -171,14 +203,25 @@ void MainWindow::on_actionLoad_triggered()
     _fileName = file_name;
     LoadModel(_fileName);
 }
+void MainWindow::on_actionLog_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionLog_triggered", _tid);
+#endif
+    _logGui->SetFileName(_fileName);
+    _logGui->show();
+}
 void MainWindow::on_actionNotes_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionNotes_triggered", _tid);
+#endif
     _notesGui->show();
 }
 void MainWindow::on_actionParameters_triggered()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_actionParameters_triggered";
+    ScopeTracker st("MainWindow::on_actionParameters_triggered", _tid);
 #endif
     SaveModel(ds::TEMP_MODEL_FILE);
     setEnabled(false);
@@ -189,7 +232,7 @@ void MainWindow::on_actionParameters_triggered()
 void MainWindow::on_actionReload_Current_triggered()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_actionReload_Current_triggered";
+    ScopeTracker st("MainWindow::on_actionReload_Current_triggered", _tid);
 #endif
     if (_fileName.empty()) InitDefaultModel();
     else LoadModel(_fileName);
@@ -197,6 +240,9 @@ void MainWindow::on_actionReload_Current_triggered()
 
 void MainWindow::on_actionSave_Data_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Data_triggered", _tid);
+#endif
     if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
@@ -208,11 +254,17 @@ void MainWindow::on_actionSave_Data_triggered()
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Model_triggered", _tid);
+#endif
     if (_fileName.empty()) return;
     SaveModel(_fileName);
 }
 void MainWindow::on_actionSave_Model_As_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Model_As_triggered", _tid);
+#endif
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save dynamical system",
                                                          "").toStdString();
@@ -225,19 +277,31 @@ void MainWindow::on_actionSave_Model_As_triggered()
 }
 void MainWindow::on_actionSave_Phase_Plot_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Phase_Plot_triggered", _tid);
+#endif
     SaveFigure(ui->qwtPhasePlot, "phase plot", QSizeF(100, 100));
 }
 void MainWindow::on_actionSave_Time_Plot_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Time_Plot_triggered", _tid);
+#endif
     SaveFigure(ui->qwtTimePlot, "time plot", QSizeF(200, 75));
 }
 void MainWindow::on_actionSave_Vector_Field_triggered()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSave_Vector_Field_triggered", _tid);
+#endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
 }
 
 void MainWindow::on_btnAddCondition_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnAddCondition_clicked", _tid);
+#endif
     std::string cond = QInputDialog::getText(this, "New Condition",
                                                  "Condition (evaluates to true/false):",
                                                  QLineEdit::Normal).toStdString();
@@ -250,7 +314,7 @@ void MainWindow::on_btnAddCondition_clicked()
 void MainWindow::on_btnPulse_clicked()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_btnPulse_clicked";
+    ScopeTracker st("MainWindow::on_btnPulse_clicked", _tid);
 #endif
     _pulseParIdx = ui->cmbPulsePars->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
@@ -264,6 +328,9 @@ void MainWindow::on_btnPulse_clicked()
 }
 void MainWindow::on_btnAddDiff_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnAddDiff_clicked", _tid);
+#endif
     std::string diff = QInputDialog::getText(this, "New Differential",
                                                  "Differential Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -276,6 +343,9 @@ void MainWindow::on_btnAddDiff_clicked()
 }
 void MainWindow::on_btnAddExpression_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnAddExpression_clicked", _tid);
+#endif
     QModelIndex index = ui->lsConditions->currentIndex();
     if (index.parent().isValid() || index.row()==-1) return;
 
@@ -289,6 +359,9 @@ void MainWindow::on_btnAddExpression_clicked()
 }
 void MainWindow::on_btnAddParameter_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnAddParameter_clicked", _tid);
+#endif
     std::string par = QInputDialog::getText(this, "New Parameter",
                                                  "Parameter Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -302,6 +375,9 @@ void MainWindow::on_btnAddParameter_clicked()
 }
 void MainWindow::on_btnAddVariable_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnAddVariable_clicked", _tid);
+#endif
     std::string var = QInputDialog::getText(this, "New Variable",
                                                  "Variable Name:",
                                                  QLineEdit::Normal).toStdString();
@@ -314,6 +390,9 @@ void MainWindow::on_btnAddVariable_clicked()
 }
 void MainWindow::on_btnFitView_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnFitView_clicked", _tid);
+#endif
     ui->cboxFitLimits->setChecked(false);
     const size_t xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
@@ -327,6 +406,9 @@ void MainWindow::on_btnFitView_clicked()
 }
 void MainWindow::on_btnRemoveCondition_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnRemoveCondition_clicked", _tid);
+#endif
     QModelIndexList rows = ui->lsConditions->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->lsConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -334,6 +416,9 @@ void MainWindow::on_btnRemoveCondition_clicked()
 }
 void MainWindow::on_btnRemoveDiff_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnRemoveDiff_clicked", _tid);
+#endif
     QModelIndexList rows = ui->tblDifferentials->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblDifferentials->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -342,6 +427,9 @@ void MainWindow::on_btnRemoveDiff_clicked()
 }
 void MainWindow::on_btnRemoveExpression_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnRemoveExpression_clicked", _tid);
+#endif
     QModelIndexList rows = ui->lsResults->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->lsResults->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -352,6 +440,9 @@ void MainWindow::on_btnRemoveExpression_clicked()
 }
 void MainWindow::on_btnRemoveParameter_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnRemoveParameter_clicked", _tid);
+#endif
     QModelIndexList rows = ui->tblParameters->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     ui->tblParameters->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
@@ -360,6 +451,9 @@ void MainWindow::on_btnRemoveParameter_clicked()
 }
 void MainWindow::on_btnRemoveVariable_clicked()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnRemoveVariable_clicked", _tid);
+#endif
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     for (auto it : rows)
@@ -374,7 +468,7 @@ void MainWindow::on_btnRemoveVariable_clicked()
 void MainWindow::on_btnStart_clicked()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_btnStart_clicked";
+    ScopeTracker st("MainWindow::on_btnStart_clicked", _tid);
 #endif
     if (_isDrawing)
     {
@@ -394,7 +488,7 @@ void MainWindow::on_btnStart_clicked()
 void MainWindow::on_cboxVectorField_stateChanged(int state)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_cboxVectorField_stateChanged";
+    ScopeTracker st("MainWindow::on_cboxVectorField_stateChanged", _tid);
 #endif
     if (state==Qt::Checked)
     {
@@ -410,7 +504,7 @@ void MainWindow::on_cboxVectorField_stateChanged(int state)
 void MainWindow::on_cboxNullclines_stateChanged(int state)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::on_cboxNullclines_stateChanged";
+    ScopeTracker st("MainWindow::on_cboxNullclines_stateChanged", _tid);
 #endif
     if (state==Qt::Checked)
         DrawNullclines();
@@ -423,15 +517,12 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
         }
         _ncPlotItems.clear();
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::on_cboxNullclines_stateChanged";
-#endif
 }
 
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::on_cmbPlotMode_currentIndexChanged";
+    ScopeTracker st("MainWindow::on_cmbPlotMode_currentIndexChanged", _tid);
 #endif
     ClearPlots();
 
@@ -455,14 +546,11 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         ui->spnStepsPerSec->setMinimum(1);
         ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::on_cmbPlotMode_currentIndexChanged";
-#endif
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_cmbSlidePars_currentIndexChanged";
+    ScopeTracker st("MainWindow::on_cmbSlidePars_currentIndexChanged", _tid);
 #endif
     if (index==-1) return;
     const double val = std::stod( _parameters->Value(index) ),
@@ -474,6 +562,9 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 
 void MainWindow::on_edModelStep_editingFinished()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_edModelStep_editingFinished", _tid);
+#endif
     std::string text = ui->edModelStep->text().toStdString();
     size_t pos;
     double step = std::stod(text, &pos);
@@ -487,11 +578,17 @@ void MainWindow::on_edModelStep_editingFinished()
 }
 void MainWindow::on_edNumTPSamples_editingFinished()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_edNumTPSamples_editingFinished", _tid);
+#endif
     _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_lsConditions_clicked", _tid);
+#endif
     const int row = index.row();
     ResetResultsList(row);
 }
@@ -499,7 +596,7 @@ void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
 void MainWindow::on_sldParameter_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_sldParameter_valueChanged";
+    ScopeTracker st("MainWindow::on_sldParameter_valueChanged", _tid);
 #endif
     const int index = ui->cmbSlidePars->currentIndex();
     const double range = _parserMgr.Range(_parameters, index);
@@ -512,7 +609,7 @@ void MainWindow::on_sldParameter_valueChanged(int value)
 void MainWindow::on_spnStepsPerSec_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::on_spnStepsPerSec_valueChanged";
+    ScopeTracker st("MainWindow::on_spnStepsPerSec_valueChanged", _tid);
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     switch (_plotMode)
@@ -524,14 +621,11 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
             _vfStepsSec = value;
             break;
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::on_spnStepsPerSec_valueChanged";
-#endif
 }
 void MainWindow::on_spnTailLength_valueChanged(int value)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::on_spnTailLength_valueChanged";
+    ScopeTracker st("MainWindow::on_spnTailLength_valueChanged", _tid);
 #endif
     std::unique_lock<std::mutex> lock(_mutex);
     switch (_plotMode)
@@ -545,14 +639,11 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             UpdateVectorField();
             break;
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::on_spnTailLength_valueChanged";
-#endif
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::on_spnVFResolution_valueChanged";
+    ScopeTracker st("MainWindow::on_spnVFResolution_valueChanged", _tid);
 #endif
     if (IsVFPresent()) UpdateVectorField();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
@@ -560,10 +651,16 @@ void MainWindow::on_spnVFResolution_valueChanged(int)
 
 void MainWindow::AddVarDelegate(int row, const std::string& type)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::AddVarDelegate", _tid);
+#endif
     AddVarDelegate(row);//, Input::Type(type));
 }
 void MainWindow::AddVarDelegate(int row)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::AddVarDelegate", _tid);
+#endif
     VecStr vstr;
     vstr.push_back(Input::GAMMA_RAND_STR);
     vstr.push_back(Input::NORM_RAND_STR);
@@ -576,7 +673,7 @@ void MainWindow::AddVarDelegate(int row)
 void MainWindow::ClearPlots()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ClearPlots";
+    ScopeTracker st("MainWindow::ClearPlots", _tid);
 #endif
     AttachPhasePlot(false);
     AttachVectorField(false);
@@ -584,6 +681,9 @@ void MainWindow::ClearPlots()
 }
 void MainWindow::ConnectModels()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ConnectModels", _tid);
+#endif
     connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
@@ -601,9 +701,10 @@ void MainWindow::ConnectModels()
 }
 void MainWindow::Draw()
 {
+    ds::AddThread(std::this_thread::get_id());
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::Draw(), thread id " << s.str().c_str();
+    ScopeTracker::InitThread(std::this_thread::get_id());
+    ScopeTracker st("MainWindow::Draw", std::this_thread::get_id());
 #endif
     try
     {
@@ -619,16 +720,15 @@ void MainWindow::Draw()
     }
     catch (std::exception& e)
     {
-        qDebug() << "MainWindow::Draw" << e.what();
+        _log->AddExcept("MainWindow::Draw: " + std::string(e.what()));
+        ds::RemoveThread(std::this_thread::get_id());
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::Draw(), thread id " << s.str().c_str();
-#endif
+    ds::RemoveThread(std::this_thread::get_id());
 }
 void MainWindow::DrawNullclines()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::DrawNullclines";
+    ScopeTracker st("MainWindow::DrawNullclines", std::this_thread::get_id());
 #endif
     for (auto it : _ncPlotItems)
     {
@@ -700,7 +800,7 @@ void MainWindow::DrawNullclines()
     }
     catch (std::exception& e)
     {
-        qDebug() << "MainWindow::DrawNullclines" << e.what();
+        _log->AddExcept("MainWindow::DrawNullclines: " + std::string(e.what()));
     }
 
     double lastx, lasty;
@@ -883,15 +983,11 @@ void MainWindow::DrawNullclines()
     for (auto it : _ncPlotItems)
         it->attach(ui->qwtPhasePlot);
     if (!_isDrawing) ui->qwtPhasePlot->replot();
-
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::DrawNullclines";
-#endif
 }
 void MainWindow::DrawPhasePortrait()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::DrawPhasePortrait";
+    ScopeTracker st("MainWindow::DrawPhasePortrait", std::this_thread::get_id());
 #endif
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
@@ -1009,8 +1105,7 @@ void MainWindow::DrawPhasePortrait()
         }
         catch (mu::ParserError& e)
         {
-            std::cout << e.GetMsg() << std::endl;
-            qDebug() << e.GetMsg().c_str();
+            _log->AddExcept("MainWindow::DrawPhasePortrait: " + std::string(e.GetMsg()));
             break;
         }
 
@@ -1128,14 +1223,11 @@ void MainWindow::DrawPhasePortrait()
 
     temp.close();
     _isDrawing = false;
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::DrawPhasePortrait";
-#endif
 }
 void MainWindow::DrawVectorField()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::DrawVectorField";
+    ScopeTracker st("MainWindow::DrawVectorField", std::this_thread::get_id());
 #endif
 //    qDebug() << "MainWindow::DrawVectorField 1";
 
@@ -1261,7 +1353,7 @@ void MainWindow::DrawVectorField()
         }
         catch (std::exception& e)
         {
-            qDebug() << "MainWindow::DrawVectorField" << e.what();
+            _log->AddExcept("MainWindow::DrawVectorField: " + std::string(e.what()));
         }
         lock.unlock();
 
@@ -1292,13 +1384,13 @@ void MainWindow::DrawVectorField()
     }
 
     if (_plotMode==VECTOR_FIELD) _isDrawing = false;
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::DrawVectorField";
-#endif
 }
 
 void MainWindow::InitDefaultModel()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::InitDefaultModel", _tid);
+#endif
     InitModels();
 
     _parameters->AddParameter("a", "4");
@@ -1333,17 +1425,17 @@ void MainWindow::InitDefaultModel()
 void MainWindow::InitDraw()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "Enter MainWindow::InitDraw";
+    ScopeTracker st("MainWindow::InitDraw", _tid);
 #endif
     InitPlots();
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::InitDraw";
-#endif
 }
 void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, ConditionModel* conditions)
 {
+#ifdef DEBUG_MW_FUNC
+    ScopeTracker st("MainWindow::InitModels", std::this_thread::get_id());
+#endif
     _parserMgr.ClearModels();
 
     if (_parameters) delete _parameters;
@@ -1384,7 +1476,7 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
 void MainWindow::InitPlots()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::InitPlots";
+    ScopeTracker st("MainWindow::InitPlots", _tid);
 #endif
     switch (_plotMode)
     {
@@ -1440,6 +1532,9 @@ void MainWindow::InitPlots()
 
 const std::vector<QColor> MainWindow::InitTPColors() const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::InitTPColors", _tid);
+#endif
     std::vector<QColor> vc;
     vc.push_back(Qt::black);
     vc.push_back(Qt::blue);
@@ -1462,10 +1557,8 @@ const std::vector<QColor> MainWindow::InitTPColors() const
 void MainWindow::AttachPhasePlot(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::AttachPhasePlot" << attach << ", thread id"
-             << s.str().c_str();
-    assert(_guiTid == std::this_thread::get_id() && "AttachPhasePlot called from worker thread!");
+    ScopeTracker st("MainWindow::AttachPhasePlot", _tid);
+    assert(_tid == std::this_thread::get_id() && "AttachPhasePlot called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if (attach)
@@ -1480,17 +1573,12 @@ void MainWindow::AttachPhasePlot(bool attach) //slot
         }
         _ppPlotItems.clear();
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::AttachPhasePlot";
-#endif
 }
 void MainWindow::AttachTimePlot(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::AttachTimePlot" << attach << ", thread id"
-             << s.str().c_str();
-    assert(_guiTid == std::this_thread::get_id() && "AttachTimePlot called from worker thread!");
+    ScopeTracker st("MainWindow::AttachTimePlot", _tid);
+    assert(_tid == std::this_thread::get_id() && "AttachTimePlot called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if (attach)
@@ -1505,17 +1593,12 @@ void MainWindow::AttachTimePlot(bool attach) //slot
         }
         _tpCurves.clear();
     }
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::AttachTimePlot";
-#endif
 }
 void MainWindow::AttachVectorField(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::AttachVectorField" << attach << ", thread id"
-             << s.str().c_str();
-    assert(_guiTid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
+    ScopeTracker st("MainWindow::AttachVectorField", _tid);
+    assert(_tid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if (attach)
@@ -1535,14 +1618,11 @@ void MainWindow::AttachVectorField(bool attach) //slot
         _isVFAttached = false;
     }
     _condVar.notify_one();
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::AttachVectorField";
-#endif
 }
 void MainWindow::ComboBoxChanged(const QString& text) //slot
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ComboBoxChanged";
+    ScopeTracker st("MainWindow::ComboBoxChanged", _tid);
 #endif
     ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
     size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
@@ -1551,7 +1631,7 @@ void MainWindow::ComboBoxChanged(const QString& text) //slot
 void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ExprnChanged";
+    ScopeTracker st("MainWindow::ExprnChanged", _tid);
 #endif
 //    _parserMgr.ResetVarInitVals();
     _needUpdateExprns = true;
@@ -1561,10 +1641,8 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 void MainWindow::InitParserMgr() //slot
 {
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::InitParserMgr" << ", thread id"
-             << s.str().c_str();
-    assert(_guiTid == std::this_thread::get_id() && "InitParserMgr called from worker thread!");
+    ScopeTracker st("MainWindow::InitParserMgr", _tid);
+    assert(_tid == std::this_thread::get_id() && "InitParserMgr called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     _parserMgr.InitModels();
@@ -1573,14 +1651,11 @@ void MainWindow::InitParserMgr() //slot
     _parserMgr.SetConditions();
     _needInitialize = false;
     _condVar.notify_one();
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::InitParserMgr";
-#endif
 }
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ParamChanged";
+    ScopeTracker st("MainWindow::ParamChanged", _tid);
 #endif
     int idx = topLeft.row();
     std::string exprn = _parameters->Expression(idx);
@@ -1591,6 +1666,9 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 }
 void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ResultsChanged", _tid);
+#endif
     int cond_row = ui->lsConditions->currentIndex().row();
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
@@ -1598,7 +1676,7 @@ void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
 void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 {
 #ifdef DEBUG_FUNC
-    assert(std::this_thread::get_id()==_guiTid && "Thread error: MainWindow::Replot");
+    assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::Replot");
 #endif
     std::unique_lock<std::mutex> lock(_mutex);
 
@@ -1626,19 +1704,22 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 void MainWindow::UpdateParams() //slot
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::UpdateParams";
+    ScopeTracker st("MainWindow::UpdateParams", _tid);
 #endif
     _parameters->SetPar((int)_pulseParIdx, _pulseResetValue);
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
 }
 bool MainWindow::IsVFPresent() const
 {
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("MainWindow::IsVFPresent", _tid);
+//#endif
     return ui->cboxVectorField->isChecked() || _plotMode==VECTOR_FIELD;
 }
 void MainWindow::LoadModel(const std::string& file_name)
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::LoadModel";
+    ScopeTracker st("MainWindow::LoadModel", _tid);
 #endif
     try
     {
@@ -1677,13 +1758,13 @@ void MainWindow::LoadModel(const std::string& file_name)
     }
     catch (std::exception& e)
     {
-        std::cerr << e.what() << std::endl;
+        _log->AddExcept("MainWindow::LoadModel: " + std::string(e.what()));
     }
 }
 void MainWindow::ResetPhasePlotAxes()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::ResetPhasePlotAxes";
+    ScopeTracker st("MainWindow::ResetPhasePlotAxes(", _tid);
 #endif
     QStringList qdiffs = ds::VecStrToQSList( _differentials->ShortKeys() );
 
@@ -1698,6 +1779,9 @@ void MainWindow::ResetPhasePlotAxes()
 }
 void MainWindow::ResetResultsList(int cond_row)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ResetResultsList", _tid);
+#endif
     delete ui->lsResults->model();
     if (cond_row==-1) return;
     QStringList qexprns = ds::VecStrToQSList( _conditions->Expressions(cond_row) );
@@ -1708,6 +1792,9 @@ void MainWindow::ResetResultsList(int cond_row)
 }
 void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SaveFigure", _tid);
+#endif
     QString suff = name;
     suff.replace(' ', '_');
     QString file_name = QFileDialog::getSaveFileName(nullptr,
@@ -1719,6 +1806,9 @@ void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& siz
 }
 void MainWindow::SaveModel(const std::string& file_name)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SaveModel", _tid);
+#endif
     std::vector<const ParamModelBase*> models;
     models.push_back(_parameters);
     models.push_back(_variables);
@@ -1731,6 +1821,9 @@ void MainWindow::SaveModel(const std::string& file_name)
 }
 void MainWindow::SetButtonsEnabled(bool is_enabled)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetButtonsEnabled", _tid);
+#endif
     ui->btnAddCondition->setEnabled(is_enabled);
     ui->btnAddDiff->setEnabled(is_enabled);
     ui->btnAddExpression->setEnabled(is_enabled);
@@ -1751,17 +1844,26 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
 }
 void MainWindow::UpdateLists()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateList", _tid);
+#endif
     UpdatePulseVList();
     UpdateSliderPList();
     UpdateTimePlotTable();
 }
 void MainWindow::UpdateNotes()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateNotes", _tid);
+#endif
     _notesGui->SetFileName(_fileName);
     _notesGui->UpdateNotes();
 }
 void MainWindow::UpdateNullclines()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateNullclines", _tid);
+#endif
     if (_isDrawing)
         _needUpdateNullclines = true;
     else
@@ -1769,6 +1871,9 @@ void MainWindow::UpdateNullclines()
 }
 void MainWindow::UpdateParamEditor()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateParamEditor", _tid);
+#endif
     SaveModel(ds::TEMP_MODEL_FILE);
     _paramEditor->SetFileName(_fileName);
     _paramEditor->UpdateParameters();
@@ -1776,7 +1881,7 @@ void MainWindow::UpdateParamEditor()
 void MainWindow::UpdatePulseVList()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::UpdatePulseVList";
+    ScopeTracker st("MainWindow::UpdatePulseVList", _tid);
 #endif
     ui->cmbPulsePars->clear();
     VecStr keys = _parameters->Keys();
@@ -1786,7 +1891,7 @@ void MainWindow::UpdatePulseVList()
 void MainWindow::UpdateSliderPList()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::UpdateSliderPList";
+    ScopeTracker st("MainWindow::UpdateSliderPList", _tid);
 #endif
     ui->cmbSlidePars->clear();
     VecStr keys = _parameters->Keys();
@@ -1795,6 +1900,9 @@ void MainWindow::UpdateSliderPList()
 }
 void MainWindow::UpdateResultsModel(int cond_row)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateResultsModel", _tid);
+#endif
     QStringList items = qobject_cast<QStringListModel*>(ui->lsResults->model())->stringList();
     VecStr exprns;
     for (const auto& it : items)
@@ -1804,7 +1912,7 @@ void MainWindow::UpdateResultsModel(int cond_row)
 void MainWindow::UpdateTimePlotTable()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "MainWindow::UpdateTimePlotTable";
+    ScopeTracker st("MainWindow::UpdateTimePlotTable", _tid);
 #endif
     delete ui->tblTimePlot->model();
     VecStr vs,
@@ -1829,14 +1937,9 @@ void MainWindow::UpdateTimePlotTable()
 void MainWindow::UpdateVectorField()
 {
 #ifdef DEBUG_FUNC
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "Enter MainWindow::UpdateVectorField(), thread id " << s.str().c_str()
-             << " _needUpdateVF: " << _needUpdateVF << " _isDrawing: " << _isDrawing;
+    ScopeTracker st("MainWindow::UpdateVectorField", _tid);
 #endif
     if (_needUpdateVF) return;
     _needUpdateVF = true;
     if (!_isDrawing) InitDraw();
-#ifdef DEBUG_FUNC
-    qDebug() << "Exit MainWindow::UpdateVectorField()";
-#endif
 }
