@@ -89,11 +89,18 @@ MainWindow::~MainWindow()
 }
 void MainWindow::LoadTempModel(void* models)
 {
-    SysFileOut out(ds::TEMP_MODEL_FILE);
-    out.Save(*(static_cast<VecStr*>(models)), _parserMgr.ModelStep(), _notesGui->GetNotes());
+    try
+    {
+        SysFileOut out(ds::TEMP_MODEL_FILE);
+        out.Save(*(static_cast<VecStr*>(models)), _parserMgr.ModelStep(), _notesGui->GetNotes());
 
-    LoadModel(ds::TEMP_MODEL_FILE);
-    SaveModel(_fileName);
+        LoadModel(ds::TEMP_MODEL_FILE);
+        SaveModel(_fileName);
+    }
+    catch (std::exception& e)
+    {
+        qDebug() << "MainWindow::LoadTempModel" << e.what();
+    }
 }
 void MainWindow::ParamEditorClosed()
 {

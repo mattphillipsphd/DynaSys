@@ -26,7 +26,8 @@ class ParamEditor : public QWidget
         void SetFileName(const std::string& file_name) { _fileName = file_name; }
 
     public slots:
-        void on_btnKeep_Changes_clicked();
+        void on_btnSave_clicked();
+        void on_btnSave_Close_clicked();
         void on_tbwParameters_currentChanged(int);
 
     protected slots:
@@ -42,6 +43,7 @@ class ParamEditor : public QWidget
 
     private:
         void TrimNewlines(std::string& text);
+        void UpdateBuffer(int idx);
         void UpdateEditors();
         void WriteBuffer();
 

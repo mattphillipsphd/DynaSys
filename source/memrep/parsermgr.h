@@ -52,9 +52,9 @@ class ParserMgr
 
     private:
         void AssociateVars(mu::Parser& parser);
-        double* Data(const ParamModelBase* model);
-        ParamModelBase* Model(ds::PMODEL model);
-        double* TempData(const ParamModelBase* model);
+        inline double* Data(const ParamModelBase* model);
+        inline ParamModelBase* Model(ds::PMODEL model);
+        inline double* TempData(const ParamModelBase* model);
 
         bool _areModelsInitialized;
         ConditionModel* _conditions;

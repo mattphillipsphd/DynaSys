@@ -396,12 +396,7 @@ double* ParserMgr::Data(const ParamModelBase* model)
 }
 ParamModelBase* ParserMgr::Model(ds::PMODEL model)
 {
-    auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::tuple<ParamModelBase*,double*,double*> p)
-    {
-            return std::get<0>(p)->Id() == model;
-    });
-    return std::get<0>(*it);
+    return std::get<0>(_models[model]);
 }
 double* ParserMgr::TempData(const ParamModelBase* model)
 {

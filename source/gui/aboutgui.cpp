@@ -9,6 +9,7 @@ AboutGui::AboutGui(QWidget *parent) :
 
     setWindowTitle("About DynaSys");
 
+    ui->txtAbout->setReadOnly(true);
     ui->txtAbout->setText(std::string(
                 "DynaSys " + ds::VERSION_STR + "\n\n"
                 "Matt Phillips, mattphillipsphd@gmail.com\n\n"

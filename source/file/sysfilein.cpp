@@ -16,7 +16,8 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
     std::getline(_in, line);
     int version = ds::VersionNum(line);
     bool has_minmax = (version>=4), //I.e. >= 0.0.4
-            has_model_step = (version>=103);
+            has_model_step = (version>=103),
+            old_par_name = (version<104);
 
     if (has_model_step)
     {
@@ -41,7 +42,7 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
                 num = line.substr(tab+1);
         const int num_pars = std::stoi(num);
         ParamModelBase* model;
-        if (name=="Parameters") name = "Inputs"; // ###
+        if (old_par_name && name=="Parameters") name = "Inputs";
         switch (ds::Model(name))
         {
             case ds::INPUTS:

@@ -16,6 +16,9 @@ ParamEditor::ParamEditor(QWidget *parent) :
     {
         const ds::PMODEL mi = (ds::PMODEL)(i-1);
         PTextEdit* ed = new PTextEdit();
+        QFont font = ed->font();
+        font.setPointSize(12);
+        ed->setFont(font);
         _editors[i] = ed;
         ed->setObjectName(ds::Model(mi).c_str());
         connect(ed, SIGNAL(KeyRelease()), this, SLOT(TabTextChanged()));
@@ -37,10 +40,10 @@ void ParamEditor::UpdateParameters()
     LoadModel();
 }
 
-void ParamEditor::on_btnKeep_Changes_clicked()
+void ParamEditor::on_btnSave_clicked()
 {
 #ifdef DEBUG_FUNC
-    qDebug() << "ParamEditor::on_btnKeep_Changes_clicked";
+    qDebug() << "ParamEditor::on_btnSave_clicked";
 #endif
     VecStr models(ds::NUM_MODELS);
     for (int i=0; i<ds::NUM_MODELS; ++i)
@@ -65,6 +68,13 @@ void ParamEditor::on_btnKeep_Changes_clicked()
     }
 
     emit ModelChanged(&models);
+}
+void ParamEditor::on_btnSave_Close_clicked()
+{
+#ifdef DEBUG_FUNC
+    qDebug() << "ParamEditor::on_btnSave_Close_clicked";
+#endif
+    on_btnSave_clicked();
     close();
 }
 void ParamEditor::on_tbwParameters_currentChanged(int)
@@ -109,10 +119,7 @@ void ParamEditor::TabTextChanged()
     qDebug() << "ParamEditor::TabTextChanged";
 #endif
     int idx = ui->tbwParameters->currentIndex();
-    std::string text = _editors.at(idx)->document()->toPlainText().toStdString();
-    TrimNewlines(text);
-    _buffer = std::make_pair(idx,text);
-
+    UpdateBuffer(idx);
     WriteBuffer();
 }
 
@@ -122,6 +129,26 @@ void ParamEditor::TrimNewlines(std::string& text)
         text.erase( text.end()-1 );
     text += "\n\n";
 }
+void ParamEditor::UpdateBuffer(int idx)
+{
+    std::string text = _editors.at(idx)->document()->toPlainText().toStdString();
+    TrimNewlines(text);
+    if ((ds::PMODEL)(idx-1)==ds::VARIABLES || (ds::PMODEL)(idx-1)==ds::DIFFERENTIALS)
+    {
+        std::stringstream ss(text);
+        std::string line, text_temp;
+        std::getline(ss, line);
+        while (!line.empty())
+        {
+            if (std::count(line.cbegin(), line.cend(), '\t')>=3) continue;
+            line += "\t-100\t100\n";
+            text_temp += line;
+            std::getline(ss, line);
+        }
+        text = text_temp;
+    }
+    _buffer = std::make_pair(idx,text);
+}
 void ParamEditor::UpdateEditors()
 {
 #ifdef DEBUG_FUNC
@@ -130,9 +157,27 @@ void ParamEditor::UpdateEditors()
     for (auto it : _editors) it->clear();
     for (int i=1; i<NUM_EDITORS; ++i)
     {
-        std::string text = _models.at(i-1);
+        int mi = i-1;
+        std::string text = _models.at(mi);
+        if ((ds::PMODEL)(mi)==ds::VARIABLES || (ds::PMODEL)(mi)==ds::DIFFERENTIALS)
+        {
+            std::stringstream ss(text);
+            std::string line, text_temp;
+            std::getline(ss, line);
+            while (!line.empty())
+            {
+                size_t pos1 = line.find_first_of('\t'),
+                        pos2 = line.find_first_of('\t', pos1+1);
+                if (pos2 != std::string::npos)
+                    line.erase(pos2);
+                line += "\n";
+                text_temp += line;
+                std::getline(ss, line);
+            }
+            text = text_temp;
+        }
 
-         _editors[0]->appendPlainText(text.c_str());
+        _editors[0]->appendPlainText(text.c_str());
 
         text.erase(0, text.find_first_of('\n') + 1);
         _editors[i]->appendPlainText(text.c_str());
