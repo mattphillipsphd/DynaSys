@@ -25,7 +25,12 @@ namespace ds
     extern const std::string TEMP_MODEL_FILE;
     extern const std::string VERSION_STR;
 
+#ifndef Q_OS_WIN
     extern const std::vector<QColor> THREAD_COLORS;
+#else
+    extern std::vector<QColor> THREAD_COLORS;
+    void InitThreadColors();
+#endif
 
     enum PMODEL
     {

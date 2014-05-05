@@ -13,6 +13,7 @@ DSPlot::DSPlot(QWidget *parent) :
     QwtPlot(parent), _tid(std::this_thread::get_id())
 {
 #ifdef DEBUG_FUNC_DSPLOT
+    ScopeTracker st("DSPlot::DSPlot", std::this_thread::get_id());
     std::stringstream s; s << std::this_thread::get_id();
     qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
 #endif
@@ -31,8 +32,7 @@ DSPlot::~DSPlot()
 QwtScaleMap DSPlot::canvasMap( int axisId ) const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::canvasMap: " << s.str().c_str();
+    ScopeTracker st("DSPlot::canvasMap", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::canvasMap(axisId);
@@ -41,8 +41,7 @@ QwtScaleMap DSPlot::canvasMap( int axisId ) const
 QSize DSPlot::sizeHint() const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::sizeHint: " << s.str().c_str();
+    ScopeTracker st("DSPlot::sizeHint", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::sizeHint();
@@ -50,8 +49,7 @@ QSize DSPlot::sizeHint() const
 QSize DSPlot::minimumSizeHint() const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::minimumSizeHint: " << s.str().c_str();
+    ScopeTracker st("DSPlot::minimumSizeHint", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::minimumSizeHint();
@@ -60,8 +58,7 @@ QSize DSPlot::minimumSizeHint() const
 void DSPlot::updateLayout()
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::updateLayout: " << s.str().c_str();
+    ScopeTracker st("DSPlot::updateLayout", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     QwtPlot::updateLayout();
@@ -69,8 +66,7 @@ void DSPlot::updateLayout()
 void DSPlot::drawCanvas( QPainter * painter)
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::drawCanvas: " << painter << s.str().c_str();
+    ScopeTracker st("DSPlot::drawCanvas", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::drawCanvas(painter);
@@ -82,8 +78,7 @@ void DSPlot::getCanvasMarginsHint(
     double &left, double &top, double &right, double &bottom) const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::getCanvasMarginsHint: " << s.str().c_str();
+    ScopeTracker st("DSPlot::getCanvasMarginsHint", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     QwtPlot::getCanvasMarginsHint(maps, canvasRect, left, top, right, bottom);
@@ -92,7 +87,7 @@ void DSPlot::getCanvasMarginsHint(
 bool DSPlot::event( QEvent * event)
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
+    ScopeTracker st("DSPlot::event", std::this_thread::get_id());
     qDebug() << "DSPlot::event: " << event << event->type();
     //8 is QEvent::FocusIn
     //9 is QEvent::FocusOut
@@ -113,8 +108,7 @@ bool DSPlot::event( QEvent * event)
 bool DSPlot::eventFilter( QObject *object, QEvent * event)
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::eventFilter: " << object << event << event->type();
+    ScopeTracker st("DSPlot::eventFilter", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::eventFilter(object, event);
@@ -125,8 +119,7 @@ void DSPlot::drawItems( QPainter *painter, const QRectF &canvasRect,
                         const QwtScaleMap maps[axisCnt]) const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::drawItems: " << painter << canvasRect << axisCnt << s.str().c_str();
+    ScopeTracker st("DSPlot::drawItems", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     QwtPlot::drawItems(painter, canvasRect, maps);
@@ -136,8 +129,7 @@ void DSPlot::drawItems( QPainter *painter, const QRectF &canvasRect,
 QVariant DSPlot::itemToInfo( QwtPlotItem * plotItem) const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::itemToInfo: " << s.str().c_str();
+    ScopeTracker st("DSPlot::itemToInfo", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::itemToInfo(plotItem);
@@ -146,8 +138,7 @@ QVariant DSPlot::itemToInfo( QwtPlotItem * plotItem) const
 QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::infoToItem: " << s.str().c_str();
+    ScopeTracker st("DSPlot::infoToItem", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     return QwtPlot::infoToItem(itemInfo);
@@ -163,8 +154,7 @@ void DSPlot::mouseMoveEvent(QMouseEvent* event)
 void DSPlot::replot()
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::replot: " << s.str().c_str();
+    ScopeTracker st("DSPlot::replot", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread!");
 #endif
     QwtPlot::replot();
@@ -173,8 +163,7 @@ void DSPlot::replot()
 void DSPlot::resizeEvent( QResizeEvent *e )
 {
 #ifdef DEBUG_FUNC_DSPLOT
-    std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::resizeEvent: " << e;
+    ScopeTracker st("DSPlot::resizeEvent", std::this_thread::get_id());
     assert(_tid == std::this_thread::get_id() && "Qwt called from worker thread ");
 #endif
     QwtPlot::resizeEvent(e);

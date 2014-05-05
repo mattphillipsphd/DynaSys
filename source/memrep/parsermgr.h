@@ -36,7 +36,7 @@ class ParserMgr
         inline double ModelStep() const { return _modelStep; }
         void ParserCondEval();
         const std::string& ParserContents() const;
-        void ParserEval(bool eval_input = true);
+        bool ParserEval(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
         void ResetDifferentials();

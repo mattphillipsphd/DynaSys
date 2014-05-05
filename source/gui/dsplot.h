@@ -10,6 +10,7 @@
 #include <QMouseEvent>
 
 #include "../globals/globals.h"
+#include "../globals/scopetracker.h"
 #include <qwt_plot.h>
 
 #ifdef DEBUG_FUNC

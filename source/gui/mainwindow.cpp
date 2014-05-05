@@ -31,6 +31,10 @@ MainWindow::MainWindow(QWidget *parent) :
     _tpColors(InitTPColors()),
     _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
+#ifdef Q_OS_WIN
+    ds::InitThreadColors();
+#endif
+
     ds::AddThread(_tid);
 #ifdef DEBUG_FUNC
     ScopeTracker::InitThread(std::this_thread::get_id());
@@ -785,7 +789,8 @@ void MainWindow::DrawNullclines()
                     _parserMgr.ResetDifferentials();
                 _parserMgr.SetData(_differentials, xidx, xij);
                 _parserMgr.SetData(_differentials, yidx, yij);
-                _parserMgr.ParserEval(false);
+                bool ok = _parserMgr.ParserEval(false);
+                if (!ok) throw std::exception();
                 xdiff[idx] = diffs[xidx] - xij;
                 ydiff[idx] = diffs[yidx] - yij;
 
@@ -1067,7 +1072,8 @@ void MainWindow::DrawPhasePortrait()
 
             for (int k=0; k<num_steps; ++k)
             {
-                _parserMgr.ParserEval();
+                bool ok = _parserMgr.ParserEval();
+                if (!ok) throw std::exception();
                 _parserMgr.ParserCondEval();
 
                 if (_pulseStepsRemaining>0) --_pulseStepsRemaining;
@@ -1089,6 +1095,9 @@ void MainWindow::DrawPhasePortrait()
                     diff_pts[i].push_back( diffs[i] );
                     ip_k += diffs[i] * diffs[i];
                 }
+                    // ### Find a way to get rid of these for loops, return data as a vector,
+                    //memcpy, etc.--take this out of the k/num_steps loop.  It is likely
+                    //a time sink, esp with the 'push_back' calls
                 for (int i=0; i<num_vars; ++i)
                     var_pts[i].push_back( vars[i] );
                 if (is_recording)
@@ -1105,8 +1114,13 @@ void MainWindow::DrawPhasePortrait()
         }
         catch (mu::ParserError& e)
         {
-            _log->AddExcept("MainWindow::DrawPhasePortrait: " + std::string(e.GetMsg()));
-            break;
+            _log->AddExcept("MainWindow::DrawPhasePortrait: " + e.GetMsg());
+            return;
+        }
+        catch (std::exception& e)
+        {
+            _log->AddExcept("MainWindow::DrawPhasePortrait: " + std::string(e.what()));
+            return;
         }
 
         //A blowup will crash QwtPlot
@@ -1321,7 +1335,8 @@ void MainWindow::DrawVectorField()
                     _parserMgr.SetData(_differentials, yidx, y);
                     for (int k=1; k<=_vfTailLen; ++k)
                     {
-                        _parserMgr.ParserEval(false);
+                        bool ok = _parserMgr.ParserEval(false);
+                        if (!ok) throw std::exception();
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
 

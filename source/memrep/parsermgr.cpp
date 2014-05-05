@@ -234,9 +234,10 @@ const std::string& ParserMgr::ParserContents() const
 {
     return _parser.GetExpr();
 }
-void ParserMgr::ParserEval(bool eval_input)
+bool ParserMgr::ParserEval(bool eval_input)
 {
     std::lock_guard<std::mutex> lock(_mutex);
+    bool result = true; // ### Replace this with throwing an exception
     try
     {
 //        qDebug() << _parser.GetExpr().c_str();
@@ -252,7 +253,9 @@ void ParserMgr::ParserEval(bool eval_input)
     {
         _log->AddExcept("ParserMgr::ParserEval: " + std::string(e.GetMsg())
                         + ", " + _parser.GetExpr());
+        result = false;
     }
+    return result;
 }
 void ParserMgr::QuickEval(const std::string& exprn)
 {

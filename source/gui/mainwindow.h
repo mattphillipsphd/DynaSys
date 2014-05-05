@@ -47,7 +47,7 @@
 #include "../models/variablemodel.h"
 #include "../memrep/parsermgr.h"
 
-#define DEBUG_FUNC
+//#define DEBUG_FUNC
 
 namespace Ui {
 class MainWindow;
