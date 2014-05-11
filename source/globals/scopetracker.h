@@ -18,7 +18,7 @@ class ScopeTracker
         }
         ~ScopeTracker()
         {
-            _log->AddMesg(_tab + "Exited " + _name);
+            _log->AddMesg(_tab + "Exited " + _name + _add);
             std::lock_guard<std::mutex> lock(_mutex);
             --_tabCts[_tid];
         }
@@ -30,12 +30,15 @@ class ScopeTracker
                 _tabCts[tid] = 0;
         }
 
+        void Add(const std::string& mesg); //For adding milestones
+
     private:
         inline std::string MakeTab(std::thread::id tid)
         {
             return std::string(_tabCts[tid]*ds::TABLEN, ' ');
         }
 
+        std::string _add;
         Log* _log;
         static std::mutex _mutex;
         const std::string _name;

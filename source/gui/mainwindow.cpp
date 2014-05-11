@@ -5,7 +5,7 @@ const int MainWindow::DEFAULT_SINGLE_STEP = 10;
 const int MainWindow::DEFAULT_SINGLE_TAIL = -1;
 const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
-const int MainWindow::MAX_BUF_SIZE = 1024 * 1024;
+const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
@@ -21,11 +21,10 @@ MainWindow::MainWindow(QWidget *parent) :
     _aboutGui(new AboutGui()), _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _variables(nullptr), _parameters(nullptr), _fileName(""),
-    _isDrawing(false), _isVFAttached(false),
-    _log(Log::Instance()),
+    _isVFAttached(false), _log(Log::Instance()),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
     _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_SAMPLES_SHOWN),
-    _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
+    _playState(STOPPED), _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
     _tid(std::this_thread::get_id()),
     _tpColors(InitTPColors()),
@@ -82,13 +81,19 @@ MainWindow::MainWindow(QWidget *parent) :
 
     _aboutGui->setWindowModality(Qt::ApplicationModal);
 
+    connect(_log, SIGNAL(OpenGui()), _logGui, SLOT(show()));
+
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
 
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)),
             this, SLOT(UpdateMousePos(QPointF)));
+    connect(ui->qwtPhasePlot, SIGNAL(MouseClick()),
+            this, SLOT(Pause()));
+    connect(ui->qwtTimePlot, SIGNAL(MouseClick()),
+            this, SLOT(Pause()));
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
 
-    _paramEditor->setWindowModality(Qt::ApplicationModal);
+//    _paramEditor->setWindowModality(Qt::ApplicationModal);
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
     connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
 }
@@ -101,7 +106,7 @@ MainWindow::~MainWindow()
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
-void MainWindow::LoadTempModel(void* models)
+void MainWindow::LoadTempModel(void* models) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::LoadTempModel", _tid);
@@ -119,14 +124,16 @@ void MainWindow::LoadTempModel(void* models)
         _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
     }
 }
-void MainWindow::ParamEditorClosed()
+void MainWindow::ParamEditorClosed() //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ParamEditorClosed", _tid);
 #endif
-    setEnabled(true);
+    ui->btnStart->setEnabled(true);
+    SetButtonsEnabled(true);
+    SetParamsEnabled(true);
 }
-void MainWindow::ParserToLog()
+void MainWindow::ParserToLog() //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ParserToLog", _tid);
@@ -135,7 +142,28 @@ void MainWindow::ParserToLog()
     std::replace(parser.begin(), parser.end(), ',', '\n');
     _log->AddMesg(parser);
 }
-void MainWindow::SaveNotes()
+void MainWindow::Pause() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::Pause", _tid);
+#endif
+    std::lock_guard<std::mutex> lock(_mutex);
+    switch (_playState)
+    {
+        case STOPPED:
+            break;
+        case DRAWING:
+            _playState = PAUSED;
+            ui->btnStart->setText("Resume");
+            break;
+        case PAUSED:
+            _playState = DRAWING;
+            ui->btnStart->setText("Stop");
+            ResumeDraw();
+            break;
+    }
+}
+void MainWindow::SaveNotes() //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::SaveNotes", _tid);
@@ -154,13 +182,21 @@ void MainWindow::SaveNotes()
     out.Save(cmodels, std::atof(model_step.c_str()),
              conditions, notes);
 }
-void MainWindow::UpdateMousePos(QPointF pos)
+void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
 //#ifdef DEBUG_FUNC
 //    ScopeTracker st("MainWindow::UpdateMousePos", _tid);
 //#endif
     ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
+}
+void MainWindow::UpdateTimePlot() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateTimePlot", _tid);
+#endif
+    if (_playState==STOPPED)
+        DrawTimePlot(true);
 }
 
 void MainWindow::closeEvent(QCloseEvent *)
@@ -186,7 +222,9 @@ void MainWindow::on_actionClear_triggered()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_actionClear_triggered", _tid);
 #endif
-    _isDrawing = _needUpdateVF = false;
+    if (_playState!=STOPPED)
+        throw std::runtime_error("MainWindow::on_actionClear_triggered, Bad state");
+    _needUpdateVF = false;
     InitModels();
     UpdateLists();
 }
@@ -228,7 +266,9 @@ void MainWindow::on_actionParameters_triggered()
     ScopeTracker st("MainWindow::on_actionParameters_triggered", _tid);
 #endif
     SaveModel(ds::TEMP_MODEL_FILE);
-    setEnabled(false);
+    ui->btnStart->setEnabled(false);
+    SetButtonsEnabled(false);
+    SetParamsEnabled(false);
     _paramEditor->SetFileName(_fileName);
     _paramEditor->show();
 }
@@ -461,10 +501,7 @@ void MainWindow::on_btnRemoveVariable_clicked()
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
     for (auto it : rows)
-//    {
-//        delete _cmbDelegates[ it.row() ]; //Actually it looks like Qt does this
         _cmbDelegates[ it.row() ] = nullptr;
-//    }
     std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
@@ -474,19 +511,26 @@ void MainWindow::on_btnStart_clicked()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_btnStart_clicked", _tid);
 #endif
-    if (_isDrawing)
+    switch (_playState)
     {
-        _isDrawing = false;
-        SetButtonsEnabled(true);
-        ui->btnStart->setText("Start");
-    }
-    else // "Stop"
-    {
-        _isDrawing = _needInitialize = true;
-        SetButtonsEnabled(false);
-        ui->btnStart->setText("Stop");
-        if (_plotMode==VECTOR_FIELD) _vfTailLen = 1;
-        InitDraw();
+        case STOPPED:
+            _playState = DRAWING;
+            _needInitialize = true;
+            SetButtonsEnabled(false);
+            ui->btnStart->setText("Stop");
+            if (_plotMode==VECTOR_FIELD) _vfTailLen = 1;
+            InitDraw();
+            break;
+        case DRAWING:
+            _playState = STOPPED;
+            SetButtonsEnabled(true);
+            ui->btnStart->setText("Start");
+            break;
+        case PAUSED:
+            _playState = DRAWING;
+            ui->btnStart->setText("Stop");
+            ResumeDraw();
+            break;
     }
 }
 void MainWindow::on_cboxVectorField_stateChanged(int state)
@@ -498,7 +542,7 @@ void MainWindow::on_cboxVectorField_stateChanged(int state)
     {
         _needUpdateVF = true;
         _needClearVF = false;
-        if (!_isDrawing) InitDraw();
+        if (_playState==STOPPED) InitDraw();
     }
     else
     {
@@ -539,6 +583,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         ui->spnStepsPerSec->setValue(_singleStepsSec);
         ui->spnStepsPerSec->setMinimum(-1);
         ui->spnTailLength->setValue(_singleTailLen);
+        _vfTailLen = 1;
     }
     else if (text=="Vector field")
     {
@@ -653,7 +698,7 @@ void MainWindow::on_spnVFResolution_valueChanged(int)
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 
-void MainWindow::AddVarDelegate(int row, const std::string& type)
+void MainWindow::AddVarDelegate(int row, const std::string&)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::AddVarDelegate", _tid);
@@ -727,6 +772,7 @@ void MainWindow::Draw()
         _log->AddExcept("MainWindow::Draw: " + std::string(e.what()));
         ds::RemoveThread(std::this_thread::get_id());
     }
+
     ds::RemoveThread(std::this_thread::get_id());
 }
 void MainWindow::DrawNullclines()
@@ -789,8 +835,7 @@ void MainWindow::DrawNullclines()
                     _parserMgr.ResetDifferentials();
                 _parserMgr.SetData(_differentials, xidx, xij);
                 _parserMgr.SetData(_differentials, yidx, yij);
-                bool ok = _parserMgr.ParserEval(false);
-                if (!ok) throw std::exception();
+                _parserMgr.ParserEval(false);
                 xdiff[idx] = diffs[xidx] - xij;
                 ydiff[idx] = diffs[yidx] - yij;
 
@@ -806,6 +851,7 @@ void MainWindow::DrawNullclines()
     catch (std::exception& e)
     {
         _log->AddExcept("MainWindow::DrawNullclines: " + std::string(e.what()));
+        throw(e);
     }
 
     double lastx, lasty;
@@ -987,7 +1033,7 @@ void MainWindow::DrawNullclines()
     ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, ymin, ymax );
     for (auto it : _ncPlotItems)
         it->attach(ui->qwtPhasePlot);
-    if (!_isDrawing) ui->qwtPhasePlot->replot();
+    if (_playState==STOPPED) ui->qwtPhasePlot->replot();
 }
 void MainWindow::DrawPhasePortrait()
 {
@@ -1002,9 +1048,6 @@ void MainWindow::DrawPhasePortrait()
             * vars = _parserMgr.ConstData(_variables);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
-    std::vector< std::deque<double> > diff_pts(num_diffs),
-            var_pts(num_vars);
-    std::deque<double> ip;
 
     QFile temp(ds::TEMP_FILE.c_str());
     std::string output;
@@ -1021,7 +1064,7 @@ void MainWindow::DrawPhasePortrait()
         temp.flush();
     }
 
-    while (_isDrawing)
+    while (_playState==DRAWING)
     {
         if (_needUpdateVF) DrawVectorField();
         if (_needUpdateNullclines)
@@ -1044,15 +1087,17 @@ void MainWindow::DrawPhasePortrait()
         if (num_steps==0) num_steps = 1;
 
             //Shrink the buffer if need be
-        while (diff_pts.at(0).size() + num_steps > MAX_BUF_SIZE)
+        const int xy_buf_over = (int)_diffPts.at(0).size() + num_steps - MAX_BUF_SIZE;
+        if (xy_buf_over>0)
         {
             for (int i=0; i<num_diffs; ++i)
-                diff_pts[i].pop_front();
+                _diffPts[i].erase(_diffPts[i].begin(), _diffPts[i].begin()+xy_buf_over-1);
             for (int i=0; i<num_vars; ++i)
-                var_pts[i].pop_front();
+                _varPts[i].erase(_varPts[i].begin(), _varPts[i].begin()+xy_buf_over-1);
         }
-        while (ip.size() + num_steps > _numTPSamples)
-            ip.pop_front();
+        const int ip_buf_over = (int)_ip.size() + num_steps - _numTPSamples;
+        if (ip_buf_over>0)
+            _ip.erase(_ip.begin(), _ip.begin()+ip_buf_over-1);
 
             //Go through each expression and evaluate them
         try
@@ -1072,8 +1117,7 @@ void MainWindow::DrawPhasePortrait()
 
             for (int k=0; k<num_steps; ++k)
             {
-                bool ok = _parserMgr.ParserEval();
-                if (!ok) throw std::exception();
+                _parserMgr.ParserEval();
                 _parserMgr.ParserCondEval();
 
                 if (_pulseStepsRemaining>0) --_pulseStepsRemaining;
@@ -1092,14 +1136,14 @@ void MainWindow::DrawPhasePortrait()
                 {
                     if (is_recording)
                         output += std::to_string(diffs[i]) + "\t";
-                    diff_pts[i].push_back( diffs[i] );
+                    _diffPts[i].push_back( diffs[i] );
                     ip_k += diffs[i] * diffs[i];
                 }
                     // ### Find a way to get rid of these for loops, return data as a vector,
                     //memcpy, etc.--take this out of the k/num_steps loop.  It is likely
                     //a time sink, esp with the 'push_back' calls
                 for (int i=0; i<num_vars; ++i)
-                    var_pts[i].push_back( vars[i] );
+                    _varPts[i].push_back( vars[i] );
                 if (is_recording)
                 {
                     for (int i=0; i<num_vars; ++i)
@@ -1108,19 +1152,19 @@ void MainWindow::DrawPhasePortrait()
                     temp.write(output.c_str());
                     temp.flush();
                 }
-                ip.push_back(ip_k);
+                _ip.push_back(ip_k);
             }
 
         }
         catch (mu::ParserError& e)
         {
             _log->AddExcept("MainWindow::DrawPhasePortrait: " + e.GetMsg());
-            return;
+            throw std::runtime_error("MainWindow::DrawPhasePortrait: Parser error");
         }
         catch (std::exception& e)
         {
             _log->AddExcept("MainWindow::DrawPhasePortrait: " + std::string(e.what()));
-            return;
+            throw(e);
         }
 
         //A blowup will crash QwtPlot
@@ -1128,7 +1172,7 @@ void MainWindow::DrawPhasePortrait()
         for (int i=0; i<num_diffs; ++i)
             if (abs(diffs[i])>DMAX)
             {
-                _isDrawing = false;
+                _playState = STOPPED;
                 ui->btnStart->setText("Start");
                 return;
             }
@@ -1138,7 +1182,7 @@ void MainWindow::DrawPhasePortrait()
                 yidx = ui->cmbDiffY->currentIndex();
         _marker->setValue(diffs[xidx], diffs[yidx]);
 
-        const int num_saved_pts = (int)diff_pts[0].size();
+        const int num_saved_pts = (int)_diffPts[0].size();
         int tail_len = std::min(num_saved_pts, ui->spnTailLength->text().toInt());
         if (tail_len==-1) tail_len = num_saved_pts;
         const int inc = tail_len < XY_SAMPLES_SHOWN/2
@@ -1149,61 +1193,12 @@ void MainWindow::DrawPhasePortrait()
 
         int ct_begin = std::max(0,num_saved_pts-tail_len);
         for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
-            points[k] = QPointF(diff_pts.at(xidx).at(ct), diff_pts.at(yidx).at(ct));
+            points[k] = QPointF(_diffPts.at(xidx).at(ct), _diffPts.at(yidx).at(ct));
         _curve->setSamples(points);
 
-        //Plot points for the inner-product graph
-        const int num_tp_points = (int)ip.size();
-        TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
-        const int dv_start = std::max(0, (int)diff_pts.at(0).size()-num_tp_points),
-                dv_end = dv_start + num_tp_points;
-        const int num_all_tplots = 1 + num_diffs + num_vars;
-        for (int i=0; i<num_all_tplots; ++i)
-        {
-            QwtPlotCurve* curv = _tpCurves[i];
-            if (!tp_model->IsEnabled(i))
-            {
-                curv->setSamples(QPolygonF());
-                continue;
-            }
-            std::string name = tp_model->Name(i);
-            if (name=="IP")
-            {
-                QPolygonF points_tp(num_tp_points);
-                for (int k=0; k<num_tp_points; ++k)
-                    points_tp[k] = QPointF((dv_start+k)*_parserMgr.ModelStep(), ip[k]);
-                curv->setSamples(points_tp);
-                continue;
-            }
-            int didx = _differentials->ShortKeyIndex(name);
-            if (didx != -1)
-            {
-                QPolygonF points_tp(num_tp_points);
-                for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), diff_pts.at(didx).at(k));
-                curv->setSamples(points_tp);
-                continue;
-            }
-            int vidx = _variables->KeyIndex(name);
-            if (vidx != -1)
-            {
-                QPolygonF points_tp(num_tp_points);
-                for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
-                    points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), var_pts.at(vidx).at(k));
-                curv->setSamples(points_tp);
-            }
-        }
+        //Plot points for the time plot
+        ViewRect tp_lims = DrawTimePlot(false);
 
-            //Get axis limits for time plot
-        double y_tp_min(std::numeric_limits<double>::max()),
-                y_tp_max(std::numeric_limits<double>::min());
-        for (int i=0; i<num_all_tplots; ++i)
-            if (tp_model->IsEnabled(i))
-            {
-                const QwtPlotCurve* curv = _tpCurves[i];
-                if (curv->maxYValue() > y_tp_max) y_tp_max = curv->maxYValue();
-                if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
-            }
             //Get axis limits
         double xmin, xmax, ymin, ymax;
         if (ui->cboxFitLimits->isChecked())
@@ -1215,18 +1210,17 @@ void MainWindow::DrawPhasePortrait()
         }
         else
         {
-            auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
-                    ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
+            auto xlims = std::minmax_element(_diffPts.at(xidx).cbegin(), _diffPts.at(xidx).cend()),
+                    ylims = std::minmax_element(_diffPts.at(yidx).cbegin(), _diffPts.at(yidx).cend());
             xmin = *xlims.first;
             xmax = *xlims.second;
             ymin = *ylims.first;
             ymax = *ylims.second;
         }
+        ViewRect pp_lims(xmin, xmax, ymin, ymax);
 
-        ViewRect pp_data(xmin, xmax, ymin, ymax),
-                tp_data( dv_start*_parserMgr.ModelStep(), dv_end*_parserMgr.ModelStep(), y_tp_min, y_tp_max );
         _finishedReplot = false;
-        emit DoReplot(pp_data, tp_data);
+        emit DoReplot(pp_lims, tp_lims);
         std::unique_lock<std::mutex> lock(_mutex);
         _condVar.wait(lock, [&]{ return _finishedReplot; });
         lock.unlock();
@@ -1236,14 +1230,87 @@ void MainWindow::DrawPhasePortrait()
     }
 
     temp.close();
-    _isDrawing = false;
+//    _playState = STOPPED;
+}
+MainWindow::ViewRect MainWindow::DrawTimePlot(bool replot_now)
+{
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("MainWindow::DrawTimePlot", std::this_thread::get_id());
+//#endif
+    if (_diffPts.empty()) return ViewRect();
+    TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars(),
+            num_tp_points = (int)_ip.size(),
+            dv_start = std::max(0, (int)_diffPts.at(0).size()-num_tp_points),
+            dv_end = dv_start + num_tp_points;
+    const int num_all_tplots = 1 + num_diffs + num_vars;
+    for (int i=0; i<num_all_tplots; ++i)
+    {
+        QwtPlotCurve* curv = _tpCurves[i];
+        if (!tp_model->IsEnabled(i))
+        {
+            curv->setSamples(QPolygonF());
+            continue;
+        }
+
+        const std::string name = tp_model->Name(i);
+        const double scale = std::pow(10.0, tp_model->LogScale(i));
+            // ### Use MSL for fast multiplication!
+
+        if (name=="IP")
+        {
+            QPolygonF points_tp(num_tp_points);
+            for (int k=0; k<num_tp_points; ++k)
+                points_tp[k] = QPointF((dv_start+k)*_parserMgr.ModelStep(), _ip[k]*scale);
+            curv->setSamples(points_tp);
+            continue;
+        }
+        int didx = _differentials->ShortKeyIndex(name);
+        if (didx != -1)
+        {
+            QPolygonF points_tp(num_tp_points);
+            for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
+                points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), _diffPts.at(didx).at(k)*scale);
+            curv->setSamples(points_tp);
+            continue;
+        }
+        int vidx = _variables->KeyIndex(name);
+        if (vidx != -1)
+        {
+            QPolygonF points_tp(num_tp_points);
+            for (int k=dv_start, ct=0; k<dv_end; ++k, ++ct)
+                points_tp[ct] = QPointF(k*_parserMgr.ModelStep(), _varPts.at(vidx).at(k)*scale);
+            curv->setSamples(points_tp);
+        }
+    }
+
+    //Get axis limits
+    double y_tp_min(std::numeric_limits<double>::max()),
+            y_tp_max(std::numeric_limits<double>::min());
+    for (int i=0; i<num_all_tplots; ++i)
+        if (tp_model->IsEnabled(i))
+        {
+            const QwtPlotCurve* curv = _tpCurves[i];
+            if (curv->maxYValue() > y_tp_max) y_tp_max = curv->maxYValue();
+            if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
+        }
+
+    ViewRect tp_lims( dv_start*_parserMgr.ModelStep(), dv_end*_parserMgr.ModelStep(), y_tp_min, y_tp_max );
+
+    if (replot_now)
+    {
+        assert(std::this_thread::get_id()==_tid && "MainWindow::DrawTimePlot Only replot from main thread!");
+        Replot(ViewRect(), tp_lims);
+    }
+
+    return tp_lims;
 }
 void MainWindow::DrawVectorField()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::DrawVectorField", std::this_thread::get_id());
 #endif
-//    qDebug() << "MainWindow::DrawVectorField 1";
 
     if (_needClearVF)
     {
@@ -1253,18 +1320,15 @@ void MainWindow::DrawVectorField()
         _needUpdateVF = _needClearVF = false;
         return;
     }
-//    qDebug() << "MainWindow::DrawVectorField 2";
 
-    if ((_isDrawing && _plotMode==VECTOR_FIELD) || _needInitialize)
+    if ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needInitialize)
     {
         emit DoInitParserMgr();
         std::unique_lock<std::mutex> lock(_mutex);
         _condVar.wait(lock, [&]{ return !_needInitialize; });
     }
 
-//    qDebug() << "MainWindow::DrawVectorField 3";
-
-    while ((_isDrawing && _plotMode==VECTOR_FIELD) || _needUpdateVF)
+    while ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
         auto loop_begin = std::chrono::system_clock::now();
 
@@ -1281,19 +1345,18 @@ void MainWindow::DrawVectorField()
                 ymin = _parserMgr.Minimum(_initConds, yidx),
                 ymax = _parserMgr.Maximum(_initConds, yidx);
         const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
-                yinc = (ymax - ymin) / (double)(vf_resolution-1);
-        const double arrow_leg = 0.2 * std::min(xinc, yinc);
+                yinc = (ymax - ymin) / (double)(vf_resolution-1),
+                xpix_inc = (double)ui->qwtPhasePlot->width() / (double)(vf_resolution-1),
+                ypix_inc = (double)ui->qwtPhasePlot->height() / (double)(vf_resolution-1);
+        ArrowHead::SetConversions(xinc, yinc, xpix_inc, ypix_inc);
 
         _isVFAttached = true;
         emit DoAttachVF(false);
-//        qDebug() << "MainWindow::DrawVectorField 4";
         std::unique_lock<std::mutex> lock(_mutex);
-//        qDebug() << "MainWindow::DrawVectorField 5";
         _condVar.wait(lock, [&]{ return !_isVFAttached; });
 
         _vfPlotItems.reserve(vf_resolution*vf_resolution*3);
 
-//        qDebug() << "MainWindow::DrawVectorField 6";
         std::vector<double> dvals_orig(num_diffs),
                 vars_orig(num_vars);
         for (int i=0; i<num_diffs; ++i)
@@ -1335,31 +1398,18 @@ void MainWindow::DrawVectorField()
                     _parserMgr.SetData(_differentials, yidx, y);
                     for (int k=1; k<=_vfTailLen; ++k)
                     {
-                        bool ok = _parserMgr.ParserEval(false);
-                        if (!ok) throw std::exception();
+                        _parserMgr.ParserEval(false);
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
 
-                    QPolygonF arrow_pts(3);
-                    const double lastx = pts[_vfTailLen].x(),
-                            lasty = pts[_vfTailLen].y();
-                    arrow_pts[1] = QPointF(lastx, lasty);
-                    const double dx = pts[_vfTailLen-1].x() - lastx,
-                            dy = pts[_vfTailLen-1].y() - lasty;
-                    const double theta = std::atan2(dy, dx);
-                    const double p1x = lastx + arrow_leg*cos(theta + ds::PI/8),
-                            p1y = lasty + arrow_leg*sin(theta + ds::PI/8),
-                            p2x = lastx + arrow_leg*cos(theta - ds::PI/8),
-                            p2y = lasty + arrow_leg*sin(theta - ds::PI/8);
-                    arrow_pts[0] = QPointF(p1x, p1y);
-                    arrow_pts[2] = QPointF(p2x, p2y);
-                    arrow->setSamples(arrow_pts);
+                    ArrowHead arrow_head(pts[_vfTailLen], pts[_vfTailLen-1]);
+                    arrow->setSamples(arrow_head.Points());
                     arrow->setZ(0);
 
                     curv->setSamples(pts);
                     curv->setZ(-0.5);
                 }
-            if (_isDrawing && _plotMode==VECTOR_FIELD) _vfTailLen += _vfStepsSec;
+            if (_playState==DRAWING && _plotMode==VECTOR_FIELD) _vfTailLen += _vfStepsSec;
 
             for (int i=0; i<num_diffs; ++i)
                 _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
@@ -1369,6 +1419,7 @@ void MainWindow::DrawVectorField()
         catch (std::exception& e)
         {
             _log->AddExcept("MainWindow::DrawVectorField: " + std::string(e.what()));
+            throw(e);
         }
         lock.unlock();
 
@@ -1378,7 +1429,6 @@ void MainWindow::DrawVectorField()
         _condVar.wait(lock2, [&]{ return _isVFAttached; });
         lock2.unlock();
 
-//        qDebug() << "MainWindow::DrawVectorField 7";
         _needUpdateVF = false;
         if (_plotMode==VECTOR_FIELD)
         {
@@ -1395,12 +1445,22 @@ void MainWindow::DrawVectorField()
                     sleep_time = std::max(10, VF_SLEEP_MS-dur_ms);
             std::this_thread::sleep_for( std::chrono::milliseconds(sleep_time) );
         }
-//        qDebug() << "MainWindow::DrawVectorField 8";
     }
 
-    if (_plotMode==VECTOR_FIELD) _isDrawing = false;
+//    if (_plotMode==VECTOR_FIELD) _playState = STOPPED;
 }
 
+void MainWindow::InitBuffers()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::InitBuffers", _tid);
+#endif
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
+    _diffPts = std::vector< std::deque<double> >(num_diffs);
+    _varPts = std::vector< std::deque<double> >(num_vars);
+    _ip.clear();
+}
 void MainWindow::InitDefaultModel()
 {
 #ifdef DEBUG_FUNC
@@ -1443,6 +1503,7 @@ void MainWindow::InitDraw()
     ScopeTracker st("MainWindow::InitDraw", _tid);
 #endif
     InitPlots();
+    InitBuffers();
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
 }
@@ -1639,9 +1700,16 @@ void MainWindow::ComboBoxChanged(const QString& text) //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ComboBoxChanged", _tid);
 #endif
-    ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
-    size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
-    _parserMgr.AssignInput(_variables, row, text.toStdString());
+    try
+    {
+        ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
+        size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
+        _parserMgr.AssignInput(_variables, row, text.toStdString());
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::ComboBoxChanged: " + std::string(e.what()));
+    }
 }
 void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 {
@@ -1660,12 +1728,19 @@ void MainWindow::InitParserMgr() //slot
     assert(_tid == std::this_thread::get_id() && "InitParserMgr called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
-    _parserMgr.InitModels();
-    _parserMgr.InitParsers();
-    _parserMgr.SetExpressions();
-    _parserMgr.SetConditions();
-    _needInitialize = false;
-    _condVar.notify_one();
+    try
+    {
+        _parserMgr.InitModels();
+        _parserMgr.InitParsers();
+        _parserMgr.SetExpressions();
+        _parserMgr.SetConditions();
+        _needInitialize = false;
+        _condVar.notify_one();
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::InitParserMgr: " + std::string(e.what()));
+    }
 }
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
@@ -1695,20 +1770,27 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
 #endif
     std::unique_lock<std::mutex> lock(_mutex);
 
-    if (pp_data != ViewRect())
+    try
     {
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_data.xmin, pp_data.xmax );
-        ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_data.ymin, pp_data.ymax );
-        ui->qwtPhasePlot->replot();
-    }
+        if (pp_data != ViewRect())
+        {
+            ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_data.xmin, pp_data.xmax );
+            ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_data.ymin, pp_data.ymax );
+            ui->qwtPhasePlot->replot();
+        }
 
-    if (tp_data != ViewRect())
+        if (tp_data != ViewRect())
+        {
+            ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_data.xmin, tp_data.xmax );
+            ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_data.ymin, tp_data.ymax );
+            ui->qwtTimePlot->replot();
+        }
+    }
+    catch (std::exception& e)
     {
-        ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_data.xmin, tp_data.xmax );
-        ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_data.ymin, tp_data.ymax );
-        ui->qwtTimePlot->replot();
+        _log->AddExcept("MainWindow::Replot: " + std::string(e.what()));
+        if (_playState==DRAWING) on_btnStart_clicked();
     }
-
     _finishedReplot = true;
     _condVar.notify_one();
 
@@ -1764,7 +1846,7 @@ void MainWindow::LoadModel(const std::string& file_name)
             AddVarDelegate((int)i, _variables->Value(i));
 
         ResetPhasePlotAxes();
-        UpdateLists();
+        if (file_name != ds::TEMP_MODEL_FILE) UpdateLists();
         UpdateNotes();
         UpdateParamEditor();
 
@@ -1804,6 +1886,14 @@ void MainWindow::ResetResultsList(int cond_row)
     ui->lsResults->setModel(model);
     connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ResultsChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+}
+void MainWindow::ResumeDraw()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ResumeDraw", _tid);
+#endif
+    std::thread t( std::bind(&MainWindow::Draw, this) );
+    t.detach();
 }
 void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const
 {
@@ -1852,10 +1942,27 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
 
     ui->actionClear->setEnabled(is_enabled);
     ui->actionLoad->setEnabled(is_enabled);
+    ui->actionParameters->setEnabled(is_enabled);
     ui->actionReload_Current->setEnabled(is_enabled);
     ui->actionSave_Data->setEnabled(is_enabled);
+    ui->actionSave_Model_As->setEnabled(is_enabled);
+    ui->actionSave_Phase_Plot->setEnabled(is_enabled);
+    ui->actionSave_Time_Plot->setEnabled(is_enabled);
+    ui->actionSave_Vector_Field->setEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
+}
+void MainWindow::SetParamsEnabled(bool is_enabled)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetParamsEnabled", _tid);
+#endif
+    ui->tblDifferentials->setEnabled(is_enabled);
+    ui->tblInitConds->setEnabled(is_enabled);
+    ui->tblParameters->setEnabled(is_enabled);
+    ui->tblVariables->setEnabled(is_enabled);
+    ui->lsConditions->setEnabled(is_enabled);
+    ui->lsResults->setEnabled(is_enabled);
 }
 void MainWindow::UpdateLists()
 {
@@ -1879,7 +1986,7 @@ void MainWindow::UpdateNullclines()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateNullclines", _tid);
 #endif
-    if (_isDrawing)
+    if (_playState==DRAWING)
         _needUpdateNullclines = true;
     else
         DrawNullclines();
@@ -1940,14 +2047,17 @@ void MainWindow::UpdateTimePlotTable()
     TPVTableModel* model = new TPVTableModel(vs, this);
     ui->tblTimePlot->setModel(model);
 
-    const size_t num_tp_rows = vs.size(),
-            num_colors = _tpColors.size();
-    for (size_t i=0; i<num_tp_rows; ++i)
-    {
-        CheckBoxDelegate* cbd = new CheckBoxDelegate(
-                    _tpColors.at(i%num_colors), this);
-        ui->tblTimePlot->setItemDelegateForRow((int)i, cbd);
-    }
+    CheckBoxDelegate* cbd = new CheckBoxDelegate(_tpColors, this);
+    connect(cbd, SIGNAL(MouseReleased()), this, SLOT(UpdateTimePlot()), Qt::DirectConnection);
+    ui->tblTimePlot->setItemDelegateForColumn(0, cbd);
+    ui->tblTimePlot->setColumnWidth(0,50);
+    model->setHeaderData(0,Qt::Horizontal,"Show",Qt::DisplayRole);
+
+    DSpinBoxDelegate* dsbd = new DSpinBoxDelegate(this);
+    connect(dsbd, SIGNAL(DataChanged()), this, SLOT(UpdateTimePlot()), Qt::DirectConnection);
+    ui->tblTimePlot->setItemDelegateForColumn(1, dsbd);
+    ui->tblTimePlot->setColumnWidth(1,50);
+    model->setHeaderData(1,Qt::Horizontal,"Scale",Qt::DisplayRole);
 }
 void MainWindow::UpdateVectorField()
 {
@@ -1956,5 +2066,5 @@ void MainWindow::UpdateVectorField()
 #endif
     if (_needUpdateVF) return;
     _needUpdateVF = true;
-    if (!_isDrawing) InitDraw();
+    if (_playState==STOPPED) InitDraw();
 }

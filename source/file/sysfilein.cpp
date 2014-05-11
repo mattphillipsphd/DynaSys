@@ -3,6 +3,9 @@
 SysFileIn::SysFileIn(const std::string& name)
     : _name(name)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::SysFileIn", std::this_thread::get_id());
+#endif
 }
 
 void SysFileIn::Load(std::vector<ParamModelBase*>& models,
@@ -10,6 +13,9 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
                      ConditionModel* conditions,
                      Notes* notes)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
+#endif
     _in.open(_name);
     std::string line;
 
@@ -58,7 +64,7 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
                 model = new InitialCondModel(nullptr, name);
                 break;
             default:
-                throw("Bad model name");
+                throw std::runtime_error("SysFileIn::Load: Bad model name");
         }
             // ### Should create a proper factory
         models.push_back(model);
@@ -98,6 +104,9 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
 }
 void SysFileIn::Load(VecStr& vmodels)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
+#endif
     std::vector<ParamModelBase*> models;
     std::string model_step;
     ConditionModel* conditions = new ConditionModel();

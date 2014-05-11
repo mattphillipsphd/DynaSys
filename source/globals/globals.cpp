@@ -38,7 +38,7 @@ ds::PMODEL ds::Model(const std::string& model)
     if (model=="Differentials") return DIFFERENTIALS;
     if (model=="InitialConds") return INIT_CONDS;
     if (model=="Conditions") return CONDITIONS;
-    throw ("Bad Model");
+    throw std::runtime_error("ds::Model: Bad Model");
 }
 std::string ds::Model(PMODEL model)
 {
@@ -55,9 +55,9 @@ std::string ds::Model(PMODEL model)
         case CONDITIONS:
             return "Conditions";
         case NUM_MODELS:
-            throw("Not a model");
+            throw std::runtime_error("ds::Model: Not a model");
     }
-    throw("Bad Model");
+    throw std::runtime_error("ds::Model: Bad Model");
 }
 
 void ds::RemoveThread(std::thread::id tid)

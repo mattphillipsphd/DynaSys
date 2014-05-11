@@ -11,6 +11,8 @@
 
 #include <QDebug>
 
+#include "../globals/log.h"
+
 class Input
 {
     public:
@@ -51,6 +53,7 @@ class Input
 
         size_t _ct;
         double* _input;
+        Log* _log;
         double* const _value;
 //        std::mutex _mutex;
         TYPE _type;

@@ -1,7 +1,7 @@
 #include "checkboxdelegate.h"
 
-CheckBoxDelegate::CheckBoxDelegate(QColor color, QObject *parent) :
-    _color(color), QStyledItemDelegate(parent)
+CheckBoxDelegate::CheckBoxDelegate(const std::vector<QColor>& colors, QObject *parent) :
+    _colors(colors), _log(Log::Instance()), QStyledItemDelegate(parent)
 {
 }
 
@@ -9,19 +9,24 @@ QWidget* CheckBoxDelegate::createEditor(QWidget* parent,
     const QStyleOptionViewItem&/* option */,
     const QModelIndex&/* index */) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CheckBoxDelegate::createEditor", std::this_thread::get_id());
+#endif
     QCheckBox* editor = new QCheckBox(parent);
     editor->setEnabled(true);
     editor->setCheckable(true);
+    editor->setAutoFillBackground(true);
     editor->raise();
 
-    qDebug() << "QCheckBox EDITOR CREATED";
     return editor;
 }
 
 bool CheckBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
                          const QStyleOptionViewItem& option, const QModelIndex& index)
 {
-
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CheckBoxDelegate::editorEvent", std::this_thread::get_id());
+#endif
     // make sure that the item is checkable
     Qt::ItemFlags flags = model->flags(index);
     if (!(flags & Qt::ItemIsUserCheckable))
@@ -41,8 +46,6 @@ bool CheckBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
                                               QRect(option.rect.x() + (2 * textMargin), option.rect.y(),
                                                     option.rect.width() - (2 * textMargin),
                                                     option.rect.height()));
-//        if (!checkRect.contains(static_cast<QMouseEvent*>(event)->pos()))
-//            return false;
     }
     else if (event->type() == QEvent::KeyPress)
     {
@@ -52,12 +55,20 @@ bool CheckBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
     else
         return false;
     Qt::CheckState state = value.toBool() ? Qt::Unchecked : Qt::Checked;
-    return model->setData(index, state, Qt::CheckStateRole);
+    bool result = model->setData(index, state, Qt::CheckStateRole);
+
+    if (result && event->type()==QEvent::MouseButtonRelease)
+        emit MouseReleased();
+
+    return result;
 }
 
 void CheckBoxDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
-    painter->fillRect(option.rect, _color);
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("CheckBoxDelegate::paint", std::this_thread::get_id());
+//#endif
+    painter->fillRect(option.rect, _colors.at(index.row()%_colors.size()));
     QStyleOptionViewItem my_option(option);
     my_option.showDecorationSelected = false;
     QStyledItemDelegate::paint(painter, my_option, index);
@@ -66,27 +77,34 @@ void CheckBoxDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
 void CheckBoxDelegate::setEditorData(QWidget* editor,
                                     const QModelIndex& index) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CheckBoxDelegate::setEditorData", std::this_thread::get_id());
+#endif
     bool val = index.model()->data(index, Qt::DisplayRole).toBool();
 
     QCheckBox* checkbox = static_cast<QCheckBox*>(editor);
-    checkbox->setPalette( QPalette(_color) );
+    checkbox->setPalette( QPalette(_colors.at(index.row()%_colors.size())) );
     checkbox->setChecked(val);
-    qDebug() << "CheckBoxDelegate::setEditorData, " << val << ".";
 }
 
 void CheckBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
                                    const QModelIndex& index) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CheckBoxDelegate::setModelData", std::this_thread::get_id());
+#endif
     QCheckBox* checkbox = qobject_cast<QCheckBox*>(editor);
     QVariant val = checkbox->isChecked();
 
     model->setData(index, val, Qt::EditRole);
-    qDebug() << "CheckBoxDelegate::setModelData, " << val.toBool() << ".";
 }
 
 void CheckBoxDelegate::updateEditorGeometry(QWidget* editor,
     const QStyleOptionViewItem &option, const QModelIndex& /* index */) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CheckBoxDelegate::UpdateTimePlotTable", std::this_thread::get_id());
+#endif
     editor->setGeometry(option.rect);
 }
 

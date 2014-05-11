@@ -13,6 +13,8 @@
 #include "../models/conditionmodel.h"
 #include "../models/parammodelbase.h"
 
+//#define DEBUG_PM_FUNC
+
 class ParserMgr
 {
     public:
@@ -36,7 +38,7 @@ class ParserMgr
         inline double ModelStep() const { return _modelStep; }
         void ParserCondEval();
         const std::string& ParserContents() const;
-        bool ParserEval(bool eval_input = true);
+        void ParserEval(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
         void ResetDifferentials();
@@ -53,6 +55,7 @@ class ParserMgr
         void TempEval();
 
     private:
+        std::string AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const;
         void AssociateVars(mu::Parser& parser);
         inline double* Data(const ParamModelBase* model);
         inline ParamModelBase* Model(ds::PMODEL model);

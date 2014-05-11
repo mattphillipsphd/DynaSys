@@ -33,6 +33,7 @@
 #include "aboutgui.h"
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
+#include "dspinboxdelegate.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
@@ -45,6 +46,7 @@
 #include "../models/parammodel.h"
 #include "../models/tpvtablemodel.h"
 #include "../models/variablemodel.h"
+#include "../memrep/arrowhead.h"
 #include "../memrep/parsermgr.h"
 
 //#define DEBUG_FUNC
@@ -62,6 +64,12 @@ class MainWindow : public QMainWindow
         {
             SINGLE,
             VECTOR_FIELD
+        };
+        enum PLAY_STATE
+        {
+            STOPPED,
+            DRAWING,
+            PAUSED
         };
 
         struct ViewRect
@@ -105,8 +113,10 @@ class MainWindow : public QMainWindow
         void LoadTempModel(void* models);
         void ParamEditorClosed();
         void ParserToLog();
+        void Pause();
         void SaveNotes();
         void UpdateMousePos(QPointF pos);
+        void UpdateTimePlot();
 
     protected:
         virtual void closeEvent(QCloseEvent *) override;
@@ -184,7 +194,9 @@ class MainWindow : public QMainWindow
         void Draw();
         void DrawNullclines();
         void DrawPhasePortrait();
+        ViewRect DrawTimePlot(bool replot_now);
         void DrawVectorField();
+        void InitBuffers();
         void InitDefaultModel();
         void InitDraw();
         void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
@@ -195,9 +207,11 @@ class MainWindow : public QMainWindow
         void LoadModel(const std::string& file_name);
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
+        void ResumeDraw();
         void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;
         void SaveModel(const std::string& file_name);
         void SetButtonsEnabled(bool is_enabled);
+        void SetParamsEnabled(bool is_enabled);
         void UpdateLists();
         void UpdateNotes();
         void UpdateNullclines();
@@ -224,7 +238,7 @@ class MainWindow : public QMainWindow
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;
-        volatile bool _isDrawing, _isVFAttached;
+        volatile bool _isVFAttached;
         Log* _log;
         std::mutex _mutex;
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
@@ -232,6 +246,7 @@ class MainWindow : public QMainWindow
         std::vector<QwtPlotItem*> _ncPlotItems;
         int _numTPSamples;
         ParserMgr _parserMgr;
+        volatile PLAY_STATE _playState;
         PLOT_MODE _plotMode;
         std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
@@ -243,6 +258,9 @@ class MainWindow : public QMainWindow
         const std::vector<QColor> _tpColors;
         std::vector<QwtPlotItem*> _vfPlotItems;
         int _vfStepsSec, _vfTailLen;
+
+        std::vector< std::deque<double> > _diffPts, _varPts;
+        std::deque<double> _ip;
 
         QwtPlotCurve* _curve;
         QwtPlotMarker* _marker;

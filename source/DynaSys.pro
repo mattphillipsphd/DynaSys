@@ -11,8 +11,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = DynaSys
 TEMPLATE = app
 
+unix{
 QMAKE_CXXFLAGS += -std=c++11
 QMAKE_CXXFLAGS += -gdwarf-3
+}
 QMAKE_CXXFLAGS += -DQWT_DLL
 
 OBJECTS_DIR = obj
@@ -47,7 +49,9 @@ SOURCES += main.cpp\
     gui/ptextedit.cpp \
     globals/log.cpp \
     gui/loggui.cpp \
-    globals/scopetracker.cpp
+    globals/scopetracker.cpp \
+    gui/dspinboxdelegate.cpp \
+    memrep/arrowhead.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -74,7 +78,9 @@ HEADERS  += gui/mainwindow.h \
     gui/ptextedit.h \
     globals/log.h \
     gui/loggui.h \
-    globals/scopetracker.h
+    globals/scopetracker.h \
+    gui/dspinboxdelegate.h \
+    memrep/arrowhead.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

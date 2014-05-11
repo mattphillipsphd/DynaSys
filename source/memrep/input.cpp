@@ -23,11 +23,12 @@ Input::TYPE Input::Type(const std::string& text)
 }
 
 Input::Input(double* const value)
-    : _ct(0), _input(nullptr), _value(value), _type(UNKNOWN)
+    : _ct(0), _input(nullptr), _log(Log::Instance()), _value(value), _type(UNKNOWN)
 {
 }
 Input::Input(const Input& other)
-    : _ct(other._ct), _input(nullptr), _value(other._value), _type(other._type)
+    : _ct(other._ct), _input(nullptr), _log(Log::Instance()),
+      _value(other._value), _type(other._type)
 {
     DeepCopy(other);
 }
@@ -56,7 +57,7 @@ void Input::GenerateInput(TYPE type)
     switch (type)
     {
         case UNKNOWN:
-            throw("Unknown Variable Type");
+            throw std::runtime_error("Input::GenerateInput: Unknown Variable Type");
         case UNI_RAND:
         {
             std::uniform_real_distribution<double> uni_rand;
@@ -80,7 +81,7 @@ void Input::GenerateInput(TYPE type)
         }
         case TXT_FILE:
         case USER:
-            throw("Input::GenerateInput not defined for type " + std::to_string(type));
+            throw std::runtime_error("Input::GenerateInput: type not defined for string " + std::to_string(type));
     }
 
     _type = type;
@@ -93,6 +94,8 @@ void Input::LoadInput(const std::string& file_name)
     {
         std::ifstream file;
         file.open(file_name);
+        if (!file.is_open()) throw std::runtime_error("Input::LoadInput: File "
+                                                      + file_name + " failed to open.");
 
         std::string line;
         std::getline(file, line);
@@ -116,13 +119,14 @@ void Input::LoadInput(const std::string& file_name)
     }
     catch (std::exception& e)
     {
-        std::cerr << e.what() << std::endl;
+        _log->AddExcept("MainWindow::InitParserMgr: " + std::string(e.what()));
+        throw(e);
     }
 }
 void Input::NextInput(int n)
 {
     if (!_input)
-        throw("Input::NextInput: _input is null");
+        throw std::runtime_error("Input::NextInput: _input is null");
     _ct+=n;
     _ct &= INPUT_MASK;
     *_value = _input[_ct];
@@ -138,7 +142,7 @@ template<typename T>
 void Input::GenerateRandInput(T& distribution)
 {
     if (!_input)
-        throw("Input::GenerateRandInput: _input is null");
+        throw std::runtime_error("Input::GenerateRandInput: _input is null");
     std::mt19937_64 mte;
     for (int k=0; k<INPUT_SIZE; ++k)
         _input[k] = distribution(mte);

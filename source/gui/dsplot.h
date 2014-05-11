@@ -54,9 +54,11 @@ class DSPlot : public QwtPlot
     public Q_SLOTS:
         virtual void replot() override;
 
+        virtual void mousePressEvent(QMouseEvent* event) override;
         virtual void mouseMoveEvent(QMouseEvent* event) override;
 
     signals:
+        void MouseClick();
         void MousePos(QPointF pos);
 
     protected:

@@ -143,6 +143,10 @@ QwtPlotItem *DSPlot::infoToItem( const QVariant & itemInfo) const
 #endif
     return QwtPlot::infoToItem(itemInfo);
 }
+void DSPlot::mousePressEvent(QMouseEvent*)
+{
+    emit MouseClick();
+}
 void DSPlot::mouseMoveEvent(QMouseEvent* event)
 {
     QwtScaleMap mapx = canvasMap(xBottom),

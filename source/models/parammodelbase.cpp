@@ -22,7 +22,7 @@ VecStr ParamModelBase::Expressions() const
 }
 std::string ParamModelBase::Key(size_t i) const
 {
-    return headerData(i, Qt::Vertical, Qt::DisplayRole).toString().toStdString();
+    return headerData((int)i, Qt::Vertical, Qt::DisplayRole).toString().toStdString();
 }
 VecStr ParamModelBase::Keys() const
 {
@@ -34,11 +34,11 @@ VecStr ParamModelBase::Keys() const
 }
 double ParamModelBase::Maximum(size_t idx) const
 {
-    return data(createIndex(idx,2),Qt::DisplayRole).toDouble();
+    return data(createIndex((int)idx,2),Qt::DisplayRole).toDouble();
 }
 double ParamModelBase::Minimum(size_t idx) const
 {
-    return data(createIndex(idx,1),Qt::DisplayRole).toDouble();
+    return data(createIndex((int)idx,1),Qt::DisplayRole).toDouble();
 }
 std::string ParamModelBase::ShortKey(size_t i) const
 {
@@ -105,11 +105,11 @@ std::string ParamModelBase::Name() const
 }
 void ParamModelBase::SetMaximum(size_t idx, double val)
 {
-    setData(createIndex(idx,2),val,Qt::EditRole);
+    setData(createIndex((int)idx,2),val,Qt::EditRole);
 }
 void ParamModelBase::SetMinimum(size_t idx, double val)
 {
-    setData(createIndex(idx,1),val,Qt::EditRole);
+    setData(createIndex((int)idx,1),val,Qt::EditRole);
 }
 void ParamModelBase::SetPar(const std::string& key, const std::string& value)
 {
@@ -189,7 +189,7 @@ QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, in
             break;
         case Qt::Vertical:
             if (section>(int)_parameters.size())
-                throw "ParamModelBase::headerData: Bad parameter index.";
+                throw std::runtime_error("ParamModelBase::headerData: Bad parameter index.");
             header = _parameters.at(section).key.c_str();
             break;
     }
@@ -218,7 +218,7 @@ int ParamModelBase::rowCount() const
 }
 int ParamModelBase::rowCount(const QModelIndex&) const
 {
-    return _parameters.size();
+    return (int)_parameters.size();
 }
 
 bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, int role)
@@ -229,7 +229,8 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
     {
         case Qt::EditRole:
         {
-            if (index.row()>=rowCount()) throw "ParamModelBase::setData: Index out of bounds";
+            if (index.row()>=rowCount())
+                throw std::runtime_error("ParamModelBase::setData: Index out of bounds");
             switch (index.column())
             {
                 case 0:
@@ -253,9 +254,9 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
     return true;
 }
 
-bool ParamModelBase::setHeaderData(int section, Qt::Orientation orientation, const QVariant &value, int role)
+bool ParamModelBase::setHeaderData(int, Qt::Orientation, const QVariant&, int)
 {
-    throw "ParamModelBase::setHeaderData: Can't change parameter name.";
+    throw std::runtime_error("ParamModelBase::setHeaderData: Can't change parameter name.");
 }
 
 int ParamModelBase::KeyIndex(const std::string& par_name) const

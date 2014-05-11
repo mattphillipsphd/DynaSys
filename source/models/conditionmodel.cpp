@@ -69,8 +69,8 @@ void ConditionModel::Read(std::istream& in)
     while (line.empty() && !in.eof())
         std::getline(in, line);
     if (in.eof()) return;
-    int tab = line.find_first_of('\t');
-    int num_conds = std::stoi( line.substr(tab+1) );
+    size_t tab = line.find_first_of('\t');
+    const int num_conds = std::stoi( line.substr(tab+1) );
     for (int i=0; i<num_conds; ++i)
     {
         std::getline(in, line);

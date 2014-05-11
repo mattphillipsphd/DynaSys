@@ -1,9 +1,14 @@
 #ifndef TPVTABLEMODEL_H
 #define TPVTABLEMODEL_H
 
+#include <thread>
+
 #include <QAbstractTableModel>
 
 #include "../globals/globals.h"
+#include "../globals/scopetracker.h"
+
+//#define DEBUG_TP_FUNC
 
 class TPVTableModel : public QAbstractTableModel
 {
@@ -13,6 +18,7 @@ class TPVTableModel : public QAbstractTableModel
 
         VecStr IsEnabled() const;
         bool IsEnabled(int idx) const;
+        double LogScale(int idx) const;
         std::string Name(int idx) const;
 
         int columnCount() const;
@@ -32,14 +38,16 @@ class TPVTableModel : public QAbstractTableModel
     private:
         struct RowRecord //Expand this to include min/max etc. as needed
         {
-            RowRecord(const std::string& name_, bool en = false)
-                : name(name_), is_enabled(en)
+            RowRecord(const std::string& name_, bool en = false, double lscale = 0.0)
+                : name(name_), is_enabled(en), log_scale(lscale)
             {}
             const std::string name;
             bool is_enabled;
+            double log_scale;
         };
 
         std::vector<RowRecord> _data;
+        VecStr _headers;
 };
 
 #endif // TPVTABLEMODEL_H

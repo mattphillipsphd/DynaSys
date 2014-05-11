@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 
+#include "../globals/scopetracker.h"
 #include "../memrep/notes.h"
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"

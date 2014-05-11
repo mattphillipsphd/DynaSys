@@ -3,6 +3,9 @@
 SysFileOut::SysFileOut(const std::string& name)
     : _name(name)
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileOut::SysFileOut", std::this_thread::get_id());
+#endif
 }
 
 void SysFileOut::Save(const std::vector<const ParamModelBase*>& models,
@@ -10,13 +13,16 @@ void SysFileOut::Save(const std::vector<const ParamModelBase*>& models,
                       const ConditionModel* conditions,
                       const Notes* notes) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileOut::Save", std::this_thread::get_id());
+#endif
     _out.open(_name);
 
     SaveHeader(model_step);
     _out << models.size() << std::endl;
     for (auto it : models)
     {
-        const int num_pars = it->NumPars();
+        const int num_pars = (int)it->NumPars();
         _out << it->Name() << "\t" << num_pars << std::endl;
         for (int i=0; i<num_pars; ++i)
             _out << it->Key(i) << "\t" << it->Value(i) << "\t"
@@ -34,6 +40,9 @@ void SysFileOut::Save(const VecStr& vmodels,
                       double model_step,
                       const Notes* notes) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileOut::Save", std::this_thread::get_id());
+#endif
     _out.open(_name);
 
     SaveHeader(model_step);
@@ -47,6 +56,9 @@ void SysFileOut::Save(const VecStr& vmodels,
 
 void SysFileOut::SaveHeader(double model_step) const
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileOut::SaveHeader", std::this_thread::get_id());
+#endif
     _out << "DynaSys " << ds::VERSION_STR << std::endl;
     _out << "Model step: " << model_step << std::endl;
 }

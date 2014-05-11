@@ -1,7 +1,7 @@
 #ifndef CHECKBOXDELEGATE_H
 #define CHECKBOXDELEGATE_H
 
-#include <iostream>
+#include <thread>
 
 #include <QApplication>
 #include <QCheckBox>
@@ -12,11 +12,14 @@
 #include <QPainter>
 #include <QStyledItemDelegate>
 
+#include "../globals/log.h"
+#include "../globals/scopetracker.h"
+
 class CheckBoxDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
     public:
-        explicit CheckBoxDelegate(QColor color, QObject* parent = 0);
+        explicit CheckBoxDelegate(const std::vector<QColor>& colors, QObject* parent = 0);
 
         virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const override;
@@ -31,12 +34,13 @@ class CheckBoxDelegate : public QStyledItemDelegate
             const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
     signals:
-        void ComboBoxChanged(int value);
+        void MouseReleased();
 
     public slots:
 
     private:
-        QColor _color;
+        const std::vector<QColor>&  _colors;
+        Log* _log;
 };
 
 #endif // CHECKBOXDELEGATE_H

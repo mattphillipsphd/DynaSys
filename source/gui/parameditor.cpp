@@ -225,7 +225,7 @@ void ParamEditor::WriteBuffer()
             }
             if (ct != ds::NUM_MODELS)
                 return;
-//                throw ("Bad Parameter file!  Changes not recorded.");
+//                throw std::runtime_error("ParamEditor::WriteBuffer: Bad Parameter file!  Changes not recorded.");
             _models = temp_models;
         }
         else
