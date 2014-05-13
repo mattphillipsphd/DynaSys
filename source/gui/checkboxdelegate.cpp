@@ -45,13 +45,13 @@ bool CheckBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
     // make sure that we have the right event type
     if (event->type() == QEvent::MouseButtonRelease)
     {
-        const int textMargin = QApplication::style()->pixelMetric(QStyle::PM_FocusFrameHMargin) + 1;
+/*        const int textMargin = QApplication::style()->pixelMetric(QStyle::PM_FocusFrameHMargin) + 1;
         QRect checkRect = QStyle::alignedRect(option.direction, Qt::AlignCenter,
                                               option.decorationSize,
                                               QRect(option.rect.x() + (2 * textMargin), option.rect.y(),
                                                     option.rect.width() - (2 * textMargin),
                                                     option.rect.height()));
-    }
+*/    }
     else if (event->type() == QEvent::KeyPress)
     {
         if (static_cast<QKeyEvent*>(event)->key() != Qt::Key_Space&& static_cast<QKeyEvent*>(event)->key() != Qt::Key_Select)

@@ -1923,12 +1923,14 @@ void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& siz
 #endif
     QString suff = name;
     suff.replace(' ', '_');
-    QString file_name = QFileDialog::getSaveFileName(nullptr,
+    std::string base_name = _fileName.substr(0, _fileName.find_last_of('.'));
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                      "Save " + name + " figure",
-                                                     QString(_fileName.c_str()) + suff + ".pdf");
-    if (file_name.isEmpty()) return;
+                                                     QString(base_name.c_str())
+                                                         + "_" + suff + ".pdf").toStdString();
+    if (file_name.empty()) return;
     QwtPlotRenderer renderer;
-    renderer.renderDocument(fig, file_name, "pdf", size);
+    renderer.renderDocument(fig, file_name.c_str(), "pdf", size);
 }
 void MainWindow::SaveModel(const std::string& file_name)
 {
