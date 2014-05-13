@@ -15,11 +15,13 @@ class ArrowHead
         const QPolygonF& Points() const { return _pts; }
 
     private:
+        inline QPolygonF MakePoints(const QPointF& a, const QPointF& b);
+
         static const double _length; //As fraction of dx, dy
         static const double _width;
         static double _xPixInc, _yPixInc,
             _xPix2Val, _yPix2Val;
-        QPolygonF _pts;
+        const QPolygonF _pts;
 };
 
 #endif // ARROWHEAD_H

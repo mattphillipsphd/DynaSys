@@ -1,5 +1,9 @@
 #include "parammodelbase.h"
 
+const std::string ParamModelBase::Param::DEFAULT_MAX = "100";
+const std::string ParamModelBase::Param::DEFAULT_MIN = "-100";
+const std::string ParamModelBase::Param::DEFAULT_VAL = "0";
+
 ParamModelBase::ParamModelBase(QObject* parent, const std::string& name) :
     QAbstractTableModel(parent), _id(ds::Model(name))
 {
@@ -11,6 +15,15 @@ ParamModelBase::~ParamModelBase()
 std::string ParamModelBase::Expression(size_t i) const
 {
     return ShortKey(i) + " = " + Value(i);
+}
+std::string ParamModelBase::ExpressionList() const
+{
+    std::string elist;
+    const size_t num_pars_m1 = _parameters.size()-1;
+    for (size_t i=0; i<num_pars_m1; ++i)
+        elist += Expression(i) + ", ";
+    elist += Expression(num_pars_m1);
+    return elist;
 }
 VecStr ParamModelBase::Expressions() const
 {
@@ -176,15 +189,15 @@ QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, in
         case Qt::Horizontal:
             switch (section)
             {
-            case 0:
-                header = "Value";
-                break;
-            case 1:
-                header = "Min";
-                break;
-            case 2:
-                header = "Max";
-                break;
+                case 0:
+                    header = "Value";
+                    break;
+                case 1:
+                    header = "Min";
+                    break;
+                case 2:
+                    header = "Max";
+                    break;
             }
             break;
         case Qt::Vertical:

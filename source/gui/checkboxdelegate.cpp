@@ -1,13 +1,13 @@
 #include "checkboxdelegate.h"
 
 CheckBoxDelegate::CheckBoxDelegate(const std::vector<QColor>& colors, QObject *parent) :
-    _colors(colors), _log(Log::Instance()), QStyledItemDelegate(parent)
+     QStyledItemDelegate(parent), _colors(colors), _log(Log::Instance())
 {
 }
 
 QWidget* CheckBoxDelegate::createEditor(QWidget* parent,
     const QStyleOptionViewItem&/* option */,
-    const QModelIndex&/* index */) const
+    const QModelIndex& index) const
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("CheckBoxDelegate::createEditor", std::this_thread::get_id());
@@ -15,7 +15,12 @@ QWidget* CheckBoxDelegate::createEditor(QWidget* parent,
     QCheckBox* editor = new QCheckBox(parent);
     editor->setEnabled(true);
     editor->setCheckable(true);
+
+    QPalette palette = editor->palette();
+    palette.setColor(QPalette::Window, _colors.at(index.row()%_colors.size()));
+    editor->setPalette(palette);
     editor->setAutoFillBackground(true);
+
     editor->raise();
 
     return editor;

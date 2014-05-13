@@ -99,6 +99,7 @@ class MainWindow : public QMainWindow
                         SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         TP_SAMPLES_SHOWN,
+                        TP_WINDOW_LENGTH,
                         XY_SAMPLES_SHOWN,
                         VF_RESOLUTION,
                         VF_SLEEP_MS;
@@ -110,6 +111,7 @@ class MainWindow : public QMainWindow
         ~MainWindow();
 
     public slots:
+        void Error();
         void LoadTempModel(void* models);
         void ParamEditorClosed();
         void ParserToLog();
@@ -246,11 +248,12 @@ class MainWindow : public QMainWindow
         std::vector<QwtPlotItem*> _ncPlotItems;
         int _numTPSamples;
         ParserMgr _parserMgr;
+        int _pastDVSampsCt, _pastIPSampsCt; //Samples outside the buffer
         volatile PLAY_STATE _playState;
         PLOT_MODE _plotMode;
         std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
-        size_t _pulseParIdx;
+        int _pulseParIdx;
         int _pulseStepsRemaining,
             //Consider making a little pulse struct/class
             _singleStepsSec, _singleTailLen;

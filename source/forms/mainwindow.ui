@@ -500,7 +500,7 @@
          <widget class="QLineEdit" name="edNumTPSamples"/>
         </item>
         <item row="1" column="0">
-         <widget class="QLabel" name="label_13">
+         <widget class="QLabel" name="lblTimePlotN">
           <property name="text">
            <string>N:</string>
           </property>

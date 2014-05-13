@@ -16,6 +16,21 @@ class ParamModelBase : public QAbstractTableModel
 {
     Q_OBJECT
     public:
+        struct Param
+        {
+            static const std::string DEFAULT_MAX, DEFAULT_MIN, DEFAULT_VAL;
+            Param()
+                : key(""), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL)
+            {}
+            Param(const std::string& k)
+                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL)
+            {}
+            Param(const std::string& k, const std::string& v)
+                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(v)
+            {}
+            std::string key, max, min, value;
+        };
+
         explicit ParamModelBase(QObject* parent, const std::string& name);
 //        ParamModelBase(const ParamModelBase&) = delete;
 //        ParamModelBase& operator=(const ParamModelBase&) = delete;
@@ -26,6 +41,7 @@ class ParamModelBase : public QAbstractTableModel
         virtual bool DoInitialize() const = 0; //Whether the model values
             //are used to initialize the variables
         virtual std::string Expression(size_t i) const;
+        std::string ExpressionList() const;
         virtual VecStr Expressions() const;
         ds::PMODEL Id() const { return _id; }
         virtual VecStr Initializations() const { return VecStr(); }
@@ -66,25 +82,7 @@ class ParamModelBase : public QAbstractTableModel
         virtual bool setData(const QModelIndex &index, const QVariant &value, int role) override;
         virtual bool setHeaderData(int section, Qt::Orientation orientation, const QVariant &value, int role) override;
 
-//    signals:
-
-//    protected:
-
     private:
-        struct Param
-        {
-            Param()
-                : key(""), min("-100"), max("100"), value("0")
-            {}
-            Param(const std::string& k)
-                : key(k), min("-100"), max("100"), value("0")
-            {}
-            Param(const std::string& k, const std::string& v)
-                : key(k), min("-100"), max("100"), value(v)
-            {}
-            std::string key, max, min, value;
-        };
-
         const ds::PMODEL _id;
         mutable std::mutex _mutex;
         std::vector<Param> _parameters;

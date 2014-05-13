@@ -39,6 +39,8 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
 
     std::getline(_in, line);
     const int num_models = std::stoi(line);
+    if (num_models != ds::NUM_MODELS-1)
+        throw std::runtime_error("SysFileIn::Load: Wrong number of models");
 
     for (int i=0; i<num_models; ++i)
     {
@@ -79,11 +81,19 @@ void SysFileIn::Load(std::vector<ParamModelBase*>& models,
             if (has_minmax)
             {
                 size_t tab = value.find_first_of('\t');
-                std::string rest = value.substr(tab+1);
-                value = value.substr(0,tab);
-                tab = rest.find_first_of('\t');
-                pmin = rest.substr(0,tab);
-                pmax = rest.substr(tab+1);
+                if (tab==std::string::npos)
+                {
+                    pmin = ParamModelBase::Param::DEFAULT_MIN;
+                    pmax = ParamModelBase::Param::DEFAULT_MAX;
+                }
+                else
+                {
+                    std::string rest = value.substr(tab+1);
+                    value = value.substr(0,tab);
+                    tab = rest.find_first_of('\t');
+                    pmin = rest.substr(0,tab);
+                    pmax = rest.substr(tab+1);
+                }
             }
             model->AddParameter(key, value);
             if (has_minmax)

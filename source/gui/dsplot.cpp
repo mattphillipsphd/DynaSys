@@ -15,7 +15,6 @@ DSPlot::DSPlot(QWidget *parent) :
 #ifdef DEBUG_FUNC_DSPLOT
     ScopeTracker st("DSPlot::DSPlot", std::this_thread::get_id());
     std::stringstream s; s << std::this_thread::get_id();
-    qDebug() << "DSPlot::DSPlot, thread id:" << s.str().c_str();
 #endif
 
     canvas()->setMouseTracking(true);
@@ -88,7 +87,7 @@ bool DSPlot::event( QEvent * event)
 {
 #ifdef DEBUG_FUNC_DSPLOT
     ScopeTracker st("DSPlot::event", std::this_thread::get_id());
-    qDebug() << "DSPlot::event: " << event << event->type();
+    Log.AddMesg("DSPlot::event: " + std::to_string(event) + ", " + std::to_string(event->type());
     //8 is QEvent::FocusIn
     //9 is QEvent::FocusOut
     //10 is QEvent::Enter

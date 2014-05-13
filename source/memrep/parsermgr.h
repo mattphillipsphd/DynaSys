@@ -1,6 +1,7 @@
 #ifndef PARSERMGR_H
 #define PARSERMGR_H
 
+#include <cstdlib>
 #include <exception>
 #include <mutex>
 
@@ -36,14 +37,14 @@ class ParserMgr
         double Maximum(const ParamModelBase* model, size_t idx) const;
         double Minimum(const ParamModelBase* model, size_t idx) const;
         inline double ModelStep() const { return _modelStep; }
-        void ParserCondEval();
         const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
+        void ParserEvalAndConds(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
         void ResetDifferentials();
-//        void ResetValues();
-//        void ResetVarInitVals();
+        void ResetValues();
+        void ResetVarInitVals();
         void SetCondModel(ConditionModel* conditions);
         void SetConditions();
         void SetData(const ParamModelBase* model, size_t idx, double val);
@@ -58,8 +59,10 @@ class ParserMgr
         std::string AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const;
         void AssociateVars(mu::Parser& parser);
         inline double* Data(const ParamModelBase* model);
+        inline double* Data(ds::PMODEL model);
         inline ParamModelBase* Model(ds::PMODEL model);
         inline double* TempData(const ParamModelBase* model);
+        inline double* TempData(ds::PMODEL model);
 
         bool _areModelsInitialized;
         ConditionModel* _conditions;
@@ -75,7 +78,7 @@ class ParserMgr
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
         int _stepCt;
-        std::vector<double> _varInitVals; //For temporary model resets
+        double* _varInitVals; //For temporary model resets
 };
 
 #endif // PARSERMGR_H

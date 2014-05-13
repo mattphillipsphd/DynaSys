@@ -11,6 +11,7 @@
 
 #include "../globals/globals.h"
 #include "../globals/scopetracker.h"
+#include "../globals/log.h"
 #include <qwt_plot.h>
 
 #ifdef DEBUG_FUNC

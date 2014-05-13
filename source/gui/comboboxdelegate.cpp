@@ -1,7 +1,7 @@
 #include "comboboxdelegate.h"
 
 ComboBoxDelegate::ComboBoxDelegate(VecStr items, QObject *parent)
-    : _items(items), QStyledItemDelegate(parent)
+    : QStyledItemDelegate(parent), _items(items)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("ComboBoxDelegate::ComboBoxDelegate", std::this_thread::get_id());
