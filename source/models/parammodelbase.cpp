@@ -33,6 +33,10 @@ VecStr ParamModelBase::Expressions() const
         vs[i] = Expression(i);
     return vs;
 }
+bool ParamModelBase::IsFreeze(size_t idx) const
+{
+    return data(createIndex((int)idx,FREEZE),Qt::DisplayRole).toBool();
+}
 std::string ParamModelBase::Key(size_t i) const
 {
     return headerData((int)i, Qt::Vertical, Qt::DisplayRole).toString().toStdString();
@@ -47,11 +51,11 @@ VecStr ParamModelBase::Keys() const
 }
 double ParamModelBase::Maximum(size_t idx) const
 {
-    return data(createIndex((int)idx,2),Qt::DisplayRole).toDouble();
+    return data(createIndex((int)idx,MAX),Qt::DisplayRole).toDouble();
 }
 double ParamModelBase::Minimum(size_t idx) const
 {
-    return data(createIndex((int)idx,1),Qt::DisplayRole).toDouble();
+    return data(createIndex((int)idx,MIN),Qt::DisplayRole).toDouble();
 }
 std::string ParamModelBase::ShortKey(size_t i) const
 {
@@ -118,11 +122,11 @@ std::string ParamModelBase::Name() const
 }
 void ParamModelBase::SetMaximum(size_t idx, double val)
 {
-    setData(createIndex((int)idx,2),val,Qt::EditRole);
+    setData(createIndex((int)idx,MAX),val,Qt::EditRole);
 }
 void ParamModelBase::SetMinimum(size_t idx, double val)
 {
-    setData(createIndex((int)idx,1),val,Qt::EditRole);
+    setData(createIndex((int)idx,MIN),val,Qt::EditRole);
 }
 void ParamModelBase::SetPar(const std::string& key, const std::string& value)
 {
@@ -130,11 +134,11 @@ void ParamModelBase::SetPar(const std::string& key, const std::string& value)
 }
 void ParamModelBase::SetPar(int i, const std::string& value)
 {
-    setData( createIndex(i,0), value.c_str(), Qt::EditRole );
+    setData( createIndex(i,VALUE), value.c_str(), Qt::EditRole );
 }
 void ParamModelBase::SetPar(int i, double value)
 {
-    setData( createIndex(i,0), value, Qt::EditRole );
+    setData( createIndex(i,VALUE), value, Qt::EditRole );
 }
 void ParamModelBase::SetRange(size_t idx, double min, double max)
 {
@@ -148,7 +152,7 @@ int ParamModelBase::columnCount() const
 }
 int ParamModelBase::columnCount(const QModelIndex&) const
 {
-    return 3;
+    return NUM_COLUMNS;
 }
 QVariant ParamModelBase::data(const QModelIndex &index, int role) const
 {
@@ -160,13 +164,16 @@ QVariant ParamModelBase::data(const QModelIndex &index, int role) const
         case Qt::DisplayRole:
             switch (index.column())
             {
-                case 0:
+                case FREEZE:
+                    value = _parameters.at( index.row() ).is_freeze;
+                    break;
+                case VALUE:
                     value = _parameters.at( index.row() ).value.c_str();
                     break;
-                case 1:
+                case MIN:
                     value = _parameters.at( index.row() ).min.c_str();
                     break;
-                case 2:
+                case MAX:
                     value = _parameters.at( index.row() ).max.c_str();
                     break;
             }
@@ -189,13 +196,16 @@ QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, in
         case Qt::Horizontal:
             switch (section)
             {
-                case 0:
+                case FREEZE:
+                    header = "";
+                    break;
+                case VALUE:
                     header = "Value";
                     break;
-                case 1:
+                case MIN:
                     header = "Min";
                     break;
-                case 2:
+                case MAX:
                     header = "Max";
                     break;
             }
@@ -246,13 +256,16 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
                 throw std::runtime_error("ParamModelBase::setData: Index out of bounds");
             switch (index.column())
             {
-                case 0:
+                case FREEZE:
+                    _parameters[ index.row() ].is_freeze = value.toBool();
+                    break;
+                case VALUE:
                     _parameters[ index.row() ].value = val;
                     break;
-                case 1:
+                case MIN:
                     _parameters[ index.row() ].min = val;
                     break;
-                case 2:
+                case MAX:
                     _parameters[ index.row() ].max = val;
                     break;
             }

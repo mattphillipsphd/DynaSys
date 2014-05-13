@@ -727,7 +727,7 @@ void MainWindow::AddVarDelegate(int row)
     vstr.push_back(Input::NORM_RAND_STR);
     vstr.push_back(Input::UNI_RAND_STR);
     ComboBoxDelegate* cbd = new ComboBoxDelegate(vstr);
-    ui->tblVariables->setItemDelegateForRow(row, cbd);
+    ui->tblVariables->setItemDelegateForRow(row, cbd); // ### One delegate, for the column
     connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
     _cmbDelegates.push_back(cbd);
 }
@@ -1538,14 +1538,16 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     if (_parameters) delete _parameters;
     _parameters = (models) ? (*models)[ds::INPUTS] : new ParamModel(this, ds::Model(ds::INPUTS));
     ui->tblParameters->setModel(_parameters);
+    ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_parameters);
 
     if (_variables) delete _variables;
     _variables = (models) ? (*models)[ds::VARIABLES] : new VariableModel(this, ds::Model(ds::VARIABLES));
     ui->tblVariables->setModel(_variables);
-    ui->tblVariables->setColumnHidden(1,true);
-    ui->tblVariables->setColumnHidden(2,true);
+    ui->tblVariables->setColumnHidden(ParamModelBase::MIN,true);
+    ui->tblVariables->setColumnHidden(ParamModelBase::MAX,true);
+    ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_variables);
 
@@ -1553,13 +1555,15 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     _differentials =(models) ? (*models)[ds::DIFFERENTIALS] :  new DifferentialModel(this, ds::Model(ds::DIFFERENTIALS));
     ui->tblDifferentials->setModel(_differentials);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
-    ui->tblDifferentials->setColumnHidden(1,true);
-    ui->tblDifferentials->setColumnHidden(2,true);
+    ui->tblDifferentials->setColumnHidden(ParamModelBase::MIN,true);
+    ui->tblDifferentials->setColumnHidden(ParamModelBase::MAX,true);
+    ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
     _parserMgr.AddModel(_differentials);
 
     if (_initConds) delete _initConds;
     _initConds = (models) ? (*models)[ds::INIT_CONDS] : new InitialCondModel(this, ds::Model(ds::INIT_CONDS));
     ui->tblInitConds->setModel(_initConds);
+    ui->tblInitConds->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
     _parserMgr.AddModel(_initConds);
 
