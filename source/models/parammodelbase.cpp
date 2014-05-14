@@ -35,7 +35,7 @@ VecStr ParamModelBase::Expressions() const
 }
 bool ParamModelBase::IsFreeze(size_t idx) const
 {
-    return data(createIndex((int)idx,FREEZE),Qt::DisplayRole).toBool();
+    return data(createIndex((int)idx,FREEZE),Qt::CheckStateRole).toBool();
 }
 std::string ParamModelBase::Key(size_t i) const
 {
@@ -160,12 +160,16 @@ QVariant ParamModelBase::data(const QModelIndex &index, int role) const
     QVariant value;
     switch (role)
     {
+        case Qt::CheckStateRole:
+            if (index.column()!=FREEZE) break;
+            value = _parameters.at( index.row() ).is_freeze;
+            break;
         case Qt::EditRole:
         case Qt::DisplayRole:
             switch (index.column())
             {
                 case FREEZE:
-                    value = _parameters.at( index.row() ).is_freeze;
+//                    value = _parameters.at( index.row() ).is_freeze;
                     break;
                 case VALUE:
                     value = _parameters.at( index.row() ).value.c_str();
@@ -185,7 +189,13 @@ QVariant ParamModelBase::data(const QModelIndex &index, int role) const
 }
 Qt::ItemFlags ParamModelBase::flags(const QModelIndex &index) const
 {
-    return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
+    switch (index.column())
+    {
+        case FREEZE:
+            return QAbstractTableModel::flags(index) | Qt::ItemIsUserCheckable;
+        default:
+            return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
+    }
 }
 QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, int role) const
 {
@@ -250,6 +260,9 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
     std::string val = value.toString().toStdString();
     switch (role)
     {
+        case Qt::CheckStateRole:
+            if (index.column()!=FREEZE)
+                throw std::runtime_error("ParamModelBase::setData: Bad role");
         case Qt::EditRole:
         {
             if (index.row()>=rowCount())

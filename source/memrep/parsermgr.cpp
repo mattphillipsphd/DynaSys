@@ -420,7 +420,12 @@ void ParserMgr::SetExpressions()
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
                 if (model->IsFreeze(i))
-                    AddExpression(model->TempKey(i) + " = 0");
+                {
+                    std::string freeze_val = (model->Id()==ds::DIFFERENTIALS)
+                            ? Model(ds::INIT_CONDS)->Value(i)
+                            : "0";
+                    AddExpression(model->TempKey(i) + " = " + freeze_val);
+                }
             if (model->Id()==ds::VARIABLES) // ### Really need separate parsers for both here
                 for (size_t i=0; i<num_pars; ++i)
                     AddExpression(model->Key(i) + " = " + model->TempKey(i));

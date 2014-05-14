@@ -436,7 +436,6 @@ void MainWindow::on_btnAddVariable_clicked()
     if (!var.empty())
     {
         _variables->AddParameter(var, ParamModelBase::Param::DEFAULT_VAL);
-        AddVarDelegate((int)_variables->NumPars()-1);
         UpdateTimePlotTable();
     }
 }
@@ -508,9 +507,6 @@ void MainWindow::on_btnRemoveVariable_clicked()
 #endif
     QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
-    for (auto it : rows)
-        _cmbDelegates[ it.row() ] = nullptr;
-    std::remove(_cmbDelegates.begin(), _cmbDelegates.end(), nullptr);
     ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
 }
@@ -710,27 +706,6 @@ void MainWindow::on_spnVFResolution_valueChanged(int)
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
 
-void MainWindow::AddVarDelegate(int row, const std::string&)
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::AddVarDelegate", _tid);
-#endif
-    AddVarDelegate(row);//, Input::Type(type));
-}
-void MainWindow::AddVarDelegate(int row)
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::AddVarDelegate", _tid);
-#endif
-    VecStr vstr;
-    vstr.push_back(Input::GAMMA_RAND_STR);
-    vstr.push_back(Input::NORM_RAND_STR);
-    vstr.push_back(Input::UNI_RAND_STR);
-    ComboBoxDelegate* cbd = new ComboBoxDelegate(vstr);
-    ui->tblVariables->setItemDelegateForRow(row, cbd); // ### One delegate, for the column
-    connect(cbd, SIGNAL(ComboBoxChanged(const QString&)), this, SLOT(ComboBoxChanged(const QString&)));
-    _cmbDelegates.push_back(cbd);
-}
 void MainWindow::ClearPlots()
 {
 #ifdef DEBUG_FUNC
@@ -1494,8 +1469,6 @@ void MainWindow::InitDefaultModel()
 
     _variables->AddParameter("q", Input::NORM_RAND_STR);
     _variables->AddParameter("r", "u*v");
-    AddVarDelegate(0);
-    AddVarDelegate(1);
 
     _differentials->AddParameter("v'", "(u + r + a)/b");
     _differentials->AddParameter("u'", "q*(b - v)");
@@ -1549,6 +1522,15 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     ui->tblVariables->setColumnHidden(ParamModelBase::MAX,true);
     ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
+    CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
+    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
+    VecStr vstr;
+    vstr.push_back(Input::GAMMA_RAND_STR);
+    vstr.push_back(Input::NORM_RAND_STR);
+    vstr.push_back(Input::UNI_RAND_STR);
+    ComboBoxDelegate* cmbd = new ComboBoxDelegate(vstr);
+    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
+    connect(cmbd, SIGNAL(ComboBoxChanged(size_t)), this, SLOT(ComboBoxChanged(size_t)));
     _parserMgr.AddModel(_variables);
 
     if (_differentials) delete _differentials;
@@ -1558,6 +1540,8 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     ui->tblDifferentials->setColumnHidden(ParamModelBase::MIN,true);
     ui->tblDifferentials->setColumnHidden(ParamModelBase::MAX,true);
     ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
+    CheckBoxDelegate* cbbd_d = new CheckBoxDelegate(std::vector<QColor>(), this);
+    ui->tblDifferentials->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
     _parserMgr.AddModel(_differentials);
 
     if (_initConds) delete _initConds;
@@ -1720,16 +1704,15 @@ void MainWindow::AttachVectorField(bool attach) //slot
     }
     _condVar.notify_one();
 }
-void MainWindow::ComboBoxChanged(const QString& text) //slot
+void MainWindow::ComboBoxChanged(size_t row) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ComboBoxChanged", _tid);
 #endif
     try
     {
-        ComboBoxDelegate* cbd = qobject_cast<ComboBoxDelegate*>(sender());
-        size_t row = std::find(_cmbDelegates.cbegin(), _cmbDelegates.cend(), cbd) - _cmbDelegates.cbegin();
-        _parserMgr.AssignInput(_variables, row, text.toStdString());
+        std::string text = _variables->Value(row);
+        _parserMgr.AssignInput(_variables, row, text);
     }
     catch (std::exception& e)
     {
@@ -1862,13 +1845,6 @@ void MainWindow::LoadModel(const std::string& file_name)
 
         ui->edModelStep->setText( model_step.c_str() );
         _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
-
-        for (auto it : _cmbDelegates)
-            delete it;
-        _cmbDelegates.clear();
-        const size_t num_vars = _variables->NumPars();
-        for (size_t i=0; i<num_vars; ++i)
-            AddVarDelegate((int)i, _variables->Value(i));
 
         ResetPhasePlotAxes();
         if (file_name != ds::TEMP_MODEL_FILE) UpdateLists();
@@ -2075,14 +2051,14 @@ void MainWindow::UpdateTimePlotTable()
     CheckBoxDelegate* cbd = new CheckBoxDelegate(_tpColors, this);
     connect(cbd, SIGNAL(MouseReleased()), this, SLOT(UpdateTimePlot()), Qt::DirectConnection);
     ui->tblTimePlot->setItemDelegateForColumn(0, cbd);
-    ui->tblTimePlot->setColumnWidth(0,50);
-    model->setHeaderData(0,Qt::Horizontal,"Show",Qt::DisplayRole);
+    ui->tblTimePlot->setColumnWidth(TPVTableModel::SHOW,50);
+    model->setHeaderData(TPVTableModel::SHOW,Qt::Horizontal,"Show",Qt::DisplayRole);
 
     DSpinBoxDelegate* dsbd = new DSpinBoxDelegate(this);
     connect(dsbd, SIGNAL(DataChanged()), this, SLOT(UpdateTimePlot()), Qt::DirectConnection);
     ui->tblTimePlot->setItemDelegateForColumn(1, dsbd);
-    ui->tblTimePlot->setColumnWidth(1,50);
-    model->setHeaderData(1,Qt::Horizontal,"Scale",Qt::DisplayRole);
+    ui->tblTimePlot->setColumnWidth(TPVTableModel::SCALE,50);
+    model->setHeaderData(TPVTableModel::SCALE,Qt::Horizontal,"Scale",Qt::DisplayRole);
 }
 void MainWindow::UpdateVectorField()
 {

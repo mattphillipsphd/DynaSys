@@ -39,7 +39,7 @@ class CheckBoxDelegate : public QStyledItemDelegate
     public slots:
 
     private:
-        const std::vector<QColor>&  _colors;
+        const std::vector<QColor> _colors;
         Log* _log;
 };
 

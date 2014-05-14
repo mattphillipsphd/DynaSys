@@ -1,8 +1,9 @@
 #ifndef COMBOBOXDELEGATE_H
 #define COMBOBOXDELEGATE_H
 
-#include <QStyledItemDelegate>
 #include <QComboBox>
+#include <QEvent>
+#include <QStyledItemDelegate>
 
 #include <iostream>
 #include <vector>
@@ -22,8 +23,8 @@ class ComboBoxDelegate : public QStyledItemDelegate
 
         virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const override;
-//        virtual QString displayText(const QVariant& value, const QLocale& locale) const override;
-//        virtual void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
+//        virtual bool editorEvent(QEvent* event, QAbstractItemModel* model,
+//                                const QStyleOptionViewItem& option, const QModelIndex& index) override;
         virtual void setEditorData(QWidget* editor, const QModelIndex& index) const override;
         virtual void setModelData(QWidget* editor, QAbstractItemModel* model,
                           const QModelIndex& index) const override;
@@ -32,8 +33,7 @@ class ComboBoxDelegate : public QStyledItemDelegate
             const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
     signals:
-        void ComboBoxChanged(int value);
-        void ComboBoxChanged(const QString& text);
+        void ComboBoxChanged(size_t value) const;
 
     private:
         const VecStr _items;

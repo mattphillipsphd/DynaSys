@@ -27,7 +27,7 @@ bool TPVTableModel::IsEnabled(int idx) const
 #ifdef DEBUG_TP_FUNC
     ScopeTracker st("TPVTableModel::IsEnabled", std::this_thread::get_id());
 #endif
-    QModelIndex index = createIndex(idx, 0);
+    QModelIndex index = createIndex(idx, SHOW);
     return data(index,Qt::CheckStateRole).toBool();
 }
 double TPVTableModel::LogScale(int idx) const
@@ -35,7 +35,7 @@ double TPVTableModel::LogScale(int idx) const
 #ifdef DEBUG_TP_FUNC
     ScopeTracker st("TPVTableModel::LogScale", std::this_thread::get_id());
 #endif
-    QModelIndex index = createIndex(idx, 1);
+    QModelIndex index = createIndex(idx, SCALE);
     return data(index,Qt::EditRole).toDouble();
 }
 std::string TPVTableModel::Name(int idx) const
@@ -56,7 +56,7 @@ int TPVTableModel::columnCount(const QModelIndex&) const
 #ifdef DEBUG_TP_FUNC
     ScopeTracker st("TPVTableModel::columnCount", std::this_thread::get_id());
 #endif
-    return 2;
+    return NUM_COLUMNS;
 }
 QVariant TPVTableModel::data(const QModelIndex &index, int role) const
 {
@@ -67,17 +67,17 @@ QVariant TPVTableModel::data(const QModelIndex &index, int role) const
     switch (role)
     {
         case Qt::CheckStateRole:
-            if (index.column()!=0) break;
+            if (index.column()!=SHOW) break;
             value = _data.at(index.row()).is_enabled;
             break;
         case Qt::EditRole:
         case Qt::DisplayRole:
             switch (index.column())
             {
-                case 0:
+                case SHOW:
 //                    value = _data.at(index.row()).is_enabled;
                     break;
-                case 1:
+                case SCALE:
                     value = _data.at(index.row()).log_scale;
                     break;
             }
@@ -94,9 +94,9 @@ Qt::ItemFlags TPVTableModel::flags(const QModelIndex &index) const
 #endif
     switch (index.column())
     {
-        case 0:
+        case SHOW:
             return QAbstractTableModel::flags(index) | Qt::ItemIsUserCheckable;
-        case 1:
+        case SCALE:
             return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
         default:
             throw std::runtime_error("TPVTableModel::flags, bad column index");
@@ -143,17 +143,17 @@ bool TPVTableModel::setData(const QModelIndex &index, const QVariant &value, int
     switch (role)
     {
         case Qt::CheckStateRole:
-            if (index.column()!=0) break;
+            if (index.column()!=SHOW) break;
         case Qt::EditRole:
         {
             if (index.row()>=rowCount())
                 throw std::runtime_error("TPVTableModel::setData: Index out of bounds");
             switch (index.column())
             {
-                case 0:
+                case SHOW:
                     _data[ index.row() ].is_enabled = value.toBool();
                     break;
-                case 1:
+                case SCALE:
                     _data[ index.row() ].log_scale = value.toDouble();
                     break;
             }
