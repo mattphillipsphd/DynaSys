@@ -14,6 +14,13 @@ class TPVTableModel : public QAbstractTableModel
 {
     Q_OBJECT
     public:
+        enum COLUMNS
+        {
+            SHOW = 0,
+            SCALE,
+            NUM_COLUMNS
+        };
+
         explicit TPVTableModel(const VecStr& names, QObject *parent = 0);
 
         VecStr IsEnabled() const;

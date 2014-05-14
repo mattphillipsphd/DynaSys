@@ -16,19 +16,29 @@ class ParamModelBase : public QAbstractTableModel
 {
     Q_OBJECT
     public:
+        enum COLUMNS
+        {
+            FREEZE = 0,
+            VALUE,
+            MIN,
+            MAX,
+            NUM_COLUMNS
+        };
+
         struct Param
         {
             static const std::string DEFAULT_MAX, DEFAULT_MIN, DEFAULT_VAL;
             Param()
-                : key(""), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL)
+                : key(""), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL), is_freeze(false)
             {}
             Param(const std::string& k)
-                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL)
+                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL), is_freeze(false)
             {}
             Param(const std::string& k, const std::string& v)
-                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(v)
+                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(v), is_freeze(false)
             {}
             std::string key, max, min, value;
+            bool is_freeze;
         };
 
         explicit ParamModelBase(QObject* parent, const std::string& name);
@@ -45,6 +55,7 @@ class ParamModelBase : public QAbstractTableModel
         virtual VecStr Expressions() const;
         ds::PMODEL Id() const { return _id; }
         virtual VecStr Initializations() const { return VecStr(); }
+        bool IsFreeze(size_t idx) const;
         std::string Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;

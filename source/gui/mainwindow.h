@@ -178,7 +178,7 @@ class MainWindow : public QMainWindow
         void AttachPhasePlot(bool attach = true);
         void AttachTimePlot(bool attach = true);
         void AttachVectorField(bool attach = true);
-        void ComboBoxChanged(const QString& text);
+        void ComboBoxChanged(size_t row);
         void ExprnChanged(QModelIndex, QModelIndex);
         void InitParserMgr();
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
@@ -189,8 +189,6 @@ class MainWindow : public QMainWindow
     private:
         Ui::MainWindow *ui;
 
-        void AddVarDelegate(int row);
-        void AddVarDelegate(int row, const std::string& type);
         void ClearPlots();
         void ConnectModels();
         void Draw();
@@ -236,7 +234,6 @@ class MainWindow : public QMainWindow
                 * _parameters, //Must be numeric
                 * _variables;   //Can invoke other expressions
 
-        std::vector<ComboBoxDelegate*> _cmbDelegates;
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;

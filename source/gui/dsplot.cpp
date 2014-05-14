@@ -88,6 +88,11 @@ bool DSPlot::event( QEvent * event)
 #ifdef DEBUG_FUNC_DSPLOT
     ScopeTracker st("DSPlot::event", std::this_thread::get_id());
     Log.AddMesg("DSPlot::event: " + std::to_string(event) + ", " + std::to_string(event->type());
+    //2 is QEvent::MouseButtonPress
+    //3 is QEvent::MouseButtonRelease
+    //4 is QEvent::MouseButtonDblClick
+    //6 is QEvent::KeyPress
+    //7 is QEvent::KeyRelease
     //8 is QEvent::FocusIn
     //9 is QEvent::FocusOut
     //10 is QEvent::Enter

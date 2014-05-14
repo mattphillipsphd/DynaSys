@@ -137,8 +137,6 @@ void ParserMgr::InitParsers()
             //Note that the expressions are not actually evaluated
 
         _stepCt = std::numeric_limits<int>::max() - 1;
-
-//        ResetVarInitVals();
     }
     catch (mu::ParserError& e)
     {
@@ -419,12 +417,18 @@ void ParserMgr::SetExpressions()
             VecStr temp_expressions = model->TempExpressions();
             for (const auto& it : temp_expressions)
                 AddExpression(it);
+            const size_t num_pars = model->NumPars();
+            for (size_t i=0; i<num_pars; ++i)
+                if (model->IsFreeze(i))
+                {
+                    std::string freeze_val = (model->Id()==ds::DIFFERENTIALS)
+                            ? Model(ds::INIT_CONDS)->Value(i)
+                            : "0";
+                    AddExpression(model->TempKey(i) + " = " + freeze_val);
+                }
             if (model->Id()==ds::VARIABLES) // ### Really need separate parsers for both here
-            {
-                const size_t num_pars = model->NumPars();
                 for (size_t i=0; i<num_pars; ++i)
                     AddExpression(model->Key(i) + " = " + model->TempKey(i));
-            }
         }
     }
     catch (mu::ParserError& e)

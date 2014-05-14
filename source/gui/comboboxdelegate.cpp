@@ -22,11 +22,18 @@ QWidget* ComboBoxDelegate::createEditor(QWidget* parent,
 
     editor->setEditable(true);
     editor->setInsertPolicy(QComboBox::InsertAtTop);
-
-    connect(editor, SIGNAL(currentTextChanged(const QString&)), this, SIGNAL(ComboBoxChanged(const QString&)));
+//    editor->setMouseTracking(true);
 
     return editor;
 }
+/*bool ComboBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
+                        const QStyleOptionViewItem& option, const QModelIndex& index)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ComboBoxDelegate::editorEvent", std::this_thread::get_id());
+#endif
+    return QStyledItemDelegate::editorEvent(event, model, option, index);
+}*/
 void ComboBoxDelegate::setEditorData(QWidget* editor,
                                     const QModelIndex& index) const
 {
@@ -49,6 +56,7 @@ void ComboBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
     QVariant text = combo_box->currentText();
 
     model->setData(index, text, Qt::EditRole);
+    emit ComboBoxChanged((size_t)index.row());
 }
 
 void ComboBoxDelegate::updateEditorGeometry(QWidget* editor,
