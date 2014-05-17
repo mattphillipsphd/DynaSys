@@ -34,6 +34,7 @@
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
 #include "dspinboxdelegate.h"
+#include "fastrungui.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
@@ -112,11 +113,13 @@ class MainWindow : public QMainWindow
 
     public slots:
         void Error();
+        void FastRunFinished(bool do_save);
         void LoadTempModel(void* models);
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
         void SaveNotes();
+        void StartFastRun(int duration, int save_mod_n);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
 
@@ -128,6 +131,7 @@ class MainWindow : public QMainWindow
         void DoInitParserMgr();
         void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
+        void UpdateSimPBar(int n);
 
     private slots:
         void on_actionAbout_triggered();
@@ -137,6 +141,7 @@ class MainWindow : public QMainWindow
         void on_actionNotes_triggered();
         void on_actionParameters_triggered();
         void on_actionReload_Current_triggered();
+        void on_actionRun_Offline_triggered();
         void on_actionSave_Data_triggered();
         void on_actionSave_Model_triggered();
         void on_actionSave_Model_As_triggered();
@@ -191,6 +196,7 @@ class MainWindow : public QMainWindow
 
         void ClearPlots();
         void ConnectModels();
+        void DoFastRun();
         void Draw();
         void DrawNullclines();
         void DrawPhasePortrait();
@@ -223,6 +229,7 @@ class MainWindow : public QMainWindow
         void UpdateVectorField();
 
         AboutGui* _aboutGui;
+        FastRunGui* _fastRunGui;
         LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
@@ -243,7 +250,7 @@ class MainWindow : public QMainWindow
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;
         std::vector<QwtPlotItem*> _ncPlotItems;
-        int _numTPSamples;
+        int _numSimSteps, _numTPSamples;
         ParserMgr _parserMgr;
         int _pastDVSampsCt, _pastIPSampsCt; //Samples outside the buffer
         volatile PLAY_STATE _playState;
@@ -253,7 +260,7 @@ class MainWindow : public QMainWindow
         int _pulseParIdx;
         int _pulseStepsRemaining,
             //Consider making a little pulse struct/class
-            _singleStepsSec, _singleTailLen;
+            _saveModN, _singleStepsSec, _singleTailLen;
         const std::thread::id _tid;
         const std::vector<QColor> _tpColors;
         std::vector<QwtPlotItem*> _vfPlotItems;

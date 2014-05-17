@@ -559,7 +559,14 @@
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
    </widget>
+   <widget class="QMenu" name="menuRun">
+    <property name="title">
+     <string>Run</string>
+    </property>
+    <addaction name="actionRun_Offline"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuRun"/>
    <addaction name="menuEdit"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -635,6 +642,11 @@
   <action name="actionLog">
    <property name="text">
     <string>Log</string>
+   </property>
+  </action>
+  <action name="actionRun_Offline">
+   <property name="text">
+    <string>Run Offline</string>
    </property>
   </action>
  </widget>

@@ -51,7 +51,8 @@ SOURCES += main.cpp\
     gui/loggui.cpp \
     globals/scopetracker.cpp \
     gui/dspinboxdelegate.cpp \
-    memrep/arrowhead.cpp
+    memrep/arrowhead.cpp \
+    gui/fastrungui.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -80,14 +81,16 @@ HEADERS  += gui/mainwindow.h \
     gui/loggui.h \
     globals/scopetracker.h \
     gui/dspinboxdelegate.h \
-    memrep/arrowhead.h
+    memrep/arrowhead.h \
+    gui/fastrungui.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
     forms/variablegui.ui \
     forms/parameditor.ui \
     forms/notesgui.ui \
-    forms/loggui.ui
+    forms/loggui.ui \
+    forms/fastrungui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

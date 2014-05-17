@@ -19,7 +19,8 @@ const int MainWindow::VF_SLEEP_MS = 250;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    _aboutGui(new AboutGui()), _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _logGui(new LogGui()),
+    _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _parameters(nullptr), _variables(nullptr),
     _fileName(""), _isVFAttached(false), _log(Log::Instance()),
@@ -80,19 +81,22 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
 
-    _aboutGui->setWindowModality(Qt::ApplicationModal);
-
-    connect(_log, SIGNAL(OpenGui()), this, SLOT(Error()));
-
+    connect(_fastRunGui, SIGNAL(Start(int,int)), this, SLOT(StartFastRun(int,int)));
+    connect(_fastRunGui, SIGNAL(Finished(bool)), this, SLOT(FastRunFinished(bool)));
+    connect(this, SIGNAL(UpdateSimPBar(int)), _fastRunGui, SLOT(UpdatePBar(int)));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
+    connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
+    connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
+    connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
 
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
     connect(ui->qwtPhasePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
     connect(ui->qwtTimePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
-    connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
 
-    connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
-    connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
+    connect(_log, SIGNAL(OpenGui()), this, SLOT(Error()));
+
+    _aboutGui->setWindowModality(Qt::ApplicationModal);
+    _fastRunGui->setWindowModality(Qt::ApplicationModal);
 }
 MainWindow::~MainWindow()
 {
@@ -103,6 +107,14 @@ MainWindow::~MainWindow()
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
+void MainWindow::FastRunFinished(bool do_save)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::FastRunFinished", std::this_thread::get_id());
+#endif
+    setEnabled(true);
+    if (do_save) on_actionSave_Data_triggered();
+}
 void MainWindow::Error()
 {
 #ifdef DEBUG_FUNC
@@ -110,6 +122,7 @@ void MainWindow::Error()
 #endif
     _playState = STOPPED;
     ui->btnStart->setText("Start");
+    SetButtonsEnabled(true);
     _logGui->show();
 }
 void MainWindow::LoadTempModel(void* models) //slot
@@ -138,6 +151,7 @@ void MainWindow::ParamEditorClosed() //slot
     ui->btnStart->setEnabled(true);
     SetButtonsEnabled(true);
     SetParamsEnabled(true);
+    UpdateLists();
 }
 void MainWindow::ParserToLog() //slot
 {
@@ -187,6 +201,16 @@ void MainWindow::SaveNotes() //slot
     const Notes* notes = _notesGui->GetNotes();
     out.Save(cmodels, std::atof(model_step.c_str()),
              conditions, notes);
+}
+void MainWindow::StartFastRun(int duration, int save_mod_n)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StartFastRun", std::this_thread::get_id());
+#endif
+    _numSimSteps = duration;
+    _saveModN = save_mod_n;
+    std::thread t( std::bind(&MainWindow::DoFastRun, this) );
+    t.detach();
 }
 void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
@@ -288,6 +312,15 @@ void MainWindow::on_actionReload_Current_triggered()
 #endif
     if (_fileName.empty()) InitDefaultModel();
     else LoadModel(_fileName);
+}
+
+void MainWindow::on_actionRun_Offline_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionRun_Offline_triggered", _tid);
+#endif
+    _fastRunGui->show();
+    setEnabled(false);
 }
 
 void MainWindow::on_actionSave_Data_triggered()
@@ -677,6 +710,8 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
         case VECTOR_FIELD:
             _vfStepsSec = value;
             break;
+        default:
+            throw std::runtime_error("MainWindow::on_spnStepsPerSec_valueChanged: Invalid mode.");
     }
 }
 void MainWindow::on_spnTailLength_valueChanged(int value)
@@ -695,6 +730,8 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             lock.unlock();
             UpdateVectorField();
             break;
+        default:
+            throw std::runtime_error("MainWindow::on_spnStepsPerSec_valueChanged: Invalid mode.");
     }
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
@@ -734,6 +771,71 @@ void MainWindow::ConnectModels()
         delete ui->lsResults->model();
     else
         ResetResultsList(0);
+}
+void MainWindow::DoFastRun()
+{
+    ds::AddThread(std::this_thread::get_id());
+#ifdef DEBUG_FUNC
+    ScopeTracker::InitThread(std::this_thread::get_id());
+    ScopeTracker st("MainWindow::DoFastRun", std::this_thread::get_id());
+#endif
+    const int num_diffs = (int)_differentials->NumPars(),
+            num_vars = (int)_variables->NumPars();
+    const double* diffs = _parserMgr.ConstData(_differentials),
+            * vars = _parserMgr.ConstData(_variables);
+
+    QFile temp(ds::TEMP_FILE.c_str());
+    std::string output;
+    temp.open(QFile::WriteOnly | QFile::Text);
+    for (size_t i=0; i<(size_t)num_diffs; ++i)
+        output += _differentials->ShortKey(i) + "\t";
+    for (size_t i=0; i<(size_t)num_vars; ++i)
+        output += _variables->ShortKey(i)+ "\t";
+    output += "\n";
+    temp.write(output.c_str());
+    temp.flush();
+
+    _playState = DRAWING;
+    const int num_steps = _numSimSteps / _parserMgr.ModelStep() + 0.5;
+    try
+    {
+        emit DoInitParserMgr();
+
+        for (int i=0; i<num_steps; ++i)
+        {
+            _parserMgr.ParserEvalAndConds();
+
+            if (i%_saveModN==0)
+            {
+                output.clear();
+                for (int i=0; i<num_diffs; ++i)
+                    output += std::to_string(diffs[i]) + "\t";
+                for (int i=0; i<num_vars; ++i)
+                    output += std::to_string(vars[i]) + "\t";
+                output += "\n";
+                temp.write(output.c_str());
+                temp.flush();
+
+                emit UpdateSimPBar(i*_parserMgr.ModelStep());
+            }
+
+            if (_playState != DRAWING) break;
+        }
+    }
+    catch (mu::ParserError& e)
+    {
+        _log->AddExcept("MainWindow::DoFastRun: " + e.GetMsg());
+        ds::RemoveThread(std::this_thread::get_id());
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::DoFastRun: " + std::string(e.what()));
+        ds::RemoveThread(std::this_thread::get_id());
+    }
+
+    emit UpdateSimPBar(-1);
+
+    ds::RemoveThread(std::this_thread::get_id());
 }
 void MainWindow::Draw()
 {
@@ -1138,6 +1240,8 @@ void MainWindow::DrawPhasePortrait()
                     temp.write(output.c_str());
                     temp.flush();
                 }
+                    //Saving *every* sample is incredibly unwieldy--need a parameter to control
+                    //when to save values
             }
         }
         catch (mu::ParserError& e)
@@ -1397,6 +1501,7 @@ void MainWindow::DrawVectorField()
                         _parserMgr.ParserEval(false);
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
+                        // ### So currently the entire vector field is calculated from scratch, with no savings!
 
                     const ArrowHead arrow_head(pts[_vfTailLen], pts[_vfTailLen-1]);
                     arrow->setSamples(arrow_head.Points());

@@ -2,7 +2,7 @@
 
 CheckBoxDelegate::CheckBoxDelegate(const std::vector<QColor>& colors, QObject *parent) :
      QStyledItemDelegate(parent),
-     _colors(colors.empty() ? std::vector<QColor>(Qt::white) : colors),
+     _colors(colors.empty() ? std::vector<QColor>(1, Qt::white) : colors),
      _log(Log::Instance())
 {
 }
