@@ -781,8 +781,8 @@ void MainWindow::DoFastRun()
 #endif
     const int num_diffs = (int)_differentials->NumPars(),
             num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials),
-            * vars = _parserMgr.ConstData(_variables);
+    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
+            * vars = _parserMgr.ConstData(ds::VARIABLES);
 
     QFile temp(ds::TEMP_FILE.c_str());
     std::string output;
@@ -799,11 +799,12 @@ void MainWindow::DoFastRun()
     const int num_steps = _numSimSteps / _parserMgr.ModelStep() + 0.5;
     try
     {
+        auto start = std::chrono::system_clock::now();
         emit DoInitParserMgr();
 
         for (int i=0; i<num_steps; ++i)
         {
-            _parserMgr.ParserEvalAndConds();
+            _parserMgr.ParserEvalAndCondsNoLock();
 
             if (i%_saveModN==0)
             {
@@ -821,6 +822,10 @@ void MainWindow::DoFastRun()
 
             if (_playState != DRAWING) break;
         }
+
+        auto dur = std::chrono::system_clock::now() - start;
+        int dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+        _log->AddMesg("Time required by simulation: " + std::to_string(dur_ms) + "ms.");
     }
     catch (mu::ParserError& e)
     {
@@ -878,8 +883,8 @@ void MainWindow::DrawNullclines()
 
     const int num_diffs = (int)_differentials->NumPars(),
             num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials),
-            * vars = _parserMgr.ConstData(_variables);
+    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
+            * vars = _parserMgr.ConstData(ds::VARIABLES);
     const int xidx = ui->cmbDiffX->currentIndex(),
             yidx = ui->cmbDiffY->currentIndex();
 
@@ -909,6 +914,7 @@ void MainWindow::DrawNullclines()
         for (int i=0; i<num_vars; ++i)
             vars_orig[i] = vars[i];
 
+        _parserMgr.ResetVarInitVals();
         for (int i=0; i<vf_resolution; ++i)
             for (int j=0; j<vf_resolution; ++j)
             {
@@ -917,7 +923,7 @@ void MainWindow::DrawNullclines()
                 const int idx = i*vf_resolution+j;
 
                 if (num_diffs>2)
-                    _parserMgr.ResetDifferentials();
+                    _parserMgr.ResetValues();
                 _parserMgr.SetData(_differentials, xidx, xij);
                 _parserMgr.SetData(_differentials, yidx, yij);
                 _parserMgr.ParserEval(false);
@@ -1129,8 +1135,8 @@ void MainWindow::DrawPhasePortrait()
     //Get all of the information from the parameter fields, introducing new variables as needed.
     const int num_diffs = (int)_differentials->NumPars(),
             num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(_differentials),
-            * vars = _parserMgr.ConstData(_variables);
+    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
+            * vars = _parserMgr.ConstData(ds::VARIABLES);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
 
@@ -1433,8 +1439,8 @@ void MainWindow::DrawVectorField()
 
         const int num_diffs = (int)_differentials->NumPars(),
                 num_vars = (int)_variables->NumPars();
-        const double* diffs = _parserMgr.ConstData(_differentials),
-                * vars = _parserMgr.ConstData(_variables);
+        const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
+                * vars = _parserMgr.ConstData(ds::VARIABLES);
         const int xidx = ui->cmbDiffX->currentIndex(),
                 yidx = ui->cmbDiffY->currentIndex();
 
@@ -1469,11 +1475,11 @@ void MainWindow::DrawVectorField()
                 for (int j=0; j<vf_resolution; ++j)
                 {
                     QwtSymbol *symbol1 = new QwtSymbol( QwtSymbol::Ellipse,
-                        QBrush(Qt::red), QPen(Qt::red, 2), QSize(2, 2) );
+                        QBrush(Qt::gray), QPen(Qt::gray, 2), QSize(2, 2) );
                     QwtPlotMarker* marker1 = new QwtPlotMarker();
                     marker1->setSymbol(symbol1);
                     QwtPlotCurve* arrow = new QwtPlotCurve();
-                    arrow->setPen(Qt::darkYellow, 1);
+                    arrow->setPen(Qt::red, 1);
                     arrow->setRenderHint( QwtPlotItem::RenderAntialiased, true );
 
                     QwtPlotCurve* curv = new QwtPlotCurve();
@@ -1572,7 +1578,7 @@ void MainWindow::InitDefaultModel()
     _parameters->AddParameter("a", "4");
     _parameters->AddParameter("b", "10");
 
-    _variables->AddParameter("q", Input::NORM_RAND_STR);
+    _variables->AddParameter("q", Input::UNI_RAND_STR);
     _variables->AddParameter("r", "u*v");
 
     _differentials->AddParameter("v'", "(u + r + a)/b");
@@ -1814,10 +1820,11 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ComboBoxChanged", _tid);
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     try
     {
         std::string text = _variables->Value(row);
-        _parserMgr.AssignInput(_variables, row, text);
+        _parserMgr.AssignInput(_variables, row, text, true);
     }
     catch (std::exception& e)
     {

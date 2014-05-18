@@ -26,11 +26,12 @@ class ParserMgr
         void AddExpression(const std::string& exprn, bool use_mutex = true);
         void AddModel(ParamModelBase* model);
         bool AreModelsInitialized() const { return _areModelsInitialized; }
-        void AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str);
+        void AssignInput(const ParamModelBase* model, size_t i,
+                         const std::string& type_str, bool do_lock);
             //Assign the source of the data for the variables
         void ClearExpressions();
         void ClearModels();
-        const double* ConstData(const ParamModelBase* model) const;
+        const double* ConstData(ds::PMODEL pmodel) const;
         void InitParsers();
         void InitModels();
         void InputEval(int idx = -1);
@@ -40,6 +41,7 @@ class ParserMgr
         const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
         void ParserEvalAndConds(bool eval_input = true);
+        void ParserEvalAndCondsNoLock(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         double Range(const ParamModelBase* model, size_t idx) const;
         void ResetDifferentials();

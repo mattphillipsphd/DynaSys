@@ -11,6 +11,7 @@ FastRunGui::FastRunGui(QWidget *parent) :
     ui->setupUi(this);
     ui->edDuration->setText(QString("%1").arg(DEFAULT_DURATION));
     ui->edSaveModN->setText(QString("%1").arg(DEFAULT_MODN));
+    setWindowTitle("Run Simulation Offline");
 }
 
 FastRunGui::~FastRunGui()

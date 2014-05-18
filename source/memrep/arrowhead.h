@@ -20,7 +20,8 @@ class ArrowHead
         static const double _length; //As fraction of dx, dy
         static const double _width;
         static double _xPixInc, _yPixInc,
-            _xPix2Val, _yPix2Val;
+                    _xPix2Val, _yPix2Val,
+                    _xVal2Pix, _yVal2Pix;
         const QPolygonF _pts;
 };
 

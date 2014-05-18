@@ -40,11 +40,15 @@ void ParserMgr::AddModel(ParamModelBase* model)
             * temp = new double[model->NumPars()];
     _models.push_back( std::make_tuple(model, data, temp) );
 }
-void ParserMgr::AssignInput(const ParamModelBase* model, size_t i, const std::string& type_str)
+void ParserMgr::AssignInput(const ParamModelBase* model, size_t i,
+                            const std::string& type_str, bool do_lock)
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::AssignInput", std::this_thread::get_id());
 #endif
+    std::unique_lock<std::mutex> ulock(_mutex, std::defer_lock);
+    if (do_lock) ulock.lock();
+
     Input::TYPE type = Input::Type(type_str);
     double* data = TempData(model);
     switch (type)
@@ -95,12 +99,12 @@ void ParserMgr::ClearModels()
     _areModelsInitialized = false;
 }
 
-const double* ParserMgr::ConstData(const ParamModelBase* model) const
+const double* ParserMgr::ConstData(ds::PMODEL pmodel) const
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::ConstData", std::this_thread::get_id());
 #endif
-    return const_cast<ParserMgr*>(this)->Data(model);
+    return const_cast<ParserMgr*>(this)->Data(pmodel);
 }
 
 void ParserMgr::InitParsers()
@@ -169,7 +173,7 @@ void ParserMgr::InitModels()
                 const std::string& value = model->Value(i);
 
                 //Assign the source of the data--i.e. attach an input source if needed
-                AssignInput(model, i, value);
+                AssignInput(model, i, value, false);
 
                 //Initialize
                 if (model->Id()==ds::INPUTS) // ###
@@ -240,33 +244,37 @@ void ParserMgr::ParserEvalAndConds(bool eval_input)
     std::lock_guard<std::mutex> lock(_mutex);
     try
     {
-        _parser.Eval();
-        TempEval();
-        if (eval_input && ++_stepCt*_modelStep>1.0)
-        {
-            _stepCt = 0;
-            InputEval();
-        }
-
-        const int num_conds = (int)_conditions->NumPars();
-        for (int k=0; k<num_conds; ++k)
-        {
-            if (_parserConds.at(k).Eval())
-            {
-                VecStr cond_exprns = _conditions->Expressions(k);
-                for (const auto& it : cond_exprns)
-                {
-                    _parserResult.SetExpr(it);
-                    _parserResult.Eval();
-                }
-            }
-        }
+        ParserEvalAndCondsNoLock(eval_input);
     }
     catch (mu::ParserError& e)
     {
         _log->AddExcept("ParserMgr::ParserEvalAndConds: " + AnnotateErrMsg(e.GetMsg(), _parser)
                         + "\n" + _parser.GetExpr());
         throw std::runtime_error("Parser error");
+    }
+}
+void ParserMgr::ParserEvalAndCondsNoLock(bool eval_input)
+{
+    _parser.Eval();
+    TempEval();
+    if (eval_input && ++_stepCt*_modelStep>1.0)
+    {
+        _stepCt = 0;
+        InputEval();
+    }
+
+    const int num_conds = (int)_conditions->NumPars();
+    for (int k=0; k<num_conds; ++k)
+    {
+        if (_parserConds.at(k).Eval())
+        {
+            VecStr cond_exprns = _conditions->Expressions(k);
+            for (const auto& it : cond_exprns)
+            {
+                _parserResult.SetExpr(it);
+                _parserResult.Eval();
+            }
+        }
     }
 }
 void ParserMgr::QuickEval(const std::string& exprn)
@@ -315,7 +323,8 @@ void ParserMgr::ResetDifferentials()
     ScopeTracker st("ParserMgr::ResetDifferentials", std::this_thread::get_id());
 #endif
     const size_t num_diffs = Model(ds::DIFFERENTIALS)->NumPars();
-    std::memcpy(Data(ds::DIFFERENTIALS), Data(ds::INIT_CONDS), num_diffs*sizeof(double));
+    std::memcpy(Data(ds::DIFFERENTIALS),
+                ConstData(ds::INIT_CONDS), num_diffs*sizeof(double));
 }
 void ParserMgr::ResetValues()
 {
