@@ -62,7 +62,7 @@ void ParserMgr::AssignInput(const ParamModelBase* model, size_t i,
             _inputs.push_back(input);
             break;
         }
-        case Input::TXT_FILE:
+        case Input::INPUT_FILE:
         {
             Input input(&data[i]);
             std::string file_name = model->Value(i);
@@ -73,6 +73,7 @@ void ParserMgr::AssignInput(const ParamModelBase* model, size_t i,
                 }),
                     file_name.end());
             input.LoadInput(file_name);
+            _inputsPerStep = input.SamplesPerStep();
             _inputs.push_back(input);
             break;
         }
@@ -226,7 +227,7 @@ void ParserMgr::ParserEval(bool eval_input)
     {
         _parser.Eval();
         TempEval();
-        if (eval_input && ++_stepCt*_modelStep>1.0)
+        if (eval_input && ++_stepCt*_modelStep*_inputsPerStep>1.0)
         {
             _stepCt = 0;
             InputEval();
@@ -257,7 +258,7 @@ void ParserMgr::ParserEvalAndCondsNoLock(bool eval_input)
 {
     _parser.Eval();
     TempEval();
-    if (eval_input && ++_stepCt*_modelStep>1.0)
+    if (eval_input && ++_stepCt*_modelStep*_inputsPerStep>1.0)
     {
         _stepCt = 0;
         InputEval();

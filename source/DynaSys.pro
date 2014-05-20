@@ -52,7 +52,8 @@ SOURCES += main.cpp\
     globals/scopetracker.cpp \
     gui/dspinboxdelegate.cpp \
     memrep/arrowhead.cpp \
-    gui/fastrungui.cpp
+    gui/fastrungui.cpp \
+    file/datfileout.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -82,7 +83,8 @@ HEADERS  += gui/mainwindow.h \
     globals/scopetracker.h \
     gui/dspinboxdelegate.h \
     memrep/arrowhead.h \
-    gui/fastrungui.h
+    gui/fastrungui.h \
+    file/datfileout.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

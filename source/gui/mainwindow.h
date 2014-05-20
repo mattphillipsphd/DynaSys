@@ -38,6 +38,7 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "../file/datfileout.h"
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
 #include "../globals/scopetracker.h"

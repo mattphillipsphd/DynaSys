@@ -784,17 +784,6 @@ void MainWindow::DoFastRun()
     const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
             * vars = _parserMgr.ConstData(ds::VARIABLES);
 
-    QFile temp(ds::TEMP_FILE.c_str());
-    std::string output;
-    temp.open(QFile::WriteOnly | QFile::Text);
-    for (size_t i=0; i<(size_t)num_diffs; ++i)
-        output += _differentials->ShortKey(i) + "\t";
-    for (size_t i=0; i<(size_t)num_vars; ++i)
-        output += _variables->ShortKey(i)+ "\t";
-    output += "\n";
-    temp.write(output.c_str());
-    temp.flush();
-
     _playState = DRAWING;
     const int num_steps = _numSimSteps / _parserMgr.ModelStep() + 0.5;
     try
@@ -802,30 +791,36 @@ void MainWindow::DoFastRun()
         auto start = std::chrono::system_clock::now();
         emit DoInitParserMgr();
 
+        DatFileOut out(ds::TEMP_FILE);
+        VecStr save_names;
+        for (size_t i=0; i<(size_t)num_diffs; ++i)
+            save_names.push_back(_differentials->ShortKey(i));
+        for (size_t i=0; i<(size_t)num_vars; ++i)
+            save_names.push_back(_variables->ShortKey(i));
+        out.Open(save_names, _saveModN);
+
         for (int i=0; i<num_steps; ++i)
         {
             _parserMgr.ParserEvalAndCondsNoLock();
 
             if (i%_saveModN==0)
             {
-                output.clear();
-                for (int i=0; i<num_diffs; ++i)
-                    output += std::to_string(diffs[i]) + "\t";
-                for (int i=0; i<num_vars; ++i)
-                    output += std::to_string(vars[i]) + "\t";
-                output += "\n";
-                temp.write(output.c_str());
-                temp.flush();
-
+                out.Write(diffs, num_diffs);
+                out.Write(vars, num_vars);
                 emit UpdateSimPBar(i*_parserMgr.ModelStep());
             }
 
             if (_playState != DRAWING) break;
         }
 
+        out.Close();
+
         auto dur = std::chrono::system_clock::now() - start;
         int dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
-        _log->AddMesg("Time required by simulation: " + std::to_string(dur_ms) + "ms.");
+        std::string dur_str = dur_ms>10000
+                ? std::to_string(dur_ms/1000) + "sec."
+                : std::to_string(dur_ms) + "ms.";
+        _log->AddMesg("Time required by simulation: " + dur_str);
     }
     catch (mu::ParserError& e)
     {
@@ -2059,6 +2054,7 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->actionLoad->setEnabled(is_enabled);
     ui->actionParameters->setEnabled(is_enabled);
     ui->actionReload_Current->setEnabled(is_enabled);
+    ui->actionRun_Offline->setEnabled(is_enabled);
     ui->actionSave_Data->setEnabled(is_enabled);
     ui->actionSave_Model_As->setEnabled(is_enabled);
     ui->actionSave_Phase_Plot->setEnabled(is_enabled);

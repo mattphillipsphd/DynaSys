@@ -9,9 +9,8 @@
 #include <random>
 #include <string>
 
-#include <QDebug>
-
 #include "../globals/log.h"
+#include "../globals/scopetracker.h"
 
 class Input
 {
@@ -19,7 +18,7 @@ class Input
         enum TYPE
         {
             UNKNOWN = -1,
-            TXT_FILE,
+            INPUT_FILE,
             GAMMA_RAND,
             NORM_RAND,
             UNI_RAND,
@@ -39,6 +38,7 @@ class Input
         void LoadInput(const std::string& file_name);
         void NextInput(int n = 1);
 
+        int SamplesPerStep() const { return _samplesPerStep; }
         TYPE Type() const { return _type; }
 
     private:
@@ -49,14 +49,16 @@ class Input
         void DeepCopy(const Input& other);
         template<typename T>
         void GenerateRandInput(T& distribution);
+        void LoadBinInput(const std::string& file_name);
+        void LoadTextInput(const std::string& file_name);
         void ResetInput();
 
         size_t _ct;
         double* _input;
         Log* _log;
-        double* const _value;
-//        std::mutex _mutex;
+        int _samplesPerStep; //I.e. per unit time
         TYPE _type;
+        double* const _value;
 };
 
 #endif // INPUT_H

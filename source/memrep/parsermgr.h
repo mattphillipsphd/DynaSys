@@ -69,6 +69,7 @@ class ParserMgr
         bool _areModelsInitialized;
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
+        int _inputsPerStep; // ### Needs to be done separately for each input
         Log* _log;
         std::vector< std::tuple<ParamModelBase*, double*, double*> > _models;
             //Model evaluation happens in a two-step process so that all variables and differentials
