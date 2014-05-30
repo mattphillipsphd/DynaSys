@@ -22,6 +22,7 @@ namespace ds
     extern const int TABLEN;
 
     extern const std::string TEMP_FILE;
+    extern const std::string TEMP_DAT_FILE;
     extern const std::string TEMP_MODEL_FILE;
     extern const std::string VERSION_STR;
 
@@ -51,8 +52,11 @@ namespace ds
     std::string Model(PMODEL model);
 
     void RemoveThread(std::thread::id tid);
+    void RemoveWhitespace(std::string& s);
 
     double sgn(double val);
+
+    std::string StripPath(const std::string& file_name);
 
     QColor ThreadColor(std::thread::id tid);
 

@@ -19,6 +19,7 @@
 #include <QIcon>
 #include <QInputDialog>
 #include <QMainWindow>
+#include <QMessageBox>
 #include <QStringListModel>
 
 #include <qwt_scale_div.h>
@@ -38,7 +39,9 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "../compile/executable.h"
 #include "../file/datfileout.h"
+#include "../file/defaultdirmgr.h"
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
 #include "../globals/scopetracker.h"
@@ -114,12 +117,14 @@ class MainWindow : public QMainWindow
 
     public slots:
         void Error();
-        void FastRunFinished(bool do_save);
+        void ExecutableFinished(int id, bool is_normal);
+        void FastRunFinished();
         void LoadTempModel(void* models);
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
         void SaveNotes();
+        void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
@@ -137,6 +142,7 @@ class MainWindow : public QMainWindow
     private slots:
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
+        void on_actionCompile_Run_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
         void on_actionNotes_triggered();
@@ -193,6 +199,17 @@ class MainWindow : public QMainWindow
         void UpdateParams();
 
     private:
+        struct JobRecord
+        {
+            JobRecord(int id_, Executable* exe_,
+                      std::chrono::time_point<std::chrono::system_clock> start_)
+                : id(id_), exe(exe_), start(start_)
+            {}
+            int id;
+            Executable* exe;
+            std::chrono::time_point<std::chrono::system_clock> start;
+        };
+
         Ui::MainWindow *ui;
 
         void ClearPlots();
@@ -239,14 +256,15 @@ class MainWindow : public QMainWindow
         ConditionModel* _conditions;
         ParamModelBase* _differentials,
                 * _initConds,
-                * _parameters, //Must be numeric
+                * _inputs, //Must be numeric
                 * _variables;   //Can invoke other expressions
 
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;
         volatile bool _isVFAttached;
-        Log* _log;
+        std::vector<JobRecord> _jobs;
+        Log* const _log;
         std::mutex _mutex;
         volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;

@@ -59,7 +59,7 @@ class ParamEditor : public QWidget
         std::pair<int, std::string> _buffer;
         std::vector<PTextEdit*> _editors;
         std::string _fileName;
-        Log* _log;
+        Log* const _log;
         VecStr _models;
         std::thread::id _tid;
 };

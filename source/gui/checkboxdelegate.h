@@ -23,8 +23,7 @@ class CheckBoxDelegate : public QStyledItemDelegate
 
         virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                               const QModelIndex& index) const override;
-        virtual bool editorEvent(QEvent* event, QAbstractItemModel* model,
-                                 const QStyleOptionViewItem& option, const QModelIndex& index) override;
+        virtual bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem&, const QModelIndex& index) override;
         virtual void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
         virtual void setEditorData(QWidget* editor, const QModelIndex& index) const override;
         virtual void setModelData(QWidget* editor, QAbstractItemModel* model,
@@ -40,7 +39,7 @@ class CheckBoxDelegate : public QStyledItemDelegate
 
     private:
         const std::vector<QColor> _colors;
-        Log* _log;
+        Log* const _log;
 };
 
 #endif // CHECKBOXDELEGATE_H

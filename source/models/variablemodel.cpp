@@ -18,6 +18,14 @@ VecStr VariableModel::Expressions() const
     }
     return expressions;
 }
+VecStr VariableModel::Initializations() const
+{
+    VecStr initializations;
+    const size_t num_vars = NumPars();
+    for (size_t i=0; i<num_vars; ++i)
+        initializations.push_back(Key(i) + " = 0");
+    return initializations;
+}
 std::string VariableModel::TempExpression(size_t i) const
 {
     return (Input::Type(Value(i))==Input::USER)

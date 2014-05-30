@@ -53,7 +53,9 @@ SOURCES += main.cpp\
     gui/dspinboxdelegate.cpp \
     memrep/arrowhead.cpp \
     gui/fastrungui.cpp \
-    file/datfileout.cpp
+    file/datfileout.cpp \
+    compile/executable.cpp \
+    file/defaultdirmgr.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -84,7 +86,9 @@ HEADERS  += gui/mainwindow.h \
     gui/dspinboxdelegate.h \
     memrep/arrowhead.h \
     gui/fastrungui.h \
-    file/datfileout.h
+    file/datfileout.h \
+    compile/executable.h \
+    file/defaultdirmgr.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

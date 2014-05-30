@@ -39,7 +39,7 @@ class ScopeTracker
         }
 
         std::string _add;
-        Log* _log;
+        Log* const _log;
         static std::mutex _mutex;
         const std::string _name;
         static std::map<std::thread::id, int> _tabCts;

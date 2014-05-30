@@ -43,7 +43,7 @@ class LogGui : public QWidget
         Ui::LogGui *ui;
 
         std::string _fileName;
-        Log* _log;
+        Log* const _log;
         std::mutex _mutex;
 };
 

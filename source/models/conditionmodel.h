@@ -32,7 +32,7 @@ class ConditionModel : public QStandardItemModel
         const std::string Condition(int row) const;
         std::string EdString() const;
         const VecStr Expressions(int row) const;
-        size_t NumPars() const { return rowCount(); }
+        size_t NumPars() const;
         std::string String() const;
 
     signals:

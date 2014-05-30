@@ -15,6 +15,10 @@
 class Input
 {
     public:
+        static const size_t INPUT_EXP,
+                            INPUT_SIZE,
+                            INPUT_MASK;
+
         enum TYPE
         {
             UNKNOWN = -1,
@@ -42,10 +46,6 @@ class Input
         TYPE Type() const { return _type; }
 
     private:
-        static const size_t INPUT_EXP,
-                            INPUT_SIZE,
-                            INPUT_MASK;
-
         void DeepCopy(const Input& other);
         template<typename T>
         void GenerateRandInput(T& distribution);
@@ -55,7 +55,7 @@ class Input
 
         size_t _ct;
         double* _input;
-        Log* _log;
+        Log* const _log;
         int _samplesPerStep; //I.e. per unit time
         TYPE _type;
         double* const _value;

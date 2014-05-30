@@ -55,6 +55,10 @@ const VecStr ConditionModel::Expressions(int row) const
     }
     return vstr;
 }
+size_t ConditionModel::NumPars() const
+{
+    return rowCount();
+}
 std::string ConditionModel::String() const
 {
     std::stringstream s;

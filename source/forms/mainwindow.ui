@@ -564,6 +564,7 @@
      <string>Run</string>
     </property>
     <addaction name="actionRun_Offline"/>
+    <addaction name="actionCompile_Run"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -647,6 +648,11 @@
   <action name="actionRun_Offline">
    <property name="text">
     <string>Run Offline</string>
+   </property>
+  </action>
+  <action name="actionCompile_Run">
+   <property name="text">
+    <string>Compile/Run</string>
    </property>
   </action>
  </widget>

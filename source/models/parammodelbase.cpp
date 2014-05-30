@@ -105,6 +105,14 @@ const std::string& ParamModelBase::Value(size_t i) const
         //Don't go through data, for speed
 //    return data(createIndex(i,0),Qt::DisplayRole).toString().toStdString();
 }
+VecStr ParamModelBase::Values() const
+{
+    const size_t num_pars = _parameters.size();
+    VecStr vs(num_pars);
+    for (size_t i=0; i<num_pars; ++i)
+        vs[i] = Value(i);
+    return vs;
+}
 
 void ParamModelBase::AddParameter(const std::string& key, const std::string& value)
 {

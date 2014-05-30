@@ -11,7 +11,7 @@ const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::TP_SAMPLES_SHOWN = 2 * 1024;
 const int MainWindow::TP_WINDOW_LENGTH = 1000;
-const int MainWindow::XY_SAMPLES_SHOWN = 64 * 1024;
+const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 const int MainWindow::VF_RESOLUTION = 20;
 const int MainWindow::VF_SLEEP_MS = 250;
 
@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _logGui(new LogGui()),
     _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _parameters(nullptr), _variables(nullptr),
+    _inputs(nullptr), _variables(nullptr),
     _fileName(""), _isVFAttached(false), _log(Log::Instance()),
     _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
     _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_WINDOW_LENGTH),
@@ -81,8 +81,9 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
 
-    connect(_fastRunGui, SIGNAL(Start(int,int)), this, SLOT(StartFastRun(int,int)));
-    connect(_fastRunGui, SIGNAL(Finished(bool)), this, SLOT(FastRunFinished(bool)));
+    connect(_fastRunGui, SIGNAL(StartCompiled(int,int)), this, SLOT(StartCompiled(int,int)));
+    connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)));
+    connect(_fastRunGui, SIGNAL(Finished()), this, SLOT(FastRunFinished()));
     connect(this, SIGNAL(UpdateSimPBar(int)), _fastRunGui, SLOT(UpdatePBar(int)));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
@@ -107,13 +108,39 @@ MainWindow::~MainWindow()
     QFile temp_file(ds::TEMP_FILE.c_str());
     if (temp_file.exists()) temp_file.remove();
 }
-void MainWindow::FastRunFinished(bool do_save)
+void MainWindow::ExecutableFinished(int id, bool is_normal)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::ExecutableFinished", std::this_thread::get_id());
+#endif
+    auto it = std::find_if(_jobs.begin(), _jobs.end(), [&](const JobRecord& jrec)
+    {
+        return jrec.id == id;
+    });
+    if (it == _jobs.end())
+    {
+        _log->AddExcept("MainWindow::ExecutableFinished: Job id not found!");
+        return;
+    }
+    JobRecord job = *it;
+
+    auto dur = std::chrono::system_clock::now() - job.start;
+    int dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+    std::string tm = dur_ms>10000
+            ? std::to_string(dur_ms/1000) + "sec" : std::to_string(dur_ms) + "ms";
+    _log->AddMesg("Job " + std::to_string(id) + " finished in " + tm
+                  + ", exiting " + (is_normal ? "normally." : "abnormally."));
+
+    delete job.exe;
+    _jobs.erase(it);
+}
+void MainWindow::FastRunFinished()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::FastRunFinished", std::this_thread::get_id());
 #endif
+    _playState = STOPPED;
     setEnabled(true);
-    if (do_save) on_actionSave_Data_triggered();
 }
 void MainWindow::Error()
 {
@@ -202,6 +229,43 @@ void MainWindow::SaveNotes() //slot
     out.Save(cmodels, std::atof(model_step.c_str()),
              conditions, notes);
 }
+void MainWindow::StartCompiled(int duration, int save_mod_n)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StartCompiled", std::this_thread::get_id());
+#endif
+    _numSimSteps = duration;
+    _saveModN = save_mod_n;
+
+    std::string dat_file_name = _fastRunGui->FullFileName();
+    size_t pos = dat_file_name.find_last_of('.');
+    Executable* exe = new Executable( dat_file_name.substr(0,pos) );
+    connect(exe, SIGNAL(Finished(int,bool)), this, SLOT(ExecutableFinished(int,bool)),
+            Qt::QueuedConnection);
+    exe->Compile(_parserMgr);
+    try
+    {
+        VecStr values;
+        values.push_back( std::to_string(_numSimSteps) );
+        values.push_back( std::to_string(_saveModN) );
+        values.push_back(dat_file_name);
+        for (size_t i=0; i<_inputs->NumPars(); ++i)
+            values.push_back( _inputs->Value(i) );
+        for (size_t i=0; i<_initConds->NumPars(); ++i)
+            values.push_back( _initConds->Value(i) );
+
+        int job_id = exe->Launch(values);
+        _log->AddMesg("Job " + std::to_string(job_id) + " started.");
+
+        _jobs.push_back( JobRecord(job_id, exe, std::chrono::system_clock::now()) );
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept(std::string("MainWindow::StartCompiled: ") + e.what());
+    }
+
+    setEnabled(true);
+}
 void MainWindow::StartFastRun(int duration, int save_mod_n)
 {
 #ifdef DEBUG_FUNC
@@ -260,20 +324,27 @@ void MainWindow::on_actionClear_triggered()
     UpdateLists();
 }
 
+void MainWindow::on_actionCompile_Run_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionCompile_Run_triggered", _tid);
+#endif
+    _fastRunGui->SetMethod(FastRunGui::COMPILED);
+    _fastRunGui->show();
+    setEnabled(false);
+}
+
 void MainWindow::on_actionLoad_triggered()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_actionLoad_triggered", _tid);
 #endif
     std::string file_name = QFileDialog::getOpenFileName(nullptr,
-                                                             "Load dynamical system",
-#ifdef QT_DEBUG
-                                                             "../DynaSysFiles").toStdString();
-#else
-                                                             "../../DynaSysFiles").toStdString();
-#endif
+                                                         "Load dynamical system",
+                                                         DDM::ModelFilesDir().c_str()).toStdString();
     if (file_name.empty()) return;
     _fileName = file_name;
+    DDM::SetModelFilesDir(_fileName);
     _needInitialize = true;
     LoadModel(_fileName);
 }
@@ -319,6 +390,7 @@ void MainWindow::on_actionRun_Offline_triggered()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_actionRun_Offline_triggered", _tid);
 #endif
+    _fastRunGui->SetMethod(FastRunGui::FAST_RUN);
     _fastRunGui->show();
     setEnabled(false);
 }
@@ -331,8 +403,9 @@ void MainWindow::on_actionSave_Data_triggered()
     if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
     QString file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
-                                                         "");
+                                                         DDM::SaveDataDir().c_str());
     if (file_name.isEmpty()) return;
+    DDM::SetSaveDataDir(file_name.toStdString());
     QFile old(file_name);
     if (old.exists()) old.remove();
     QFile::rename(ds::TEMP_FILE.c_str(), file_name);
@@ -352,10 +425,11 @@ void MainWindow::on_actionSave_Model_As_triggered()
 #endif
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save dynamical system",
-                                                         "").toStdString();
+                                                         DDM::ModelFilesDir().c_str()).toStdString();
     if (file_name.empty()) return;
 
     _fileName = file_name;
+    DDM::SetModelFilesDir(_fileName);
 
     SaveModel(file_name);
     setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
@@ -403,10 +477,10 @@ void MainWindow::on_btnPulse_clicked()
 #endif
     _pulseParIdx = ui->cmbPulsePars->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
-    _pulseResetValue = _parameters->Value(_pulseParIdx);
+    _pulseResetValue = _inputs->Value(_pulseParIdx);
     _pulseStepsRemaining = (int)( ui->edPulseDuration->text().toDouble() / _parserMgr.ModelStep() );
     std::string val = ui->edPulseValue->text().toStdString();
-    _parameters->SetPar((int)_pulseParIdx, val);
+    _inputs->SetPar((int)_pulseParIdx, val);
 
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
@@ -452,7 +526,7 @@ void MainWindow::on_btnAddParameter_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!par.empty())
     {
-        _parameters->AddParameter(par, ParamModelBase::Param::DEFAULT_VAL);
+        _inputs->AddParameter(par, ParamModelBase::Param::DEFAULT_VAL);
         _parserMgr.InitModels();
     }
     UpdatePulseVList();
@@ -643,9 +717,9 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbSlidePars_currentIndexChanged", _tid);
 #endif
     if (index==-1) return;
-    const double val = std::stod( _parameters->Value(index) ),
-            min = _parserMgr.Minimum(_parameters, index),
-            range = _parserMgr.Range(_parameters, index);
+    const double val = std::stod( _inputs->Value(index) ),
+            min = _parserMgr.Minimum(_inputs, index),
+            range = _parserMgr.Range(_inputs, index);
     const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
     ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
 }
@@ -689,10 +763,10 @@ void MainWindow::on_sldParameter_valueChanged(int value)
     ScopeTracker st("MainWindow::on_sldParameter_valueChanged", _tid);
 #endif
     const int index = ui->cmbSlidePars->currentIndex();
-    const double range = _parserMgr.Range(_parameters, index);
+    const double range = _parserMgr.Range(_inputs, index);
     const double pct = (double)value / (double)SLIDER_INT_LIM,
-            dval = pct*range + _parserMgr.Minimum(_parameters, index);
-    _parameters->SetPar(index, std::to_string(dval));
+            dval = pct*range + _parserMgr.Minimum(_inputs, index);
+    _inputs->SetPar(index, std::to_string(dval));
     ui->tblParameters->update();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
@@ -757,7 +831,7 @@ void MainWindow::ConnectModels()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ConnectModels", _tid);
 #endif
-    connect(_parameters, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(_inputs, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
@@ -791,7 +865,7 @@ void MainWindow::DoFastRun()
         auto start = std::chrono::system_clock::now();
         emit DoInitParserMgr();
 
-        DatFileOut out(ds::TEMP_FILE);
+        DatFileOut out( _fastRunGui->FullFileName() );
         VecStr save_names;
         for (size_t i=0; i<(size_t)num_diffs; ++i)
             save_names.push_back(_differentials->ShortKey(i));
@@ -821,6 +895,8 @@ void MainWindow::DoFastRun()
                 ? std::to_string(dur_ms/1000) + "sec."
                 : std::to_string(dur_ms) + "ms.";
         _log->AddMesg("Time required by simulation: " + dur_str);
+
+        _playState = STOPPED;
     }
     catch (mu::ParserError& e)
     {
@@ -1570,10 +1646,10 @@ void MainWindow::InitDefaultModel()
 #endif
     InitModels();
 
-    _parameters->AddParameter("a", "4");
-    _parameters->AddParameter("b", "10");
+    _inputs->AddParameter("a", "4");
+    _inputs->AddParameter("b", "10");
 
-    _variables->AddParameter("q", Input::UNI_RAND_STR);
+    _variables->AddParameter("q", "1"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
     _variables->AddParameter("r", "u*v");
 
     _differentials->AddParameter("v'", "(u + r + a)/b");
@@ -1614,12 +1690,12 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
 #endif
     _parserMgr.ClearModels();
 
-    if (_parameters) delete _parameters;
-    _parameters = (models) ? (*models)[ds::INPUTS] : new ParamModel(this, ds::Model(ds::INPUTS));
-    ui->tblParameters->setModel(_parameters);
+    if (_inputs) delete _inputs;
+    _inputs = (models) ? (*models)[ds::INPUTS] : new ParamModel(this, ds::Model(ds::INPUTS));
+    ui->tblParameters->setModel(_inputs);
     ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
-    _parserMgr.AddModel(_parameters);
+    _parserMgr.AddModel(_inputs);
 
     if (_variables) delete _variables;
     _variables = (models) ? (*models)[ds::VARIABLES] : new VariableModel(this, ds::Model(ds::VARIABLES));
@@ -1863,7 +1939,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
     ScopeTracker st("MainWindow::ParamChanged", _tid);
 #endif
     int idx = topLeft.row();
-    std::string exprn = _parameters->Expression(idx);
+    std::string exprn = _inputs->Expression(idx);
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
     if (IsVFPresent()) UpdateVectorField();
@@ -1918,7 +1994,7 @@ void MainWindow::UpdateParams() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateParams", _tid);
 #endif
-    _parameters->SetPar((int)_pulseParIdx, _pulseResetValue);
+    _inputs->SetPar((int)_pulseParIdx, _pulseResetValue);
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
 }
 bool MainWindow::IsVFPresent() const
@@ -2025,7 +2101,7 @@ void MainWindow::SaveModel(const std::string& file_name)
     ScopeTracker st("MainWindow::SaveModel", _tid);
 #endif
     std::vector<const ParamModelBase*> models;
-    models.push_back(_parameters);
+    models.push_back(_inputs);
     models.push_back(_variables);
     models.push_back(_differentials);
     models.push_back(_initConds);
@@ -2117,7 +2193,7 @@ void MainWindow::UpdatePulseVList()
     ScopeTracker st("MainWindow::UpdatePulseVList", _tid);
 #endif
     ui->cmbPulsePars->clear();
-    VecStr keys = _parameters->Keys();
+    VecStr keys = _inputs->Keys();
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbPulsePars->insertItem((int)i, keys.at(i).c_str());
 }
@@ -2127,7 +2203,7 @@ void MainWindow::UpdateSliderPList()
     ScopeTracker st("MainWindow::UpdateSliderPList", _tid);
 #endif
     ui->cmbSlidePars->clear();
-    VecStr keys = _parameters->Keys();
+    VecStr keys = _inputs->Keys();
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbSlidePars->insertItem((int)i, keys.at(i).c_str());
 }

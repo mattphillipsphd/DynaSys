@@ -29,7 +29,7 @@ QWidget* CheckBoxDelegate::createEditor(QWidget* parent,
 }
 
 bool CheckBoxDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
-                         const QStyleOptionViewItem& option, const QModelIndex& index)
+                         const QStyleOptionViewItem&, const QModelIndex& index)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("CheckBoxDelegate::editorEvent", std::this_thread::get_id());

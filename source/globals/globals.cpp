@@ -5,6 +5,7 @@ const double ds::PI = 3.14159265358979;
 const int ds::TABLEN = 4;
 
 const std::string ds::TEMP_FILE = ".temp.txt";
+const std::string ds::TEMP_DAT_FILE = ".temp.dsdat";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
 const std::string ds::VERSION_STR = "0.2.0";
 
@@ -65,11 +66,21 @@ void ds::RemoveThread(std::thread::id tid)
     thread_map.equal_range(tid);
     --thread_ct;
 }
+void ds::RemoveWhitespace(std::string& s)
+{
+    s.erase( std::remove_if(s.begin(), s.end(), ::isspace), s.end() );
+}
 
 double ds::sgn(double val)
 {
     return (val<0) ? -1.0 : (val>0.0); //Thanks SO
         //http://stackoverflow.com/questions/1903954
+}
+
+std::string ds::StripPath(const std::string& file_name)
+{
+    size_t pos = file_name.find_last_of('/');
+    return (pos==std::string::npos) ? file_name : file_name.substr(pos+1);
 }
 
 QColor ds::ThreadColor(std::thread::id tid)

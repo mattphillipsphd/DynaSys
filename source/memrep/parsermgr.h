@@ -31,12 +31,14 @@ class ParserMgr
             //Assign the source of the data for the variables
         void ClearExpressions();
         void ClearModels();
+        const ConditionModel* Conditions() const { return _conditions; }
         const double* ConstData(ds::PMODEL pmodel) const;
         void InitParsers();
         void InitModels();
         void InputEval(int idx = -1);
         double Maximum(const ParamModelBase* model, size_t idx) const;
         double Minimum(const ParamModelBase* model, size_t idx) const;
+        const ParamModelBase* Model(ds::PMODEL model) const;
         inline double ModelStep() const { return _modelStep; }
         const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
@@ -58,6 +60,9 @@ class ParserMgr
         void TempEval();
 
     private:
+//        ParserMgr(const ParserMgr&) = delete;
+//        ParserMgr& operator=(const ParserMgr&) = delete;
+
         std::string AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const;
         void AssociateVars(mu::Parser& parser);
         inline double* Data(const ParamModelBase* model);
@@ -70,7 +75,7 @@ class ParserMgr
         ConditionModel* _conditions;
         std::vector<Input> _inputs;
         int _inputsPerStep; // ### Needs to be done separately for each input
-        Log* _log;
+        Log* const _log;
         std::vector< std::tuple<ParamModelBase*, double*, double*> > _models;
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for

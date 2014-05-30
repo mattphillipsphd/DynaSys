@@ -220,6 +220,13 @@ const std::string& ParserMgr::ParserContents() const
 #endif
     return _parser.GetExpr();
 }
+const ParamModelBase* ParserMgr::Model(ds::PMODEL model) const
+{
+#ifdef DEBUG_PM_FUNC
+    ScopeTracker st("ParserMgr::Model", std::this_thread::get_id());
+#endif
+    return std::get<0>( _models.at(model) );
+}
 void ParserMgr::ParserEval(bool eval_input)
 {
     std::lock_guard<std::mutex> lock(_mutex);

@@ -72,6 +72,7 @@ class ParamModelBase : public QAbstractTableModel
         std::string TempKey(size_t i) const;
         const std::string& Value(const std::string& key) const;
         const std::string& Value(size_t i) const;
+        VecStr Values() const;
 
         void AddParameter(const std::string& key, const std::string& value = "");
         void SetMaximum(size_t idx, double val);
