@@ -45,3 +45,14 @@ VecStr VariableModel::TempExpressions() const
     }
     return expressions;
 }
+int VariableModel::TypeCount(Input::TYPE type) const
+{
+    const int num_vars = NumPars();
+    int count = 0;
+    for (size_t i=0; i<num_vars; ++i)
+    {
+        const std::string& value = Value(i);
+        count += (int)( Input::Type(value)==type );
+    }
+    return count;
+}

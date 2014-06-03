@@ -55,7 +55,12 @@ SOURCES += main.cpp\
     gui/fastrungui.cpp \
     file/datfileout.cpp \
     compile/executable.cpp \
-    file/defaultdirmgr.cpp
+    file/defaultdirmgr.cpp \
+    gui/fitgui.cpp \
+    compile/fit.cpp \
+    file/fdatfilein.cpp \
+    compile/cfilebase.cpp \
+    compile/mexfile.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -88,7 +93,12 @@ HEADERS  += gui/mainwindow.h \
     gui/fastrungui.h \
     file/datfileout.h \
     compile/executable.h \
-    file/defaultdirmgr.h
+    file/defaultdirmgr.h \
+    gui/fitgui.h \
+    compile/fit.h \
+    file/fdatfilein.h \
+    compile/cfilebase.h \
+    compile/mexfile.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -96,7 +106,8 @@ FORMS    += forms/mainwindow.ui \
     forms/parameditor.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
-    forms/fastrungui.ui
+    forms/fastrungui.ui \
+    forms/fitgui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

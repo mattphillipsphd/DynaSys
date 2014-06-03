@@ -79,8 +79,21 @@ double ds::sgn(double val)
 
 std::string ds::StripPath(const std::string& file_name)
 {
-    size_t pos = file_name.find_last_of('/');
+    const size_t pos = file_name.find_last_of('/');
     return (pos==std::string::npos) ? file_name : file_name.substr(pos+1);
+}
+std::string ds::StripQuotes(const std::string& str)
+{
+    std::string out = str;
+    size_t pos = out.find_first_of('"');
+    if (pos!=std::string::npos)
+    {
+        out.erase(0,pos+1);
+        pos = out.find_last_of('"');
+        if (pos!=std::string::npos)
+            out.erase(pos);
+    }
+    return out;
 }
 
 QColor ds::ThreadColor(std::thread::id tid)

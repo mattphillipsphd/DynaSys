@@ -17,6 +17,7 @@ class VariableModel : public ParamModelBase
         virtual VecStr Initializations() const override;
         virtual std::string TempExpression(size_t i) const override;
         virtual VecStr TempExpressions() const override;
+        int TypeCount(Input::TYPE type) const;
 
     signals:
 

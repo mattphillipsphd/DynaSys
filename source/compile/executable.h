@@ -1,18 +1,9 @@
 #ifndef EXECUTABLE_H
 #define EXECUTABLE_H
 
-#include <fstream>
+#include "cfilebase.h"
 
-#include <QFile>
-#include <QProcess>
-#include <QStringList>
-
-#include "../file/defaultdirmgr.h"
-#include "../globals/log.h"
-#include "../globals/scopetracker.h"
-#include "../memrep/parsermgr.h"
-
-class Executable : public QObject
+class Executable : public CFileBase
 {
     Q_OBJECT
 
@@ -20,7 +11,11 @@ class Executable : public QObject
         Executable(const std::string& name);
 
         void Compile(const ParserMgr& parser_mgr);
+        int Launch();
         int Launch(const VecStr& inputs);
+        void WaitComplete();
+
+        void SetArguments(const VecStr& args) {_arguments = args; }
 
     signals:
         void Finished(int id, bool is_normal);
@@ -30,23 +25,25 @@ class Executable : public QObject
         void ReadProcOutput();
         void StateChanged(QProcess::ProcessState state);
 
+    protected:
+        virtual void WriteDataOut(std::ofstream& out, const ParamModelBase* model) override;
+        virtual void WriteIncludes(std::ofstream& out) override;
+        virtual void WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
+                           const ParamModelBase* init_conds) override;
+        virtual void WriteMainBegin(std::ofstream& out) override;
+        virtual void WriteMainEnd(std::ofstream& out) override;
+        virtual void WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
+                                           const ParamModelBase* diffs) override;
+
     private:
-        void MakeCFile(const ParserMgr& parser_mgr);
-        std::string PreprocessExprn(const std::string& exprn) const;
-        void WriteConditions(std::ofstream& out, const ConditionModel* conditions);
-        void WriteDataToFile(std::ofstream& out, const ParamModelBase* model);
-        void WriteFuncs(std::ofstream& out, const ParamModelBase* model);
-        void WriteLoadInput(std::ofstream& out, const ParamModelBase* variables);
-        void WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
-                                           const ParamModelBase* diffs);
-        void WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr);
-        void WriteVarsToFile(std::ofstream& out, const ParamModelBase* variables);
+        void WriteVarsOut(std::ofstream& out, const ParamModelBase* variables);
 
         static int _jobCt;
 
+        VecStr _arguments;
+        std::string _compileCmd;
         int _jobId;
-        Log* const _log;
-        const std::string _name, _nameExe;
+        const std::string _nameExe;
         QProcess _proc;
         QProcess::ProcessState _state;
 };

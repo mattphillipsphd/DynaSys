@@ -36,10 +36,12 @@
 #include "comboboxdelegate.h"
 #include "dspinboxdelegate.h"
 #include "fastrungui.h"
+#include "fitgui.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
 #include "../compile/executable.h"
+#include "../compile/mexfile.h"
 #include "../file/datfileout.h"
 #include "../file/defaultdirmgr.h"
 #include "../file/sysfilein.h"
@@ -119,6 +121,7 @@ class MainWindow : public QMainWindow
         void Error();
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
+        void FitFinished();
         void LoadTempModel(void* models);
         void ParamEditorClosed();
         void ParserToLog();
@@ -126,6 +129,7 @@ class MainWindow : public QMainWindow
         void SaveNotes();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
+        void StartFit();
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
 
@@ -142,7 +146,9 @@ class MainWindow : public QMainWindow
     private slots:
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
+        void on_actionCreate_MEX_file_triggered();
         void on_actionCompile_Run_triggered();
+        void on_actionFit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
         void on_actionNotes_triggered();
@@ -213,8 +219,10 @@ class MainWindow : public QMainWindow
         Ui::MainWindow *ui;
 
         void ClearPlots();
+        Executable* CreateExecutable(const std::string& name) const;
         void ConnectModels();
         void DoFastRun();
+        void DoFit();
         void Draw();
         void DrawNullclines();
         void DrawPhasePortrait();
@@ -248,6 +256,7 @@ class MainWindow : public QMainWindow
 
         AboutGui* _aboutGui;
         FastRunGui* _fastRunGui;
+        FitGui* _fitGui;
         LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;

@@ -19,8 +19,8 @@ const int MainWindow::VF_SLEEP_MS = 250;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _logGui(new LogGui()),
-    _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _fitGui(new FitGui()),
+    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _inputs(nullptr), _variables(nullptr),
     _fileName(""), _isVFAttached(false), _log(Log::Instance()),
@@ -85,6 +85,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)));
     connect(_fastRunGui, SIGNAL(Finished()), this, SLOT(FastRunFinished()));
     connect(this, SIGNAL(UpdateSimPBar(int)), _fastRunGui, SLOT(UpdatePBar(int)));
+    connect(_fitGui, SIGNAL(StartFit()), this, SLOT(StartFit()));
+    connect(_fitGui, SIGNAL(Finished()), this, SLOT(FitFinished()));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
@@ -141,6 +143,13 @@ void MainWindow::FastRunFinished()
 #endif
     _playState = STOPPED;
     setEnabled(true);
+}
+void MainWindow::FitFinished()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::FitFinished", std::this_thread::get_id());
+#endif
+    _log->AddMesg("FitGui finished");
 }
 void MainWindow::Error()
 {
@@ -237,24 +246,15 @@ void MainWindow::StartCompiled(int duration, int save_mod_n)
     _numSimSteps = duration;
     _saveModN = save_mod_n;
 
-    std::string dat_file_name = _fastRunGui->FullFileName();
-    size_t pos = dat_file_name.find_last_of('.');
-    Executable* exe = new Executable( dat_file_name.substr(0,pos) );
-    connect(exe, SIGNAL(Finished(int,bool)), this, SLOT(ExecutableFinished(int,bool)),
-            Qt::QueuedConnection);
-    exe->Compile(_parserMgr);
     try
     {
-        VecStr values;
-        values.push_back( std::to_string(_numSimSteps) );
-        values.push_back( std::to_string(_saveModN) );
-        values.push_back(dat_file_name);
-        for (size_t i=0; i<_inputs->NumPars(); ++i)
-            values.push_back( _inputs->Value(i) );
-        for (size_t i=0; i<_initConds->NumPars(); ++i)
-            values.push_back( _initConds->Value(i) );
+        std::string dat_file_name = _fastRunGui->FullFileName();
+        size_t pos = dat_file_name.find_last_of('.');
+        Executable* exe = CreateExecutable( dat_file_name.substr(0,pos) );
+        connect(exe, SIGNAL(Finished(int,bool)), this, SLOT(ExecutableFinished(int,bool)),
+                Qt::QueuedConnection);
 
-        int job_id = exe->Launch(values);
+        int job_id = exe->Launch();
         _log->AddMesg("Job " + std::to_string(job_id) + " started.");
 
         _jobs.push_back( JobRecord(job_id, exe, std::chrono::system_clock::now()) );
@@ -274,6 +274,14 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     _numSimSteps = duration;
     _saveModN = save_mod_n;
     std::thread t( std::bind(&MainWindow::DoFastRun, this) );
+    t.detach();
+}
+void MainWindow::StartFit()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StartFit", std::this_thread::get_id());
+#endif
+    std::thread t( std::bind(&MainWindow::DoFit, this) );
     t.detach();
 }
 void MainWindow::UpdateMousePos(QPointF pos) //slot
@@ -324,6 +332,29 @@ void MainWindow::on_actionClear_triggered()
     UpdateLists();
 }
 
+void MainWindow::on_actionCreate_MEX_file_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionCreate_MEX_file_triggered", _tid);
+#endif
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select MEX file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetMEXFilesDir(file_name);
+        MEXFile mex_file(file_name);
+        mex_file.MakeCFile(_parserMgr);
+        mex_file.MakeMFile(_parserMgr);
+        _log->AddMesg("MEX file " + file_name + " and associated m-file created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCreate_MEX_file_triggered: " + std::string(e.what()));
+    }
+}
+
 void MainWindow::on_actionCompile_Run_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -332,6 +363,14 @@ void MainWindow::on_actionCompile_Run_triggered()
     _fastRunGui->SetMethod(FastRunGui::COMPILED);
     _fastRunGui->show();
     setEnabled(false);
+}
+
+void MainWindow::on_actionFit_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionFit_triggered", _tid);
+#endif
+    _fitGui->show();
 }
 
 void MainWindow::on_actionLoad_triggered()
@@ -826,6 +865,26 @@ void MainWindow::ClearPlots()
     AttachVectorField(false);
     AttachTimePlot(false);
 }
+Executable* MainWindow::CreateExecutable(const std::string& name) const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::CreateExecutable", _tid);
+#endif
+    Executable* exe = new Executable(name);
+    exe->Compile(_parserMgr);
+
+    VecStr values;
+    values.push_back( std::to_string(_numSimSteps) );
+    values.push_back( std::to_string(_saveModN) );
+    values.push_back(name);
+    for (size_t i=0; i<_inputs->NumPars(); ++i)
+        values.push_back( _inputs->Value(i) );
+    for (size_t i=0; i<_initConds->NumPars(); ++i)
+        values.push_back( _initConds->Value(i) );
+    exe->SetArguments(values);
+
+    return exe;
+}
 void MainWindow::ConnectModels()
 {
 #ifdef DEBUG_FUNC
@@ -910,6 +969,27 @@ void MainWindow::DoFastRun()
     }
 
     emit UpdateSimPBar(-1);
+
+    ds::RemoveThread(std::this_thread::get_id());
+}
+void MainWindow::DoFit()
+{
+    ds::AddThread(std::this_thread::get_id());
+#ifdef DEBUG_FUNC
+    ScopeTracker::InitThread(std::this_thread::get_id());
+    ScopeTracker st("MainWindow::DoFastRun", std::this_thread::get_id());
+#endif
+    try
+    {
+        Executable* exe = CreateExecutable("error");
+        Fit* fit = new Fit(exe, "firingrate.out", "target4.dsfdat");
+        fit->Launch();
+        _log->AddMesg("Finished fit!");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::DoFit: " + std::string(e.what()));
+    }
 
     ds::RemoveThread(std::this_thread::get_id());
 }

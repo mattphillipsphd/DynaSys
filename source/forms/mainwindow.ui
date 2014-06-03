@@ -565,6 +565,8 @@
     </property>
     <addaction name="actionRun_Offline"/>
     <addaction name="actionCompile_Run"/>
+    <addaction name="actionFit"/>
+    <addaction name="actionCreate_MEX_file"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -653,6 +655,16 @@
   <action name="actionCompile_Run">
    <property name="text">
     <string>Compile/Run</string>
+   </property>
+  </action>
+  <action name="actionFit">
+   <property name="text">
+    <string>Fit</string>
+   </property>
+  </action>
+  <action name="actionCreate_MEX_file">
+   <property name="text">
+    <string>Create MEX file</string>
    </property>
   </action>
  </widget>

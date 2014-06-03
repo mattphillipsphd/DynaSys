@@ -57,6 +57,7 @@ namespace ds
     double sgn(double val);
 
     std::string StripPath(const std::string& file_name);
+    std::string StripQuotes(const std::string& str);
 
     QColor ThreadColor(std::thread::id tid);
 
