@@ -4,10 +4,10 @@ CFileBase::CFileBase(const std::string& name) : _log(Log::Instance()), _name(Mak
 {
 }
 
-void CFileBase::MakeCFile(const ParserMgr& parser_mgr)
+void CFileBase::Make(const ParserMgr& parser_mgr)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("Executable::MakeCFile", std::this_thread::get_id());
+    ScopeTracker st("Executable::Make", std::this_thread::get_id());
 #endif
     const ParamModelBase* inputs = parser_mgr.Model(ds::INPUTS),
             * variables = parser_mgr.Model(ds::VARIABLES),
@@ -62,7 +62,8 @@ void CFileBase::MakeCFile(const ParserMgr& parser_mgr)
     //  *****End check whether to save data
 
         //  Check whether any conditions apply
-        WriteConditions(out, parser_mgr.Conditions());
+        if (parser_mgr.Conditions()->NumPars()>0)
+            WriteConditions(out, parser_mgr.Conditions());
 
     out << "    }\n"
            "    \n";
@@ -268,11 +269,12 @@ void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variabl
         if (value_abs.empty())
             throw std::runtime_error("CFileBase::WriteLoadInput: Bad file name.");
 
-        const std::string var = variables->ShortKey(i),
+        const std::string var = variables->Key(i),
                 fpv = "fp_" + var,
                 inputv = "input_" + var,
                 spsv = "sps_" + var, //samples per step
                 samps_ct = "ct_" + var;
+        if (i!=0) out << "\n";
         out <<
                "    FILE* " + fpv + " = fopen(\"" + value_abs + "\", \"rb\");\n"
                "    if (" + fpv + "==0) return 1;\n"
@@ -290,8 +292,7 @@ void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variabl
                "    br = fread(" + inputv
                         + ", sizeof(double), (int)fmin(INPUT_SIZE, num_elts), " + fpv + ");\n"
 #endif
-               "    fclose(" + fpv + ");\n"
-               "    \n";
+               "    fclose(" + fpv + ");\n";
     }
     out << "//End WriteLoadInput\n";
     out << "\n";

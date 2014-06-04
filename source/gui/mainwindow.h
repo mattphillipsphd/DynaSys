@@ -40,8 +40,10 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "../compile/cfileso.h"
 #include "../compile/executable.h"
 #include "../compile/mexfile.h"
+#include "../compile/sharedobj.h"
 #include "../file/datfileout.h"
 #include "../file/defaultdirmgr.h"
 #include "../file/sysfilein.h"
@@ -147,7 +149,9 @@ class MainWindow : public QMainWindow
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionCreate_MEX_file_triggered();
+        void on_actionCreate_SO_triggered();
         void on_actionCompile_Run_triggered();
+        void on_actionExit_triggered();
         void on_actionFit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();

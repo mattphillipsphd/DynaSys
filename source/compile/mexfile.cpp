@@ -1,6 +1,8 @@
 #include "mexfile.h"
 
-MEXFile::MEXFile(const std::string& name) : CFileBase(name), _nameM(MakeMName(name))
+const int MEXFile::NUM_AUTO_ARGS = 2;
+
+MEXFile::MEXFile(const std::string& name) : CFileBase(name), _inputCt(0), _nameM(MakeMName(name))
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MEXFile::MEXFile", std::this_thread::get_id());
@@ -23,7 +25,9 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
             num_ics = init_conds->NumPars(),
             num_columns = num_inputs+num_ics,
             num_vars = variables->NumPars(),
-            num_diffs = diffs->NumPars();
+            num_diffs = diffs->NumPars(),
+            num_input_files = static_cast<const VariableModel*>(variables)
+                                ->TypeCount(Input::INPUT_FILE);
 
     std::string name_m = ds::StripPath(_nameM);
     name_m.erase(name_m.find_last_of('.'));
@@ -35,28 +39,45 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
 
     //All the input parameter names
     mout <<
-           "input_names = cell(" + std::to_string(num_columns+2) + ",1);\n"
+           "input_names = cell(" + std::to_string(NUM_AUTO_ARGS+num_columns+num_input_files) + ",1);\n"
            "input_names{1} = 'num_records';\n"
            "input_names{2} = 'save_mod_n';\n";
-    size_t inn_ct = 3;
+    size_t inn_ct = NUM_AUTO_ARGS+1;
     for (size_t i=0; i<num_inputs; ++i, ++inn_ct)
         mout << "input_names{" + std::to_string(inn_ct) + "} = '" + inputs->Key(i) + "';\n";
     for (size_t i=0; i<num_ics; ++i, ++inn_ct)
         mout << "input_names{" + std::to_string(inn_ct) + "} = '" + init_conds->ShortKey(i) + "0';\n";
+    for (size_t i=0; i<num_vars; ++i)
+        if (!variables->IsFreeze(i) && Input::Type(variables->Value(i))==Input::INPUT_FILE)
+        {
+            mout << "input_names{" + std::to_string(inn_ct++) + "} = 'input_" + variables->Key(i) + "';\n";
+            mout << "input_names{" + std::to_string(inn_ct++) + "} = 'sps_" + variables->Key(i) + "';\n";
+        }
     mout << "\n";
 
     //All the inputs
     mout <<
-           "inputs = cell(" + std::to_string(num_columns+2) + ",1);\n"
+           "if nargin<2\n"
+           "    num_records = -1;\n"
+           "    save_mod_n = -1;\n"
+           "end\n"
+           "\n"
+            "inputs = cell(" + std::to_string(NUM_AUTO_ARGS+num_columns+num_input_files) + ",1);\n"
            "inputs{1} = num_records;\n"
            "inputs{2} = save_mod_n;\n";
-    size_t in_ct = 3;
+    size_t in_ct = NUM_AUTO_ARGS+1;
     for (size_t i=0; i<num_inputs; ++i, ++in_ct)
         mout << "inputs{" + std::to_string(in_ct) + "} = " + inputs->Value(i)
                 + ";\t%" + inputs->Key(i) + "\n";
     for (size_t i=0; i<num_ics; ++i, ++in_ct)
         mout << "inputs{" + std::to_string(in_ct) + "} = " + init_conds->Value(i)
                 + ";\t%" + init_conds->Key(i) + "\n";
+    for (size_t i=0; i<num_vars; ++i)
+        if (!variables->IsFreeze(i) && Input::Type(variables->Value(i))==Input::INPUT_FILE)
+        {
+            mout << "inputs{" + std::to_string(in_ct++) + "} = [];\n";
+            mout << "inputs{" + std::to_string(in_ct++) + "} = [];\n";
+        }
     mout << "\n";
 
     //The column names for the output matrix
@@ -71,7 +92,11 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
 
     name_m.erase( name_m.find_last_of("_m")-1 );
     mout <<
-            "data = " + name_m + "(inputs{:});\n"
+            "if nargin<2\n"
+            "   data = [];\n"
+            "else\n"
+            "   data = " + name_m + "(inputs{:});\n"
+            "end"
             "\n"
             "end\n";
 
@@ -109,7 +134,6 @@ void MEXFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
            "            save_mod_n = (int)*mxGetPr(prhs[1]);\n"
            "\n";
 
-    const int NUM_AUTO_ARGS = 2;
     for (size_t i=0; i<num_inputs; ++i)
         out << "    " + inputs->Key(i) + " = *mxGetPr(prhs["
                + std::to_string(i+NUM_AUTO_ARGS) + "]);\n";
@@ -118,6 +142,37 @@ void MEXFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
         out << "    " + init_conds->ShortKey(i) + "0 = *mxGetPr(prhs["
                + std::to_string(i+num_inputs+NUM_AUTO_ARGS) + "]);\n";
     out << "//End WriteInitArgs\n";
+    out << "\n";
+
+    _inputCt = num_inputs+num_ics+NUM_AUTO_ARGS; // ### Feels like a hack,
+        //just make const parser_mgr& a member?
+}
+void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables)
+{
+    out << "//Begin WriteLoadInput\n";
+    const size_t num_vars = variables->NumPars();
+    for (size_t i=0; i<num_vars; ++i)
+    {
+        if (variables->IsFreeze(i)) continue;
+        const std::string& value = variables->Value(i);
+        if (Input::Type(value) != Input::INPUT_FILE) continue;
+        QFileInfo f( ds::StripQuotes(value).c_str() );
+        const std::string value_abs = f.canonicalFilePath().toStdString();
+        if (value_abs.empty())
+            throw std::runtime_error("CFileBase::WriteLoadInput: Bad file name.");
+
+        const std::string var = variables->Key(i),
+                inputv = "input_" + var,
+                spsv = "sps_" + var, //samples per step
+                samps_ct = "ct_" + var;
+        if (i!=0) out << "\n";
+        out << "    double* " + inputv + " = mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
+        out << "    int " + spsv + " = (int)*mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
+        out <<
+               "    int " + samps_ct + " = 0;\n"
+               "    " + spsv + " = (int)(1.0/(tau * (double)" + spsv + ") + 0.5);\n";
+    }
+    out << "//End WriteLoadInput\n";
     out << "\n";
 }
 void MEXFile::WriteMainBegin(std::ofstream& out)
@@ -150,13 +205,11 @@ void MEXFile::WriteOutputHeader(std::ofstream& out, const ParamModelBase* variab
     out << "//End WriteOutputHeader\n";
     out << "\n";
 }
-
 void MEXFile::WriteSaveBlockBegin(std::ofstream& out)
 {
     out << "            int col = 0;\n";
     out << "\n";
 }
-
 void MEXFile::WriteSaveBlockEnd(std::ofstream& out)
 {
     out << "            ++row_ct;\n";

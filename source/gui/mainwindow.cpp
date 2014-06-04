@@ -345,13 +345,34 @@ void MainWindow::on_actionCreate_MEX_file_triggered()
     {
         DDM::SetMEXFilesDir(file_name);
         MEXFile mex_file(file_name);
-        mex_file.MakeCFile(_parserMgr);
+        mex_file.Make(_parserMgr);
         mex_file.MakeMFile(_parserMgr);
         _log->AddMesg("MEX file " + file_name + " and associated m-file created.");
     }
     catch (std::exception& e)
     {
         _log->AddExcept("MainWindow::on_actionCreate_MEX_file_triggered: " + std::string(e.what()));
+    }
+}
+
+void MainWindow::on_actionCreate_SO_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionCreate_SO_triggered", _tid);
+#endif
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select MEX file name",
+                                                         "").toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        SharedObj so(file_name);
+        so.Compile(_parserMgr);
+        _log->AddMesg("SO created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCreate_SO_triggered: " + std::string(e.what()));
     }
 }
 
@@ -363,6 +384,14 @@ void MainWindow::on_actionCompile_Run_triggered()
     _fastRunGui->SetMethod(FastRunGui::COMPILED);
     _fastRunGui->show();
     setEnabled(false);
+}
+
+void MainWindow::on_actionExit_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionExit_triggered", _tid);
+#endif
+    close();
 }
 
 void MainWindow::on_actionFit_triggered()

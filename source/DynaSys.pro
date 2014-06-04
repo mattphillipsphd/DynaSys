@@ -60,7 +60,12 @@ SOURCES += main.cpp\
     compile/fit.cpp \
     file/fdatfilein.cpp \
     compile/cfilebase.cpp \
-    compile/mexfile.cpp
+    compile/mexfile.cpp \
+    compile/cfile.cpp \
+    compile/cfileso.cpp \
+    compile/sharedobj.cpp \
+    compile/compilable.cpp \
+    compile/compilablebase.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -98,7 +103,12 @@ HEADERS  += gui/mainwindow.h \
     compile/fit.h \
     file/fdatfilein.h \
     compile/cfilebase.h \
-    compile/mexfile.h
+    compile/mexfile.h \
+    compile/cfile.h \
+    compile/cfileso.h \
+    compile/sharedobj.h \
+    compile/compilable.h \
+    compile/compilablebase.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

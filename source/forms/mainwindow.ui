@@ -544,6 +544,7 @@
     <addaction name="actionSave_Phase_Plot"/>
     <addaction name="actionSave_Time_Plot"/>
     <addaction name="actionSave_Vector_Field"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -567,6 +568,7 @@
     <addaction name="actionCompile_Run"/>
     <addaction name="actionFit"/>
     <addaction name="actionCreate_MEX_file"/>
+    <addaction name="actionCreate_SO"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -665,6 +667,16 @@
   <action name="actionCreate_MEX_file">
    <property name="text">
     <string>Create MEX file</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>Exit</string>
+   </property>
+  </action>
+  <action name="actionCreate_SO">
+   <property name="text">
+    <string>Create SO</string>
    </property>
   </action>
  </widget>

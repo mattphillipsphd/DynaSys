@@ -1,21 +1,18 @@
-#ifndef MEXFILE_H
-#define MEXFILE_H
+#ifndef CFILESO_H
+#define CFILESO_H
 
-#include "cfilebase.h"
+#include "cfile.h"
 
-class MEXFile : public CFileBase
+//This is for linux shared objects
+class CFileSO : public CFile
 {
     public:
-        MEXFile(const std::string& name);
-
-        void MakeMFile(const ParserMgr& parser_mgr);
+        CFileSO(const std::string& name);
 
     protected:
         virtual void WriteDataOut(std::ofstream& out, const ParamModelBase* model) override;
-        virtual void WriteIncludes(std::ofstream& out) override;
         virtual void WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
                            const ParamModelBase* init_conds) override;
-        virtual void WriteLoadInput(std::ofstream& out, const ParamModelBase* variables) override;
         virtual void WriteMainBegin(std::ofstream& out) override;
         virtual void WriteMainEnd(std::ofstream& out) override;
         virtual void WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
@@ -24,12 +21,6 @@ class MEXFile : public CFileBase
         virtual void WriteSaveBlockEnd(std::ofstream& out) override;
 
     private:
-        std::string MakeMName(const std::string& name) const;
-
-        static const int NUM_AUTO_ARGS;
-
-        int _inputCt;
-        const std::string _nameM;
 };
 
-#endif // MEXFILE_H
+#endif // CFILESO_H

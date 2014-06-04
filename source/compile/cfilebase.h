@@ -19,7 +19,7 @@ class CFileBase : public QObject
     public:
         CFileBase(const std::string& name);
 
-        void MakeCFile(const ParserMgr& parser_mgr);
+        void Make(const ParserMgr& parser_mgr);
 
         const std::string& Name() const { return _name; }
 
@@ -39,7 +39,7 @@ class CFileBase : public QObject
                                 const ParamModelBase* diffs);
         virtual void WriteMainBegin(std::ofstream& out) = 0;
         virtual void WriteMainEnd(std::ofstream& out) = 0;
-        void WriteLoadInput(std::ofstream& out, const ParamModelBase* variables);
+        virtual void WriteLoadInput(std::ofstream& out, const ParamModelBase* variables);
         virtual void WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
                                            const ParamModelBase* diffs) = 0;
         virtual void WriteSaveBlockBegin(std::ofstream&) {}
