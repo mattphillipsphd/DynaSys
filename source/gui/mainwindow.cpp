@@ -48,6 +48,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
+#ifdef Q_OS_WIN
+    ui->actionCompile_Run->setEnabled(false);
+    ui->actionCreate_SO->setEnabled(false);
+#endif
+    ui->actionFit->setEnabled(false);
+
     QStringList modes;
     modes << "Single" << "Vector field";
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
@@ -1379,11 +1385,11 @@ void MainWindow::DrawPhasePortrait()
         try
         {
             if (_needInitialize)
-            {
+//            {
                 emit DoInitParserMgr();
-                std::unique_lock<std::mutex> lock(_mutex);
-                _condVar.wait(lock, [&]{ return !_needInitialize; });
-            }
+//                std::unique_lock<std::mutex> lock(_mutex);
+//                _condVar.wait(lock, [&]{ return !_needInitialize; });
+//            }
             if (_needUpdateExprns)
             {
                 _parserMgr.SetExpressions();
@@ -1408,8 +1414,9 @@ void MainWindow::DrawPhasePortrait()
                 double ip_k = 0;
                 for (int i=0; i<num_diffs; ++i)
                 {
-                    _diffPts[i].push_back( diffs[i] );
-                    ip_k += diffs[i] * diffs[i];
+                    double diffs_i = diffs[i];
+                    _diffPts[i].push_back(diffs_i);
+                    ip_k += diffs_i * diffs_i;
                 }
                 _ip.push_back(ip_k);
                 for (int i=0; i<num_vars; ++i)
@@ -1607,11 +1614,11 @@ void MainWindow::DrawVectorField()
     }
 
     if ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needInitialize)
-    {
+//    {
         emit DoInitParserMgr();
-        std::unique_lock<std::mutex> lock(_mutex);
-        _condVar.wait(lock, [&]{ return !_needInitialize; });
-    }
+//        std::unique_lock<std::mutex> lock(_mutex);
+//        _condVar.wait(lock, [&]{ return !_needInitialize; });
+//    }
 
     while ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
@@ -2035,7 +2042,7 @@ void MainWindow::InitParserMgr() //slot
         _parserMgr.SetExpressions();
         _parserMgr.SetConditions();
         _needInitialize = false;
-        _condVar.notify_one();
+//        _condVar.notify_one();
     }
     catch (std::exception& e)
     {
@@ -2135,7 +2142,8 @@ void MainWindow::LoadModel(const std::string& file_name)
         InitModels(&models, conditions);
         ConnectModels();
 
-        ui->edModelStep->setText( model_step.c_str() );
+        ui->edModelStep->setText( model_step.c_str() ); //This does *not* call editingFinished
+        _parserMgr.SetModelStep( std::stod(model_step) );
         _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
 
         ResetPhasePlotAxes();

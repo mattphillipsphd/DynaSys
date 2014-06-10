@@ -110,7 +110,7 @@ void Fit::StateChanged(QProcess::ProcessState state)
 double* Fit::LoadTarget(int& len)
 {
     FILE* fp = fopen(_target.c_str(), "rb");
-    int br = fread(&len, sizeof(int), 1, fp);
+    size_t br = fread(&len, sizeof(int), 1, fp);
     double* data = (double*)malloc(len*sizeof(double));
     br = fread(data, sizeof(double), len, fp);
     return data;

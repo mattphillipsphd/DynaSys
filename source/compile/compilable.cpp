@@ -17,8 +17,8 @@ void Compilable::Compile(const ParserMgr& parser_mgr)
     int setup_code = system(setup.c_str());
     _log->AddMesg("Executed " + setup + ", returning code "
                   + std::to_string(setup_code));
-    std::string win_name = "\"" + _name + "\"",
-            win_name_exe = "\"" + _nameExe + "\"";
+    std::string win_name = "\"" + Name() + "\"",
+            win_name_exe = "\"" + NameExe() + "\"";
     std::replace(win_name.begin(), win_name.end(), '/', '\\');
     std::replace(win_name_exe.begin(), win_name_exe.end(), '/', '\\');
     std::string cmd("\"" + DDM::VCVarsDir() + "\\cl\" /O2 " + win_name + " /Fe" + win_name_exe);

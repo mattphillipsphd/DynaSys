@@ -2,12 +2,15 @@
 
 CFileBase::CFileBase(const std::string& name) : _log(Log::Instance()), _name(MakeName(name))
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CFileBase::CFileBase", std::this_thread::get_id());
+#endif
 }
 
 void CFileBase::Make(const ParserMgr& parser_mgr)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("Executable::Make", std::this_thread::get_id());
+    ScopeTracker st("CFileBase::Make", std::this_thread::get_id());
 #endif
     const ParamModelBase* inputs = parser_mgr.Model(ds::INPUTS),
             * variables = parser_mgr.Model(ds::VARIABLES),
@@ -72,6 +75,8 @@ void CFileBase::Make(const ParserMgr& parser_mgr)
     WriteMainEnd(out);
 
     out.close();
+
+    MakeHFile();
 }
 
 std::string CFileBase::PreprocessExprn(const std::string& exprn) const
@@ -149,7 +154,7 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
 
 void CFileBase::WriteConditions(std::ofstream& out, const ConditionModel* conditions)
 {
-    out << "//Begin WriteConditions\n";
+    out << "//Begin CFileBase::WriteConditions\n";
     const size_t num_conds = conditions->NumPars();
     for (size_t i=0; i<num_conds; ++i)
     {
@@ -163,13 +168,13 @@ void CFileBase::WriteConditions(std::ofstream& out, const ConditionModel* condit
 
         out << "        }\n";
     }
-    out << "//End WriteConditions\n";
+    out << "//End CFileBase::WriteConditions\n";
 }
 
 void CFileBase::WriteExecVarsDiffs(std::ofstream& out, const ParamModelBase* variables,
                                     const ParamModelBase* diffs)
 {
-    out << "//Begin WriteExecVarsDiffs\n";
+    out << "//Begin CFileBase::WriteExecVarsDiffs\n";
     const size_t num_vars = variables->NumPars(),
             num_diffs = diffs->NumPars();
     for (size_t i=0; i<num_vars; ++i)
@@ -200,12 +205,12 @@ void CFileBase::WriteExecVarsDiffs(std::ofstream& out, const ParamModelBase* var
     for (size_t i=0; i<num_diffs; ++i)
         if (!diffs->IsFreeze(i))
             out << "        " + diffs->ShortKey(i) + " = " + diffs->TempKey(i) + ";\n";
-    out << "//End WriteExecVarsDiffs\n";
+    out << "//End CFileBase::WriteExecVarsDiffs\n";
 }
 
 void CFileBase::WriteFuncs(std::ofstream& out, const ParamModelBase* model)
 {
-    out << "//Begin WriteFuncs\n";
+    out << "//Begin CFileBase::WriteFuncs\n";
     const size_t num_pars = model->NumPars();
     for (size_t i=0; i<num_pars; ++i)
     {
@@ -217,23 +222,23 @@ void CFileBase::WriteFuncs(std::ofstream& out, const ParamModelBase* model)
                "    " + PreprocessExprn( model->TempExpression(i) ) + ";\n"
                "}\n";
     }
-    out << "//End WriteFuncs\n";
+    out << "//End CFileBase::WriteFuncs\n";
     out << "\n";
 }
 
 void CFileBase::WriteGlobalConst(std::ofstream& out, const ParserMgr& parser_mgr)
 {
-    out << "//Begin WriteGlobalConst\n";
+    out << "//Begin CFileBase::WriteGlobalConst\n";
     out << "const int INPUT_SIZE = " << Input::INPUT_SIZE << ";\n";
     out << "const double tau = " << parser_mgr.ModelStep() << ";\n";
-    out << "//End WriteGlobalConst\n";
+    out << "//End CFileBase::WriteGlobalConst\n";
     out << "\n";
 }
 
 void CFileBase::WriteInitVarsDiffs(std::ofstream& out, const ParamModelBase* variables,
                         const ParamModelBase* diffs)
 {
-    out << "//Begin WriteInitVarsDiffs\n";
+    out << "//Begin CFileBase::WriteInitVarsDiffs\n";
     const size_t num_vars = variables->NumPars(),
             num_diffs = diffs->NumPars();
     for (size_t i=0; i<num_vars; ++i)
@@ -249,13 +254,13 @@ void CFileBase::WriteInitVarsDiffs(std::ofstream& out, const ParamModelBase* var
     }
     for (size_t i=0; i<num_diffs; ++i)
         out << "    " + diffs->ShortKey(i) + " = " + diffs->ShortKey(i) + "0;\n";
-    out << "//End WriteInitVarsDiffs\n";
+    out << "//End CFileBase::WriteInitVarsDiffs\n";
     out << "\n";
 }
 
 void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables)
 {
-    out << "//Begin WriteLoadInput\n";
+    out << "//Begin CFileBase::WriteLoadInput\n";
     out << "    size_t br;\n";
     out << "    int num_elts;\n";
     const size_t num_vars = variables->NumPars();
@@ -294,13 +299,13 @@ void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variabl
 #endif
                "    fclose(" + fpv + ");\n";
     }
-    out << "//End WriteLoadInput\n";
+    out << "//End CFileBase::WriteLoadInput\n";
     out << "\n";
 }
 
 void CFileBase::WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr)
 {
-    out << "//Begin WriteVarDecls\n";
+    out << "//Begin CFileBase::WriteVarDecls\n";
     const ParamModelBase* init_conds = parser_mgr.Model(ds::INIT_CONDS);
     const size_t num_ics = init_conds->NumPars();
     for (size_t i=0; i<num_ics; ++i)
@@ -331,16 +336,16 @@ void CFileBase::WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr)
         if (!diffs->IsFreeze(i))
             out << "double " + diffs->TempKey(i) + ";\n";
     }
-    out << "//End WriteVarDecls\n";
+    out << "//End CFileBase::WriteVarDecls\n";
     out << "\n";
 }
 
 std::string CFileBase::MakeName(const std::string& name) const
 {
     std::string out(name);
-    const int len = out.length();
+    const size_t len = out.length();
 #ifdef Q_OS_WIN
-    if (out.substr(len-2) != ".cpp") out += ".cpp";
+    if (out.substr(len-4) != ".cpp") out += ".cpp";
 #else
     if (out.substr(len-2) != ".c") out += ".c";
 #endif

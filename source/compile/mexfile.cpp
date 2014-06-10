@@ -105,27 +105,27 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
 
 void MEXFile::WriteDataOut(std::ofstream& out, const ParamModelBase* model)
 {
-    out << "//Begin WriteDataOut\n";
+    out << "//Begin MEXFile::WriteDataOut\n";
     const size_t num_pars = model->NumPars();
     for (size_t i=0; i<num_pars; ++i)
         out << "            out[ col++*num_records + row_ct ] = " + model->ShortKey(i) + ";\n";
-    out << "//End WriteDataOut\n";
+    out << "//End MEXFile::WriteDataOut\n";
     out << "    \n";
 }
 void MEXFile::WriteIncludes(std::ofstream& out)
 {
-    out << "//Begin WriteIncludes\n";
+    out << "//Begin MEXFile::WriteIncludes\n";
     out <<
            "#include \"math.h\"\n"
            "#include \"mex.h\"\n"
            "#include \"matrix.h\"\n";
-    out << "//End WriteIncludes\n";
+    out << "//End MEXFile::WriteIncludes\n";
     out << "\n";
 }
 void MEXFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
                    const ParamModelBase* init_conds)
 {
-    out << "//Begin WriteInitArgs\n";
+    out << "//Begin MEXFile::WriteInitArgs\n";
     const size_t num_inputs = inputs->NumPars(),
             num_ics = init_conds->NumPars();
 
@@ -141,7 +141,7 @@ void MEXFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
     for (size_t i=0; i<num_ics; ++i)
         out << "    " + init_conds->ShortKey(i) + "0 = *mxGetPr(prhs["
                + std::to_string(i+num_inputs+NUM_AUTO_ARGS) + "]);\n";
-    out << "//End WriteInitArgs\n";
+    out << "//End MEXFile::WriteInitArgs\n";
     out << "\n";
 
     _inputCt = num_inputs+num_ics+NUM_AUTO_ARGS; // ### Feels like a hack,
@@ -149,17 +149,13 @@ void MEXFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
 }
 void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables)
 {
-    out << "//Begin WriteLoadInput\n";
+    out << "//Begin MEXFile::WriteLoadInput\n";
     const size_t num_vars = variables->NumPars();
     for (size_t i=0; i<num_vars; ++i)
     {
         if (variables->IsFreeze(i)) continue;
         const std::string& value = variables->Value(i);
         if (Input::Type(value) != Input::INPUT_FILE) continue;
-        QFileInfo f( ds::StripQuotes(value).c_str() );
-        const std::string value_abs = f.canonicalFilePath().toStdString();
-        if (value_abs.empty())
-            throw std::runtime_error("CFileBase::WriteLoadInput: Bad file name.");
 
         const std::string var = variables->Key(i),
                 inputv = "input_" + var,
@@ -172,7 +168,7 @@ void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables
                "    int " + samps_ct + " = 0;\n"
                "    " + spsv + " = (int)(1.0/(tau * (double)" + spsv + ") + 0.5);\n";
     }
-    out << "//End WriteLoadInput\n";
+    out << "//End MEXFile::WriteLoadInput\n";
     out << "\n";
 }
 void MEXFile::WriteMainBegin(std::ofstream& out)
@@ -187,14 +183,12 @@ void MEXFile::WriteMainBegin(std::ofstream& out)
 }
 void MEXFile::WriteMainEnd(std::ofstream& out)
 {
-    out <<
-           "    mexPrintf(\"" + ds::StripPath(Name()) + " exited without crashing.\\n\");\n"
-           "}\n";
+    out << "}\n";
 }
 void MEXFile::WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
                                    const ParamModelBase* diffs)
 {
-    out << "//Begin WriteOutputHeader\n";
+    out << "//Begin MEXFile::WriteOutputHeader\n";
     const size_t num_fields = variables->NumPars()+diffs->NumPars();
     out <<
            "    const int num_fields = " + std::to_string(num_fields) + ",\n"
@@ -202,7 +196,7 @@ void MEXFile::WriteOutputHeader(std::ofstream& out, const ParamModelBase* variab
            "    plhs[0] = mxCreateDoubleMatrix((mwSize)num_records, (mwSize)num_fields, mxREAL);\n"
            "    double* out = mxGetPr(plhs[0]);\n"
            "    int row_ct = 0;\n";
-    out << "//End WriteOutputHeader\n";
+    out << "//End MEXFile::WriteOutputHeader\n";
     out << "\n";
 }
 void MEXFile::WriteSaveBlockBegin(std::ofstream& out)
@@ -219,7 +213,8 @@ void MEXFile::WriteSaveBlockEnd(std::ofstream& out)
 std::string MEXFile::MakeMName(const std::string& name) const
 {
     std::string out(name);
-    out.erase( name.find_last_of('.') );
+    size_t pos = out.find_last_of('.');
+    if (pos!=std::string::npos) out.erase(pos);
     out += "_m.m";
     return out;
 }

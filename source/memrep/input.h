@@ -35,7 +35,6 @@ class Input
 
         Input(double* const value);
         Input(const Input& other);
-        Input& operator=(const Input& other);
         ~Input();
 
         void GenerateInput(TYPE type);
@@ -46,6 +45,8 @@ class Input
         TYPE Type() const { return _type; }
 
     private:
+        Input& operator=(const Input&);
+
         void DeepCopy(const Input& other);
         template<typename T>
         void GenerateRandInput(T& distribution);

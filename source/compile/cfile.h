@@ -9,6 +9,8 @@ class CFile : public CFileBase
         CFile(const std::string& name);
 
     protected:
+        virtual void MakeHFile() override {}
+
         virtual void WriteDataOut(std::ofstream& out, const ParamModelBase* model) override;
         virtual void WriteIncludes(std::ofstream& out) override;
         virtual void WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,

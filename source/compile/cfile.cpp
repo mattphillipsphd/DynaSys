@@ -6,11 +6,11 @@ CFile::CFile(const std::string& name) : CFileBase(name)
 
 void CFile::WriteDataOut(std::ofstream& out, const ParamModelBase* model)
 {
-    out << "//Begin WriteDataOut\n";
+    out << "//Begin CFile::WriteDataOut\n";
     const size_t num_pars = model->NumPars();
     for (size_t i=0; i<num_pars; ++i)
         out << "            fwrite(&" + model->ShortKey(i) + ", sizeof(double), 1, fp);\n";
-    out << "//End WriteDataOut\n";
+    out << "//End CFile::WriteDataOut\n";
     out << "    \n";
 }
 
@@ -33,7 +33,7 @@ void CFile::WriteIncludes(std::ofstream& out)
 void CFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
                    const ParamModelBase* init_conds)
 {
-    out << "//Begin WriteInitArgs\n";
+    out << "//Begin CFile::WriteInitArgs\n";
     const size_t num_inputs = inputs->NumPars(),
             num_ics = init_conds->NumPars();
 
@@ -51,7 +51,7 @@ void CFile::WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
     for (size_t i=0; i<num_ics; ++i)
         out << "    " + init_conds->ShortKey(i) + "0 = atof(argv["
                + std::to_string(i+num_inputs+NUM_AUTO_ARGS) + "]);\n";
-    out << "//End WriteInitArgs\n";
+    out << "//End CFile::WriteInitArgs\n";
     out << "\n";
 }
 
@@ -74,7 +74,7 @@ void CFile::WriteMainEnd(std::ofstream& out)
 void CFile::WriteOutputHeader(std::ofstream& out, const ParamModelBase* variables,
                                    const ParamModelBase* diffs)
 {
-    out << "//Begin WriteOutputHeader\n";
+    out << "//Begin CFile::WriteOutputHeader\n";
     out <<
            "    FILE* fp;\n"
            "    fp = fopen(argv[3], \"wb\");\n"
@@ -96,13 +96,13 @@ void CFile::WriteOutputHeader(std::ofstream& out, const ParamModelBase* variable
            "    \n"
            "    const int num_records = num_iters / save_mod_n;\n"
            "    fwrite(&num_records, sizeof(int), 1, fp);\n";
-    out << "//End WriteOutputHeader\n";
+    out << "//End CFile::WriteOutputHeader\n";
     out << "\n";
 }
 
 void CFile::WriteVarsOut(std::ofstream& out, const ParamModelBase* variables)
 {
-    out << "//Begin WriteVarsOut\n";
+    out << "//Begin CFile::WriteVarsOut\n";
     const size_t num_pars = variables->NumPars();
     for (size_t i=0; i<num_pars; ++i)
     {
@@ -110,6 +110,6 @@ void CFile::WriteVarsOut(std::ofstream& out, const ParamModelBase* variables)
         out << "    fwrite(&len, sizeof(int), 1, fp);\n";
         out << "    fputs(\"" + variables->ShortKey(i) + "\", fp);\n";
     }
-    out << "//End WriteVarsOut\n";
+    out << "//End CFile::WriteVarsOut\n";
     out << "    \n";
 }

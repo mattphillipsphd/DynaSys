@@ -25,6 +25,7 @@ class CFileBase : public QObject
 
     protected:
         std::string PreprocessExprn(const std::string& exprn) const;
+        virtual void MakeHFile() = 0;
 
         void WriteConditions(std::ofstream& out, const ConditionModel* conditions);
         virtual void WriteDataOut(std::ofstream& out, const ParamModelBase* model) = 0;
