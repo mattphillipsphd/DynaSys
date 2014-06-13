@@ -18,16 +18,18 @@ class CompilableBase : public QObject
         const std::string& Name() const { return _name; }
         const std::string& NameExe() const { return _nameExe; }
         const std::string& NameRaw() const { return _nameRaw; }
+        const std::string& Path() const { return _path; }
 
     protected:
         CFileBase* GetCFile() const { return _cFile; }
-        const std::string MakeRawName(const std::string& name);
+        const std::string MakePath(const std::string& name) const;
+        const std::string MakeRawName(const std::string& name) const;
 
         Log* _log;
 
     private:
         CFileBase* const _cFile;
-        const std::string _nameRaw, _name, _nameExe;
+        const std::string _nameRaw, _path, _name, _nameExe;
 };
 
 #endif // COMPILABLEBASE_H

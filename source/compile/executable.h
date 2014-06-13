@@ -10,12 +10,15 @@ class Executable : public Compilable
 
     public:
         Executable(const std::string& name);
+        virtual ~Executable();
 
         int Launch();
         int Launch(const VecStr& inputs);
         void WaitComplete();
 
         void SetArguments(const VecStr& args) {_arguments = args; }
+
+        const VecStr& Arguments() const { return _arguments; }
 
     signals:
         void Finished(int id, bool is_normal);

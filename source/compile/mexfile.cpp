@@ -34,7 +34,14 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
 
     mout <<
             "function [input_names, inputs, output_names, data] = "
-                    + name_m + "(num_records, save_mod_n)\n"
+                    + name_m + "(num_records, save_mod_n";
+    for (size_t i=0, ct=0; i<num_vars; ++i)
+        if (!variables->IsFreeze(i) && Input::Type(variables->Value(i))==Input::INPUT_FILE)
+        {
+            std::string si = std::to_string(ct++);
+            mout << ", input" + si + ", sput" + si;
+        }
+    mout << ")\n"
             "\n";
 
     //All the input parameter names
@@ -51,7 +58,7 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
         if (!variables->IsFreeze(i) && Input::Type(variables->Value(i))==Input::INPUT_FILE)
         {
             mout << "input_names{" + std::to_string(inn_ct++) + "} = 'input_" + variables->Key(i) + "';\n";
-            mout << "input_names{" + std::to_string(inn_ct++) + "} = 'sps_" + variables->Key(i) + "';\n";
+            mout << "input_names{" + std::to_string(inn_ct++) + "} = 'sput_" + variables->Key(i) + "';\n";
         }
     mout << "\n";
 
@@ -59,7 +66,12 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
     mout <<
            "if nargin<2\n"
            "    num_records = -1;\n"
-           "    save_mod_n = -1;\n"
+           "    save_mod_n = -1;\n";
+    for (size_t i=0; i<num_input_files; ++i)
+        mout <<
+                "    input" + std::to_string(i) + " = [];\n"
+                "    sput" + std::to_string(i) + " = [];\n";
+    mout <<
            "end\n"
            "\n"
             "inputs = cell(" + std::to_string(NUM_AUTO_ARGS+num_columns+num_input_files) + ",1);\n"
@@ -69,14 +81,25 @@ void MEXFile::MakeMFile(const ParserMgr& parser_mgr)
     for (size_t i=0; i<num_inputs; ++i, ++in_ct)
         mout << "inputs{" + std::to_string(in_ct) + "} = " + inputs->Value(i)
                 + ";\t%" + inputs->Key(i) + "\n";
+    mout << "\n";
+
+        //Inportant to put the parameter names in the namespace because they can be
+        //used as initial conditions
+    mout <<
+            "for i=1:" + std::to_string(num_inputs) + "\n"
+            "    eval([input_names{i} ' = ' num2str(inputs{i}) ';']);\n"
+            "end\n"
+            "\n";
+
     for (size_t i=0; i<num_ics; ++i, ++in_ct)
         mout << "inputs{" + std::to_string(in_ct) + "} = " + init_conds->Value(i)
                 + ";\t%" + init_conds->Key(i) + "\n";
-    for (size_t i=0; i<num_vars; ++i)
+    for (size_t i=0, ct=0; i<num_vars; ++i)
         if (!variables->IsFreeze(i) && Input::Type(variables->Value(i))==Input::INPUT_FILE)
         {
-            mout << "inputs{" + std::to_string(in_ct++) + "} = [];\n";
-            mout << "inputs{" + std::to_string(in_ct++) + "} = [];\n";
+            std::string si = std::to_string(ct++);
+            mout << "inputs{" + std::to_string(in_ct++) + "} = input" + si + ";\n";
+            mout << "inputs{" + std::to_string(in_ct++) + "} = sput" + si + ";\n";
         }
     mout << "\n";
 
@@ -151,7 +174,7 @@ void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables
 {
     out << "//Begin MEXFile::WriteLoadInput\n";
     const size_t num_vars = variables->NumPars();
-    for (size_t i=0; i<num_vars; ++i)
+    for (size_t i=0, ct=0; i<num_vars; ++i)
     {
         if (variables->IsFreeze(i)) continue;
         const std::string& value = variables->Value(i);
@@ -159,14 +182,14 @@ void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables
 
         const std::string var = variables->Key(i),
                 inputv = "input_" + var,
-                spsv = "sps_" + var, //samples per step
+                sputv = "sput_" + var, //samples per unit time
                 samps_ct = "ct_" + var;
-        if (i!=0) out << "\n";
+        if (ct++!=0) out << "\n";
         out << "    double* " + inputv + " = mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
-        out << "    int " + spsv + " = (int)*mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
+        out << "    int " + sputv + " = (int)*mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
         out <<
                "    int " + samps_ct + " = 0;\n"
-               "    " + spsv + " = (int)(1.0/(tau * (double)" + spsv + ") + 0.5);\n";
+               "    " + sputv + " = (int)(1.0/(tau * (double)" + sputv + ") + 0.5);\n";
     }
     out << "//End MEXFile::WriteLoadInput\n";
     out << "\n";

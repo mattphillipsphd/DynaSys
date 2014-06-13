@@ -261,7 +261,11 @@ void MainWindow::StartCompiled(int duration, int save_mod_n)
                 Qt::QueuedConnection);
 
         int job_id = exe->Launch();
-        _log->AddMesg("Job " + std::to_string(job_id) + " started.");
+        const VecStr& args = exe->Arguments();
+        _log->AddMesg("Job " + std::to_string(job_id) + " started, with arguments:");
+        int ct=1;
+        for (const auto& it : args)
+            _log->AddMesg(std::to_string(ct++) + ":\t" + it);
 
         _jobs.push_back( JobRecord(job_id, exe, std::chrono::system_clock::now()) );
     }
@@ -443,7 +447,6 @@ void MainWindow::on_actionParameters_triggered()
     ScopeTracker st("MainWindow::on_actionParameters_triggered", _tid);
 #endif
     SaveModel(ds::TEMP_MODEL_FILE);
-    ui->btnStart->setEnabled(false);
     SetButtonsEnabled(false);
     SetParamsEnabled(false);
     _paramEditor->SetFileName(_fileName);
@@ -708,7 +711,8 @@ void MainWindow::on_btnStart_clicked()
             break;
         case DRAWING:
             _playState = STOPPED;
-            SetButtonsEnabled(true);
+            if (!_paramEditor->isVisible())
+                SetButtonsEnabled(true);
             ui->btnStart->setText("Start");
             break;
         case PAUSED:
@@ -911,11 +915,15 @@ Executable* MainWindow::CreateExecutable(const std::string& name) const
     VecStr values;
     values.push_back( std::to_string(_numSimSteps) );
     values.push_back( std::to_string(_saveModN) );
-    values.push_back(name);
+    values.push_back(name + ".dsdat");
     for (size_t i=0; i<_inputs->NumPars(); ++i)
         values.push_back( _inputs->Value(i) );
     for (size_t i=0; i<_initConds->NumPars(); ++i)
-        values.push_back( _initConds->Value(i) );
+    {
+        std::string val = _initConds->Value(i);
+        int idx = _inputs->KeyIndex(val);
+        values.push_back( idx==-1 ? val : _inputs->Value(val) );
+    }
     exe->SetArguments(values);
 
     return exe;
@@ -1385,11 +1393,7 @@ void MainWindow::DrawPhasePortrait()
         try
         {
             if (_needInitialize)
-//            {
                 emit DoInitParserMgr();
-//                std::unique_lock<std::mutex> lock(_mutex);
-//                _condVar.wait(lock, [&]{ return !_needInitialize; });
-//            }
             if (_needUpdateExprns)
             {
                 _parserMgr.SetExpressions();
@@ -1614,11 +1618,7 @@ void MainWindow::DrawVectorField()
     }
 
     if ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needInitialize)
-//    {
         emit DoInitParserMgr();
-//        std::unique_lock<std::mutex> lock(_mutex);
-//        _condVar.wait(lock, [&]{ return !_needInitialize; });
-//    }
 
     while ((_playState==DRAWING && _plotMode==VECTOR_FIELD) || _needUpdateVF)
     {
@@ -2042,7 +2042,6 @@ void MainWindow::InitParserMgr() //slot
         _parserMgr.SetExpressions();
         _parserMgr.SetConditions();
         _needInitialize = false;
-//        _condVar.notify_one();
     }
     catch (std::exception& e)
     {
@@ -2255,6 +2254,8 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->actionSave_Vector_Field->setEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
+
+    _paramEditor->setEnabled(!is_enabled);
 }
 void MainWindow::SetParamsEnabled(bool is_enabled)
 {

@@ -13,6 +13,12 @@ Executable::Executable(const std::string& name) : Compilable(name),
     connect(&_proc, SIGNAL(stateChanged(QProcess::ProcessState)),
             this, SLOT(StateChanged(QProcess::ProcessState)));
 }
+Executable::~Executable()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("Executable::~Executable", std::this_thread::get_id());
+#endif
+}
 
 int Executable::Launch()
 {

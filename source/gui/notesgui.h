@@ -32,6 +32,7 @@ class NotesGui : public QWidget
 
     private slots:
         void on_btnSave_clicked();
+        void on_btnSaveClose_clicked();
 
     private:
         Ui::NotesGui *ui;

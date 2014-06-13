@@ -96,10 +96,11 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
         std::string base = temp.substr(0, posc);
         size_t base_begin = 0;
         int paren = 0;
-        for (size_t i=posc-1; i<std::numeric_limits<size_t>::max(); --i)
+        for (size_t i=posc-1; i!=-1; --i)
         {
             char c = temp.at(i);
-            if (paren==0 && OPS.find_first_of(c)!=std::string::npos)
+            if (paren==0
+                    && (OPS.find_first_of(c)!=std::string::npos || c=='('))
             {
                 base = temp.substr(i+1,posc-i-1);
                 base_begin = i+1;
@@ -125,11 +126,12 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
         for (size_t i=posc+1; i<len; ++i)
         {
             char c = temp.at(i);
-            if (paren==0 && OPS.find_first_of(c)!=std::string::npos)
+            if (paren==0
+                    && (OPS.find_first_of(c)!=std::string::npos || c==')'))
             {
                 if (c=='-' && i==posc+1) continue; //unary minus
-                expt = temp.substr(posc+1,i-posc);
-                expt_end = i+1;
+                expt = temp.substr(posc+1,i-posc-1);
+                expt_end = i;
                 break;
             }
             else if (c=='(')
@@ -146,7 +148,7 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
             }
         }
 
-        temp.replace(base_begin, expt_end-base_begin, "exp(" + base + "," + expt + ")");
+        temp.replace(base_begin, expt_end-base_begin, "pow(" + base + "," + expt + ")");
         posc = temp.find_first_of('^');
     }
     return temp;
@@ -187,10 +189,10 @@ void CFileBase::WriteExecVarsDiffs(std::ofstream& out, const ParamModelBase* var
         {
             std::string var = variables->ShortKey(i),
                     inputv = "input_" + var,
-                    spsv = "sps_" + var, //samples per step
+                    sputv = "sput_" + var, //samples per unit time
                     samps_ct = "ct_" + var;
             out <<
-                   "        if (i % " + spsv + " == 0)\n"
+                   "        if (i % " + sputv + " == 0)\n"
                    "            " + var + " = " + inputv + "[++" + samps_ct + "];\n"
                    "        \n";
         }
@@ -264,7 +266,7 @@ void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variabl
     out << "    size_t br;\n";
     out << "    int num_elts;\n";
     const size_t num_vars = variables->NumPars();
-    for (size_t i=0; i<num_vars; ++i)
+    for (size_t i=0, ct=0; i<num_vars; ++i)
     {
         if (variables->IsFreeze(i)) continue;
         const std::string& value = variables->Value(i);
@@ -277,17 +279,17 @@ void CFileBase::WriteLoadInput(std::ofstream& out, const ParamModelBase* variabl
         const std::string var = variables->Key(i),
                 fpv = "fp_" + var,
                 inputv = "input_" + var,
-                spsv = "sps_" + var, //samples per step
+                sputv = "sput_" + var, //samples per step
                 samps_ct = "ct_" + var;
-        if (i!=0) out << "\n";
+        if (ct++!=0) out << "\n";
         out <<
                "    FILE* " + fpv + " = fopen(\"" + value_abs + "\", \"rb\");\n"
                "    if (" + fpv + "==0) return 1;\n"
                "    int vnum_" + var + ";\n"
                "    br = fread(&vnum_" + var + ", sizeof(int), 1, " + fpv + ");\n"
-               "    int " + spsv + ", " + samps_ct + " = 0;\n"
-               "    br = fread(&" + spsv + ", sizeof(int), 1, " + fpv + ");\n"
-               "    " + spsv + " = (int)(1.0/(tau * (double)" + spsv + ") + 0.5);\n"
+               "    int " + sputv + ", " + samps_ct + " = 0;\n"
+               "    br = fread(&" + sputv + ", sizeof(int), 1, " + fpv + ");\n"
+               "    " + sputv + " = (int)(1.0/(tau * (double)" + sputv + ") + 0.5);\n"
                "    br = fread(&num_elts, sizeof(int), 1, " + fpv + ");\n"
                "    double* " + inputv + " = (double*)malloc(INPUT_SIZE*sizeof(double));\n"
 #ifdef Q_OS_WIN

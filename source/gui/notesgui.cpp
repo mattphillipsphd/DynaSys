@@ -30,5 +30,12 @@ void NotesGui::on_btnSave_clicked()
     _notes->SetText(
                 ui->txtNotes->document()->toPlainText().toStdString() );
     emit SaveNotes();
+}
+
+void NotesGui::on_btnSaveClose_clicked()
+{
+    _notes->SetText(
+                ui->txtNotes->document()->toPlainText().toStdString() );
+    emit SaveNotes();
     close();
 }
