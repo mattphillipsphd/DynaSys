@@ -65,7 +65,8 @@ SOURCES += main.cpp\
     compile/cfileso.cpp \
     compile/sharedobj.cpp \
     compile/compilable.cpp \
-    compile/compilablebase.cpp
+    compile/compilablebase.cpp \
+    compile/cudakernel.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -108,7 +109,8 @@ HEADERS  += gui/mainwindow.h \
     compile/cfileso.h \
     compile/sharedobj.h \
     compile/compilable.h \
-    compile/compilablebase.h
+    compile/compilablebase.h \
+    compile/cudakernel.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

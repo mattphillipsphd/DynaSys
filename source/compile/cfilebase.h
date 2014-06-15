@@ -31,8 +31,8 @@ class CFileBase : public QObject
         virtual void WriteDataOut(std::ofstream& out, const ParamModelBase* model) = 0;
         void WriteExecVarsDiffs(std::ofstream& out, const ParamModelBase* variables,
                                 const ParamModelBase* diffs);
-        void WriteFuncs(std::ofstream& out, const ParamModelBase* model);
-        void WriteGlobalConst(std::ofstream& out, const ParserMgr& parser_mgr);
+        virtual void WriteFuncs(std::ofstream& out, const ParamModelBase* model);
+        virtual void WriteGlobalConst(std::ofstream& out, const ParserMgr& parser_mgr);
         virtual void WriteIncludes(std::ofstream& out) = 0;
         virtual void WriteInitArgs(std::ofstream& out, const ParamModelBase* inputs,
                            const ParamModelBase* init_conds) = 0;
@@ -45,14 +45,17 @@ class CFileBase : public QObject
                                            const ParamModelBase* diffs) = 0;
         virtual void WriteSaveBlockBegin(std::ofstream&) {}
         virtual void WriteSaveBlockEnd(std::ofstream&) {}
-        void WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr);
+        virtual void WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr);
 
         Log* const _log;
 
-    private:
-        std::string MakeName(const std::string& name) const;
+    protected:
+        void ResetNameSuffix(const std::string& new_suffix);
 
-        const std::string _name;
+    private:
+        virtual std::string MakeName(const std::string& name) const;
+
+        std::string _name; // ### Making this non-const so CudaKernel can revise it to .cu
 };
 
 #endif // CFILEBASE_H

@@ -342,6 +342,27 @@ void MainWindow::on_actionClear_triggered()
     UpdateLists();
 }
 
+void MainWindow::on_actionCreate_CUDA_kernel_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionCreate_CUDA_kernel_triggered", _tid);
+#endif
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select CUDA kernel file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+//        DDM::SetMEXFilesDir(file_name);
+        CudaKernel cuda_kernel(file_name);
+        cuda_kernel.Make(_parserMgr);
+        _log->AddMesg("CUDA kernel file " + file_name + " created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCreate_CUDA_kernel_triggered: " + std::string(e.what()));
+    }
+}
 void MainWindow::on_actionCreate_MEX_file_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -795,11 +816,7 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbSlidePars_currentIndexChanged", _tid);
 #endif
     if (index==-1) return;
-    const double val = std::stod( _inputs->Value(index) ),
-            min = _parserMgr.Minimum(_inputs, index),
-            range = _parserMgr.Range(_inputs, index);
-    const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
-    ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
+    UpdateSlider(index);
 }
 
 void MainWindow::on_edModelStep_editingFinished()
@@ -835,10 +852,10 @@ void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
     ResetResultsList(row);
 }
 
-void MainWindow::on_sldParameter_valueChanged(int value)
+void MainWindow::on_sldParameter_sliderMoved(int value)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::on_sldParameter_valueChanged", _tid);
+    ScopeTracker st("MainWindow::on_sldParameter_sliderMoved", _tid);
 #endif
     const int index = ui->cmbSlidePars->currentIndex();
     const double range = _parserMgr.Range(_inputs, index);
@@ -2057,6 +2074,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
     std::string exprn = _inputs->Expression(idx);
     if (_parserMgr.AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
+    UpdateSlider( ui->cmbSlidePars->currentIndex() );
     if (IsVFPresent()) UpdateVectorField();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
@@ -2314,6 +2332,18 @@ void MainWindow::UpdatePulseVList()
     VecStr keys = _inputs->Keys();
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbPulsePars->insertItem((int)i, keys.at(i).c_str());
+}
+void MainWindow::UpdateSlider(int index)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::UpdateSlider", _tid);
+#endif
+    if (index==-1) return;
+    const double val = std::stod( _inputs->Value(index) ),
+            min = _parserMgr.Minimum(_inputs, index),
+            range = _parserMgr.Range(_inputs, index);
+    const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
+    ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
 }
 void MainWindow::UpdateSliderPList()
 {

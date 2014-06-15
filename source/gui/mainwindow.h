@@ -41,6 +41,7 @@
 #include "notesgui.h"
 #include "parameditor.h"
 #include "../compile/cfileso.h"
+#include "../compile/cudakernel.h"
 #include "../compile/executable.h"
 #include "../compile/mexfile.h"
 #include "../compile/sharedobj.h"
@@ -148,6 +149,7 @@ class MainWindow : public QMainWindow
     private slots:
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
+        void on_actionCreate_CUDA_kernel_triggered();
         void on_actionCreate_MEX_file_triggered();
         void on_actionCreate_SO_triggered();
         void on_actionCompile_Run_triggered();
@@ -191,7 +193,7 @@ class MainWindow : public QMainWindow
 
         void on_lsConditions_clicked(const QModelIndex& index);
 
-        void on_sldParameter_valueChanged(int value);
+        void on_sldParameter_sliderMoved(int value);
 
         void on_spnStepsPerSec_valueChanged(int value);
         void on_spnTailLength_valueChanged(int value);
@@ -253,6 +255,7 @@ class MainWindow : public QMainWindow
         void UpdateNullclines();
         void UpdateParamEditor();
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
+        void UpdateSlider(int index);
         void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
         void UpdateTimePlotTable();

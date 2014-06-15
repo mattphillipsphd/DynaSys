@@ -185,7 +185,7 @@ void MEXFile::WriteLoadInput(std::ofstream& out, const ParamModelBase* variables
                 sputv = "sput_" + var, //samples per unit time
                 samps_ct = "ct_" + var;
         if (ct++!=0) out << "\n";
-        out << "    double* " + inputv + " = mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
+        out << "    const double* " + inputv + " = mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
         out << "    int " + sputv + " = (int)*mxGetPr(prhs[" + std::to_string(_inputCt++) + "]);\n";
         out <<
                "    int " + samps_ct + " = 0;\n"

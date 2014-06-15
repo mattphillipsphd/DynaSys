@@ -528,7 +528,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -569,6 +569,7 @@
     <addaction name="actionFit"/>
     <addaction name="actionCreate_MEX_file"/>
     <addaction name="actionCreate_SO"/>
+    <addaction name="actionCreate_CUDA_kernel"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -677,6 +678,11 @@
   <action name="actionCreate_SO">
    <property name="text">
     <string>Create SO</string>
+   </property>
+  </action>
+  <action name="actionCreate_CUDA_kernel">
+   <property name="text">
+    <string>Create CUDA kernel</string>
    </property>
   </action>
  </widget>

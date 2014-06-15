@@ -342,6 +342,15 @@ void CFileBase::WriteVarDecls(std::ofstream& out, const ParserMgr& parser_mgr)
     out << "\n";
 }
 
+void CFileBase::ResetNameSuffix(const std::string& new_suffix)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("CFileBase::ResetNameSuffix", std::this_thread::get_id());
+#endif
+    _name.erase( _name.find_last_of('.') );
+    _name += new_suffix;
+}
+
 std::string CFileBase::MakeName(const std::string& name) const
 {
     std::string out(name);
