@@ -40,11 +40,11 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
-#include "../compile/cfileso.h"
-#include "../compile/cudakernel.h"
-#include "../compile/executable.h"
-#include "../compile/mexfile.h"
-#include "../compile/sharedobj.h"
+#include "../generate/script/cfileso.h"
+#include "../generate/script/cudakernel.h"
+#include "../generate/object/executable.h"
+#include "../generate/script/mexfile.h"
+#include "../generate/object/sharedobj.h"
 #include "../file/datfileout.h"
 #include "../file/defaultdirmgr.h"
 #include "../file/sysfilein.h"
@@ -73,7 +73,8 @@ class MainWindow : public QMainWindow
         enum PLOT_MODE
         {
             SINGLE,
-            VECTOR_FIELD
+            VECTOR_FIELD,
+            VARIABLE_VIEW
         };
         enum PLAY_STATE
         {
@@ -201,6 +202,7 @@ class MainWindow : public QMainWindow
 
         void AttachPhasePlot(bool attach = true);
         void AttachTimePlot(bool attach = true);
+        void AttachVariableView(bool attach = true);
         void AttachVectorField(bool attach = true);
         void ComboBoxChanged(size_t row);
         void ExprnChanged(QModelIndex, QModelIndex);
@@ -233,6 +235,7 @@ class MainWindow : public QMainWindow
         void DrawNullclines();
         void DrawPhasePortrait();
         ViewRect DrawTimePlot(bool replot_now);
+        void DrawVariableView();
         void DrawVectorField();
         void InitBuffers();
         void InitDefaultModel();
@@ -250,6 +253,7 @@ class MainWindow : public QMainWindow
         void SaveModel(const std::string& file_name);
         void SetButtonsEnabled(bool is_enabled);
         void SetParamsEnabled(bool is_enabled);
+        void SetSaveActionsEnabled(bool is_enabled);
         void UpdateLists();
         void UpdateNotes();
         void UpdateNullclines();
@@ -278,11 +282,11 @@ class MainWindow : public QMainWindow
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;
-        volatile bool _isVFAttached;
+        volatile bool _isVFAttached, _isVVAttached;
         std::vector<JobRecord> _jobs;
         Log* const _log;
         std::mutex _mutex;
-        volatile bool _needClearVF, _needInitialize, _needUpdateExprns,
+        volatile bool _needClearVF, _needClearVV, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;
         std::vector<QwtPlotItem*> _ncPlotItems;
         int _numSimSteps, _numTPSamples;
@@ -298,7 +302,7 @@ class MainWindow : public QMainWindow
             _saveModN, _singleStepsSec, _singleTailLen;
         const std::thread::id _tid;
         const std::vector<QColor> _tpColors;
-        std::vector<QwtPlotItem*> _vfPlotItems;
+        std::vector<QwtPlotItem*> _vfPlotItems, _vvPlotItems;
         int _vfStepsSec, _vfTailLen;
 
         std::vector< std::deque<double> > _diffPts, _varPts;

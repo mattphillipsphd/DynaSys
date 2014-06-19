@@ -29,7 +29,8 @@ class Input
             USER
         };
         static TYPE Type(const std::string& text);
-        static const std::string GAMMA_RAND_STR,
+        static const std::string INPUT_FILE_STR,
+                                GAMMA_RAND_STR,
                                 NORM_RAND_STR,
                                 UNI_RAND_STR;
 

@@ -6,8 +6,8 @@
 #include <QMainWindow>
 #include <QWidget>
 
-#include "../compile/executable.h"
-#include "../compile/fit.h"
+#include "../generate/object/executable.h"
+#include "../generate/fit.h"
 #include "../globals/globals.h"
 #include "../globals/scopetracker.h"
 

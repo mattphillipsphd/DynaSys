@@ -23,8 +23,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
     _inputs(nullptr), _variables(nullptr),
-    _fileName(""), _isVFAttached(false), _log(Log::Instance()),
-    _needClearVF(false), _needInitialize(true), _needUpdateExprns(false),
+    _fileName(""), _isVFAttached(false), _isVVAttached(false), _log(Log::Instance()),
+    _needClearVF(false), _needClearVV(false), _needInitialize(true), _needUpdateExprns(false),
     _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_WINDOW_LENGTH),
     _playState(STOPPED), _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
@@ -49,8 +49,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
 #ifdef Q_OS_WIN
-    ui->actionCompile_Run->setEnabled(false);
-    ui->actionCreate_SO->setEnabled(false);
+//    ui->actionCompile_Run->setEnabled(false);
+//    ui->actionCreate_SO->setEnabled(false);
 #endif
     ui->actionFit->setEnabled(false);
 
@@ -217,10 +217,12 @@ void MainWindow::Pause() //slot
         case DRAWING:
             _playState = PAUSED;
             ui->btnStart->setText("Resume");
+            SetSaveActionsEnabled(true);
             break;
         case PAUSED:
             _playState = DRAWING;
             ui->btnStart->setText("Stop");
+            SetSaveActionsEnabled(false);
             ResumeDraw();
             break;
     }
@@ -377,8 +379,8 @@ void MainWindow::on_actionCreate_MEX_file_triggered()
         DDM::SetMEXFilesDir(file_name);
         MEXFile mex_file(file_name);
         mex_file.Make(_parserMgr);
-        mex_file.MakeMFile(_parserMgr);
-        _log->AddMesg("MEX file " + file_name + " and associated m-file created.");
+        mex_file.MakeMFiles(_parserMgr);
+        _log->AddMesg("MEX file " + file_name + " and associated m-files created.");
     }
     catch (std::exception& e)
     {
@@ -526,7 +528,9 @@ void MainWindow::on_actionSave_Model_As_triggered()
                                                          DDM::ModelFilesDir().c_str()).toStdString();
     if (file_name.empty()) return;
 
-    _fileName = file_name;
+    _fileName = file_name.substr(file_name.find_last_of('.'))==".txt"
+            ? file_name
+            : file_name + ".txt";
     DDM::SetModelFilesDir(_fileName);
 
     SaveModel(file_name);
@@ -785,29 +789,36 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
     ClearPlots();
 
     if (text=="Single")
-    {
         _plotMode = SINGLE;
-        ui->btnPulse->setEnabled(true);
-        ui->qwtTimePlot->show();
-        ui->tblTimePlot->show();
-        ui->lblTimePlotN->show();
-        ui->edNumTPSamples->show();
-        ui->spnStepsPerSec->setValue(_singleStepsSec);
-        ui->spnStepsPerSec->setMinimum(-1);
-        ui->spnTailLength->setValue(_singleTailLen);
-        _vfTailLen = 1;
-    }
     else if (text=="Vector field")
-    {
         _plotMode = VECTOR_FIELD;
-        ui->btnPulse->setEnabled(false);
-        ui->qwtTimePlot->hide();
-        ui->tblTimePlot->hide();
-        ui->lblTimePlotN->hide();
-        ui->edNumTPSamples->hide();
-        ui->spnStepsPerSec->setValue(_vfStepsSec);
-        ui->spnStepsPerSec->setMinimum(1);
-        ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
+    else if (text=="Variable View")
+        _plotMode = VARIABLE_VIEW;
+
+    switch (_plotMode)
+    {
+        case SINGLE:
+        case VARIABLE_VIEW:
+            ui->btnPulse->setEnabled(true);
+            ui->qwtTimePlot->show();
+            ui->tblTimePlot->show();
+            ui->lblTimePlotN->show();
+            ui->edNumTPSamples->show();
+            ui->spnStepsPerSec->setValue(_singleStepsSec);
+            ui->spnStepsPerSec->setMinimum(-1);
+            ui->spnTailLength->setValue(_singleTailLen);
+            _vfTailLen = 1;
+            break;
+        case VECTOR_FIELD:
+            ui->btnPulse->setEnabled(false);
+            ui->qwtTimePlot->hide();
+            ui->tblTimePlot->hide();
+            ui->lblTimePlotN->hide();
+            ui->edNumTPSamples->hide();
+            ui->spnStepsPerSec->setValue(_vfStepsSec);
+            ui->spnStepsPerSec->setMinimum(1);
+            ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
+            break;
     }
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
@@ -874,13 +885,12 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
     switch (_plotMode)
     {
         case SINGLE:
+        case VARIABLE_VIEW:
             _singleStepsSec = value;
             break;
         case VECTOR_FIELD:
             _vfStepsSec = value;
             break;
-        default:
-            throw std::runtime_error("MainWindow::on_spnStepsPerSec_valueChanged: Invalid mode.");
     }
 }
 void MainWindow::on_spnTailLength_valueChanged(int value)
@@ -892,6 +902,7 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
     switch (_plotMode)
     {
         case SINGLE:
+        case VARIABLE_VIEW:
             _singleTailLen = value;
             break;
         case VECTOR_FIELD:
@@ -899,8 +910,6 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             lock.unlock();
             UpdateVectorField();
             break;
-        default:
-            throw std::runtime_error("MainWindow::on_spnStepsPerSec_valueChanged: Invalid mode.");
     }
 }
 void MainWindow::on_spnVFResolution_valueChanged(int)
@@ -1069,6 +1078,9 @@ void MainWindow::Draw()
                 break;
             case VECTOR_FIELD:
                 DrawVectorField();
+                break;
+            case VARIABLE_VIEW:
+                DrawVariableView();
                 break;
         }
     }
@@ -1619,6 +1631,14 @@ MainWindow::ViewRect MainWindow::DrawTimePlot(bool replot_now)
 
     return tp_lims;
 }
+void MainWindow::DrawVariableView()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::DrawVariableView", std::this_thread::get_id());
+#endif
+    // ### Need to create new, or reuse the parser object.  The expressions are evaluated
+    //in a new way for this.
+}
 void MainWindow::DrawVectorField()
 {
 #ifdef DEBUG_FUNC
@@ -1840,6 +1860,7 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
     ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
     VecStr vstr;
+    vstr.push_back(Input::INPUT_FILE_STR);
     vstr.push_back(Input::GAMMA_RAND_STR);
     vstr.push_back(Input::NORM_RAND_STR);
     vstr.push_back(Input::UNI_RAND_STR);
@@ -1922,11 +1943,13 @@ void MainWindow::InitPlots()
             break;
         }
         case VECTOR_FIELD:
-        {
             AttachVectorField(false);
             _needClearVF = false;
             break;
-        }
+        case VARIABLE_VIEW:
+            AttachVariableView(false);
+            _needClearVV = false;
+            break;
     }
 }
 
@@ -1994,6 +2017,30 @@ void MainWindow::AttachTimePlot(bool attach) //slot
         _tpCurves.clear();
     }
 }
+void MainWindow::AttachVariableView(bool attach) //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::AttachVectorField", _tid);
+    assert(_tid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
+#endif
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (attach)
+    {
+        for (auto it : _vvPlotItems)
+            it->attach(ui->qwtPhasePlot);
+        _isVVAttached = true;
+    }
+    else
+    {
+        for (auto it : _vvPlotItems)
+        {
+            it->detach();
+            delete it;
+        }
+        _vvPlotItems.clear();
+        _isVVAttached = false;
+    }
+}
 void MainWindow::AttachVectorField(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
@@ -2028,6 +2075,19 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
     try
     {
         std::string text = _variables->Value(row);
+        if (text==Input::INPUT_FILE_STR)
+        {
+            std::string file_name = QFileDialog::getOpenFileName(nullptr,
+                                                                  "Select input file",
+                                                                  DDM::InputFilesDir().c_str(),
+                                                                  "Text file (*.txt) ;; DSIN file (*.dsin)"
+                                                                 ).toStdString();
+            if (!file_name.empty())
+                text = "\"" + file_name + "\"";
+            else
+                text = "0";
+            _variables->SetPar((size_t)row, text);
+        }
         _parserMgr.AssignInput(_variables, row, text, true);
     }
     catch (std::exception& e)
@@ -2265,11 +2325,7 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->actionParameters->setEnabled(is_enabled);
     ui->actionReload_Current->setEnabled(is_enabled);
     ui->actionRun_Offline->setEnabled(is_enabled);
-    ui->actionSave_Data->setEnabled(is_enabled);
-    ui->actionSave_Model_As->setEnabled(is_enabled);
-    ui->actionSave_Phase_Plot->setEnabled(is_enabled);
-    ui->actionSave_Time_Plot->setEnabled(is_enabled);
-    ui->actionSave_Vector_Field->setEnabled(is_enabled);
+    SetSaveActionsEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
 
@@ -2286,6 +2342,17 @@ void MainWindow::SetParamsEnabled(bool is_enabled)
     ui->tblVariables->setEnabled(is_enabled);
     ui->lsConditions->setEnabled(is_enabled);
     ui->lsResults->setEnabled(is_enabled);
+}
+void MainWindow::SetSaveActionsEnabled(bool is_enabled)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetSaveActionsEnabled", _tid);
+#endif
+    ui->actionSave_Data->setEnabled(is_enabled);
+    ui->actionSave_Model_As->setEnabled(is_enabled);
+    ui->actionSave_Phase_Plot->setEnabled(is_enabled);
+    ui->actionSave_Time_Plot->setEnabled(is_enabled);
+    ui->actionSave_Vector_Field->setEnabled(is_enabled);
 }
 void MainWindow::UpdateLists()
 {

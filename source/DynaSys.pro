@@ -54,19 +54,19 @@ SOURCES += main.cpp\
     memrep/arrowhead.cpp \
     gui/fastrungui.cpp \
     file/datfileout.cpp \
-    compile/executable.cpp \
+    generate/object/executable.cpp \
     file/defaultdirmgr.cpp \
     gui/fitgui.cpp \
-    compile/fit.cpp \
+    generate/fit.cpp \
     file/fdatfilein.cpp \
-    compile/cfilebase.cpp \
-    compile/mexfile.cpp \
-    compile/cfile.cpp \
-    compile/cfileso.cpp \
-    compile/sharedobj.cpp \
-    compile/compilable.cpp \
-    compile/compilablebase.cpp \
-    compile/cudakernel.cpp
+    generate/script/cfilebase.cpp \
+    generate/script/mexfile.cpp \
+    generate/script/cfile.cpp \
+    generate/script/cfileso.cpp \
+    generate/object/sharedobj.cpp \
+    generate/object/compilable.cpp \
+    generate/object/compilablebase.cpp \
+    generate/script/cudakernel.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -98,19 +98,19 @@ HEADERS  += gui/mainwindow.h \
     memrep/arrowhead.h \
     gui/fastrungui.h \
     file/datfileout.h \
-    compile/executable.h \
+    generate/object/executable.h \
     file/defaultdirmgr.h \
     gui/fitgui.h \
-    compile/fit.h \
+    generate/fit.h \
     file/fdatfilein.h \
-    compile/cfilebase.h \
-    compile/mexfile.h \
-    compile/cfile.h \
-    compile/cfileso.h \
-    compile/sharedobj.h \
-    compile/compilable.h \
-    compile/compilablebase.h \
-    compile/cudakernel.h
+    generate/script/cfilebase.h \
+    generate/script/mexfile.h \
+    generate/script/cfile.h \
+    generate/script/cfileso.h \
+    generate/object/sharedobj.h \
+    generate/object/compilable.h \
+    generate/object/compilablebase.h \
+    generate/script/cudakernel.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

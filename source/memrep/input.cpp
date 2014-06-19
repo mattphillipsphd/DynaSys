@@ -3,6 +3,7 @@
 const size_t Input::INPUT_EXP = 20;
 const size_t Input::INPUT_SIZE = 16 * 1024 * 1024;
 const size_t Input::INPUT_MASK = INPUT_SIZE-1;
+const std::string Input::INPUT_FILE_STR = "input file";
 const std::string Input::GAMMA_RAND_STR = "gamma rand";
 const std::string Input::NORM_RAND_STR = "normal rand";
 const std::string Input::UNI_RAND_STR = "uniform rand";
