@@ -1,19 +1,27 @@
 #include "parsermgr.h"
 
-ParserMgr::ParserMgr() : _areModelsInitialized(false), _log(Log::Instance()),
-    _modelStep(ds::DEFAULT_MODEL_STEP), _varInitVals(nullptr)
+ParserMgr::ParserMgr()
+    : _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _varInitVals(nullptr)
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker::InitThread(std::this_thread::get_id());
     ScopeTracker st("ParserMgr::ParserMgr", std::this_thread::get_id());
 #endif
 }
+ParserMgr::ParserMgr(const ParserMgr& other)
+    : _inputs(other._inputs), _log(other._log), _modelMgr(other._modelMgr), _varInitVals(nullptr)
+{
+#ifdef DEBUG_PM_FUNC
+    ScopeTracker st("ParserMgr::ParserMgr(const ParserMgr&)", std::this_thread::get_id());
+#endif
+    DeepCopy(other);
+}
 ParserMgr::~ParserMgr()
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::~ParserMgr", std::this_thread::get_id());
 #endif
-    ClearModels();
+    ClearModelData();
 }
 
 void ParserMgr::AddExpression(const std::string& exprn, bool use_mutex)
@@ -31,58 +39,6 @@ void ParserMgr::AddExpression(const std::string& exprn, bool use_mutex)
     }
     if (use_mutex) _mutex.unlock();
 }
-void ParserMgr::AddModel(ParamModelBase* model)
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::AddModel", std::this_thread::get_id());
-#endif
-    double* data = new double[model->NumPars()],
-            * temp = new double[model->NumPars()];
-    _models.push_back( std::make_tuple(model, data, temp) );
-}
-void ParserMgr::AssignInput(const ParamModelBase* model, size_t i,
-                            const std::string& type_str, bool do_lock)
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::AssignInput", std::this_thread::get_id());
-#endif
-    std::unique_lock<std::mutex> ulock(_mutex, std::defer_lock);
-    if (do_lock) ulock.lock();
-
-    Input::TYPE type = Input::Type(type_str);
-    double* data = TempData(model);
-    switch (type)
-    {
-        case Input::UNI_RAND:
-        case Input::GAMMA_RAND:
-        case Input::NORM_RAND:
-        {
-            Input input(&data[i]);
-            input.GenerateInput(type);
-            _inputs.push_back(input);
-            break;
-        }
-        case Input::INPUT_FILE:
-        {
-            Input input(&data[i]);
-            std::string file_name = model->Value(i);
-            file_name.erase(
-                std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
-                {
-                    return c=='"';
-                }),
-                    file_name.end());
-            input.LoadInput(file_name);
-            _inputsPerStep = input.SamplesPerStep();
-            _inputs.push_back(input);
-            break;
-        }
-        case Input::USER:
-            break;
-        case Input::UNKNOWN:
-            throw std::runtime_error("ParserMgr::SetInput: Unknown input.");
-    }
-}
 void ParserMgr::ClearExpressions()
 {
 #ifdef DEBUG_PM_FUNC
@@ -91,34 +47,26 @@ void ParserMgr::ClearExpressions()
     std::lock_guard<std::mutex> lock(_mutex);
     _parser.SetExpr("");
 }
-void ParserMgr::ClearModels()
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::ClearModels", std::this_thread::get_id());
-#endif
-    _models.clear();
-    _areModelsInitialized = false;
-}
 
-const double* ParserMgr::ConstData(ds::PMODEL pmodel) const
+void ParserMgr::InitData()
 {
 #ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::ConstData", std::this_thread::get_id());
-#endif
-    return const_cast<ParserMgr*>(this)->Data(pmodel);
-}
-
-void ParserMgr::InitParsers()
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::InitParsers", std::this_thread::get_id());
+    ScopeTracker st("ParserMgr::InitData", std::this_thread::get_id());
 #endif
     try
     {
+        AllocModelData();
+        AssociateVars(_parser);
+        AssociateVars(_parserResult);
+        for (auto& itp : _parserConds)
+            AssociateVars(itp);
+
+        _inputs.clear();
+
         VecStr initializations, expressions;
-        for (auto& it : _models)
+        for (size_t i=0; i<ds::NUM_MODELS; ++i)
         {
-            ParamModelBase* model = std::get<0>(it);
+            const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
             if (model->DoInitialize())
             {
                 VecStr model_inits = model->Initializations();
@@ -137,7 +85,51 @@ void ParserMgr::InitParsers()
 
         for (const auto& it : initializations)
             QuickEval(it);
+        for (size_t i=0; i<ds::NUM_MODELS; ++i)
+        {
+            const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
+            if (!model->DoInitialize()) continue;
+            double* data = _modelData[i].first,
+                    *temp_data = _modelData[i].second;
+            const size_t num_pars = model->NumPars();
+            for (size_t k=0; k<num_pars; ++k)
+            {
+                const std::string& value = model->Value(k);
 
+                //Assign the source of the data--i.e. attach an input source if needed
+                _modelMgr->AssignInput(k, temp_data, value, false);
+
+                //Initialize
+                if (model->Id()==ds::INP) // ###
+                    data[k] = std::stod(value.c_str());
+            }
+        }
+//        _areModelsInitialized = true;
+    }
+    catch (mu::ParserError& e)
+    {
+        _log->AddExcept("ParserMgr::InitModels: " + std::string(e.GetMsg()));
+    }
+}
+void ParserMgr::InitParsers()
+{
+#ifdef DEBUG_PM_FUNC
+    ScopeTracker st("ParserMgr::InitParsers", std::this_thread::get_id());
+#endif
+    try
+    {
+        VecStr expressions;
+        for (size_t i=0; i<ds::NUM_MODELS; ++i)
+        {
+            const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
+            if (model->DoEvaluate())
+            {
+                VecStr model_exprns = model->Expressions();
+                expressions.insert(expressions.end(),
+                                       model_exprns.begin(),
+                                       model_exprns.end());
+            }
+        }
         SetExpression(expressions);
             //Note that the expressions are not actually evaluated
 
@@ -146,46 +138,6 @@ void ParserMgr::InitParsers()
     catch (mu::ParserError& e)
     {
         _log->AddExcept("ParserMgr::InitParsers: " + std::string(e.GetMsg()));
-    }
-}
-void ParserMgr::InitModels()
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::InitModels", std::this_thread::get_id());
-#endif
-    std::lock_guard<std::mutex> lock(_mutex);
-    try
-    {
-        AssociateVars(_parser);
-        AssociateVars(_parserResult);
-        for (auto& itp : _parserConds)
-            AssociateVars(itp);
-
-        _inputs.clear();
-
-        for (auto& it : _models)
-        {
-            ParamModelBase* model = std::get<0>(it);
-            if (!model->DoInitialize()) continue;
-            double* data = std::get<1>(it);
-            const size_t num_pars = model->NumPars();
-            for (size_t i=0; i<num_pars; ++i)
-            {
-                const std::string& value = model->Value(i);
-
-                //Assign the source of the data--i.e. attach an input source if needed
-                AssignInput(model, i, value, false);
-
-                //Initialize
-                if (model->Id()==ds::INPUTS) // ###
-                    data[i] = std::atof(value.c_str());
-            }
-        }
-        _areModelsInitialized = true;
-    }
-    catch (mu::ParserError& e)
-    {
-        _log->AddExcept("ParserMgr::InitModels: " + std::string(e.GetMsg()));
     }
 }
 
@@ -199,33 +151,12 @@ void ParserMgr::InputEval(int idx)
     else
         _inputs[idx].NextInput();
 }
-double ParserMgr::Maximum(const ParamModelBase* model, size_t idx) const
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Maximum", std::this_thread::get_id());
-#endif
-    return model->Maximum(idx);
-}
-double ParserMgr::Minimum(const ParamModelBase* model, size_t idx) const
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Minimum", std::this_thread::get_id());
-#endif
-    return model->Minimum(idx);
-}
 const std::string& ParserMgr::ParserContents() const
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::ParserContents", std::this_thread::get_id());
 #endif
     return _parser.GetExpr();
-}
-const ParamModelBase* ParserMgr::Model(ds::PMODEL model) const
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Model", std::this_thread::get_id());
-#endif
-    return std::get<0>( _models.at(model) );
 }
 void ParserMgr::ParserEval(bool eval_input)
 {
@@ -234,7 +165,7 @@ void ParserMgr::ParserEval(bool eval_input)
     {
         _parser.Eval();
         TempEval();
-        if (eval_input && ++_stepCt*_modelStep*_inputsPerStep>1.0)
+        if (eval_input && ++_stepCt*_modelMgr->ModelStep()*_inputsPerUnitTime>1.0)
         {
             _stepCt = 0;
             InputEval();
@@ -265,19 +196,19 @@ void ParserMgr::ParserEvalAndCondsNoLock(bool eval_input)
 {
     _parser.Eval();
     TempEval();
-    if (eval_input && ++_stepCt*_modelStep*_inputsPerStep>1.0)
+    if (eval_input && ++_stepCt*_modelMgr->ModelStep()*_inputsPerUnitTime>1.0)
     {
         _stepCt = 0;
         InputEval();
     }
 
-    const int num_conds = (int)_conditions->NumPars();
+    const int num_conds = (int)_modelMgr->Model(ds::COND)->NumPars();
     for (int k=0; k<num_conds; ++k)
     {
         if (_parserConds.at(k).Eval())
         {
-            VecStr cond_exprns = _conditions->Expressions(k);
-            for (const auto& it : cond_exprns)
+            VecStr cond_results = _modelMgr->CondResults(k);
+            for (const auto& it : cond_results)
             {
                 _parserResult.SetExpr(it);
                 _parserResult.Eval();
@@ -318,21 +249,14 @@ void ParserMgr::QuickEval(const std::string& exprn)
         throw std::runtime_error("Parser error");
     }
 }
-double ParserMgr::Range(const ParamModelBase* model, size_t idx) const
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Range", std::this_thread::get_id());
-#endif
-    return Maximum(model, idx) - Minimum(model, idx);
-}
 void ParserMgr::ResetDifferentials()
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::ResetDifferentials", std::this_thread::get_id());
 #endif
-    const size_t num_diffs = Model(ds::DIFFERENTIALS)->NumPars();
-    std::memcpy(Data(ds::DIFFERENTIALS),
-                ConstData(ds::INIT_CONDS), num_diffs*sizeof(double));
+    const size_t num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
+    std::memcpy(Data(ds::DIFF),
+                ConstData(ds::INIT), num_diffs*sizeof(double));
 }
 void ParserMgr::ResetValues()
 {
@@ -340,8 +264,8 @@ void ParserMgr::ResetValues()
     ScopeTracker st("ParserMgr::ResetValues", std::this_thread::get_id());
 #endif
     ResetDifferentials();
-    const size_t num_vars = Model(ds::VARIABLES)->NumPars();
-    std::memcpy(Data(ds::VARIABLES), _varInitVals, num_vars*sizeof(double));
+    const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars();
+    std::memcpy(Data(ds::VAR), _varInitVals, num_vars*sizeof(double));
 }
 void ParserMgr::ResetVarInitVals()
 {
@@ -352,7 +276,7 @@ void ParserMgr::ResetVarInitVals()
 
     ResetDifferentials();
 
-    ParamModelBase* var_model = Model(ds::VARIABLES);
+    const ParamModelBase* var_model = _modelMgr->Model(ds::VAR);
     const size_t num_vars = var_model->NumPars();
     _varInitVals = new double[num_vars];
 
@@ -360,7 +284,22 @@ void ParserMgr::ResetVarInitVals()
     for (const auto& it : expressions)
         if ( Input::Type(it)==Input::USER )
             QuickEval(it);
-    std::memcpy(_varInitVals, Data(ds::VARIABLES), num_vars*sizeof(double));
+    std::memcpy(_varInitVals, Data(ds::VAR), num_vars*sizeof(double));
+}
+void ParserMgr::TempEval()
+{
+    for (size_t i=0; i<ds::NUM_MODELS; ++i)
+    {
+        const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
+        if ( model->DoEvaluate() )
+        {
+            const size_t num_pars = model->NumPars();
+            double* data = _modelData[i].first;
+            const double* temp = _modelData.at(i).second;
+            for (size_t i=0; i<num_pars; ++i)
+                data[i] = temp[i];
+        }
+    }
 }
 
 void ParserMgr::SetConditions()
@@ -369,38 +308,26 @@ void ParserMgr::SetConditions()
     ScopeTracker st("ParserMgr::SetConditions", std::this_thread::get_id());
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
-    int num_conds = (int)_conditions->NumPars();
+    size_t num_conds = _modelMgr->Model(ds::COND)->NumPars();
     _parserConds = std::vector<mu::Parser>(num_conds);
     for (auto& itp : _parserConds)
         AssociateVars(itp);
 
-    for (int k=0; k<num_conds; ++k)
+    for (size_t k=0; k<num_conds; ++k)
     {
-        std::string expr = _conditions->Condition(k);
+        std::string expr = _modelMgr->Model(ds::COND)->Key(k);
         _parserConds[k].SetExpr(expr);
     }
 }
-void ParserMgr::SetCondModel(ConditionModel* conditions)
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::SetCondModel", std::this_thread::get_id());
-#endif
-    _conditions = conditions;
-    SetConditions();
-}
-void ParserMgr::SetData(const ParamModelBase* model, size_t idx, double val)
+void ParserMgr::SetData(ds::PMODEL mi, size_t idx, double val)
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::SetData", std::this_thread::get_id());
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
-    auto it = std::find_if(_models.begin(), _models.end(),
-                        [&](std::tuple<ParamModelBase*,double*,double*> p)
-    {
-            return std::get<0>(p) == model;
-    });
-    *(std::get<1>(*it) + idx) = val;
+    _modelData[mi].first[idx] = val;
 }
+
 void ParserMgr::SetExpression(const std::string& exprn)
 {
 #ifdef DEBUG_PM_FUNC
@@ -427,23 +354,23 @@ void ParserMgr::SetExpressions()
     try
     {
         ClearExpressions();
-        for (auto& it : _models)
+        for (size_t i=0; i<ds::NUM_MODELS; ++i)
         {
-            ParamModelBase* model = std::get<0>(it);
+            const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
             if (!model->DoEvaluate()) continue;
             VecStr temp_expressions = model->TempExpressions();
             for (const auto& it : temp_expressions)
                 AddExpression(it);
             const size_t num_pars = model->NumPars();
-            for (size_t i=0; i<num_pars; ++i)
-                if (model->IsFreeze(i))
+            for (size_t k=0; k<num_pars; ++k)
+                if (model->IsFreeze(k))
                 {
-                    std::string freeze_val = (model->Id()==ds::DIFFERENTIALS)
-                            ? Model(ds::INIT_CONDS)->Value(i)
+                    std::string freeze_val = (model->Id()==ds::DIFF)
+                            ? _modelMgr->Model(ds::INIT)->Value(k)
                             : "0";
-                    AddExpression(model->TempKey(i) + " = " + freeze_val);
+                    AddExpression(model->TempKey(k) + " = " + freeze_val);
                 }
-            if (model->Id()==ds::VARIABLES) // ### Really need separate parsers for both here
+            if (model->Id()==ds::VAR) // ### Really need separate parsers for both here
                 for (size_t i=0; i<num_pars; ++i)
                     AddExpression(model->Key(i) + " = " + model->TempKey(i));
         }
@@ -453,29 +380,38 @@ void ParserMgr::SetExpressions()
         _log->AddExcept("ParserMgr::SetExpressions: " + std::string(e.GetMsg()));
     }
 }
-void ParserMgr::SetModelStep(double step)
+
+const double* ParserMgr::ConstData(ds::PMODEL mi) const
 {
 #ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::SetModelStep", std::this_thread::get_id());
+    ScopeTracker st("ParserMgr::ConstData", std::this_thread::get_id());
 #endif
-    _modelStep = step;
+    return const_cast<ParserMgr*>(this)->Data(mi);
 }
-void ParserMgr::TempEval()
+inline double* ParserMgr::Data(ds::PMODEL model)
 {
-    for (auto& it : _models)
-    {
-        const ParamModelBase* model = std::get<0>(it);
-        if ( model->DoEvaluate() )
-        {
-            const size_t num_pars = model->NumPars();
-            double* data = std::get<1>(it);
-            const double* temp = std::get<2>(it);
-            for (size_t i=0; i<num_pars; ++i)
-                data[i] = temp[i];
-        }
-    }
+#ifdef DEBUG_PM_FUNC
+    ScopeTracker st("ParserMgr::Data", std::this_thread::get_id());
+#endif
+    return _modelData[model].first;
 }
 
+
+void ParserMgr::AllocModelData()
+{
+#ifdef DEBUG_PM_FUNC
+    ScopeTracker st("ParserMgr::AllocModelData", std::this_thread::get_id());
+#endif
+    ClearModelData();
+    _modelData = std::vector< std::pair<double*,double*> >(ds::NUM_MODELS);
+    for (size_t i=0; i<ds::NUM_MODELS; ++i)
+    {
+        ds::PMODEL mi = (ds::PMODEL)i;
+        const size_t num_pars = _modelMgr->Model(mi)->NumPars();
+        _modelData[i].first = new double[num_pars];
+        _modelData[i].second = new double[num_pars];
+    }
+}
 std::string ParserMgr::AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const
 {
 #ifdef DEBUG_PM_FUNC
@@ -501,12 +437,12 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
 #endif
     try
     {
-        for (auto& it : _models)
+        for (size_t i=0; i<ds::NUM_MODELS; ++i)
         {
-            ParamModelBase* model = std::get<0>(it);
-            if (model->Id()==ds::INIT_CONDS) continue;
-            double* data = std::get<1>(it),
-                    * temp_data = std::get<2>(it);
+            const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
+            if (model->Id()==ds::INIT || model->Id()==ds::COND) continue;
+            double* data = _modelData[i].first,
+                    * temp_data = _modelData[i].second;
             const size_t num_pars = model->NumPars();
             for (size_t i=0; i<num_pars; ++i)
             {
@@ -522,49 +458,36 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
         _log->AddExcept("ParserMgr::AssociateVars: " + AnnotateErrMsg(e.GetMsg(), parser));
     }
 }
-double* ParserMgr::Data(const ParamModelBase* model)
+void ParserMgr::ClearModelData()
 {
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Data", std::this_thread::get_id());
-#endif
-    auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::tuple<ParamModelBase*,double*,double*> p)
+    for (auto it : _modelData)
     {
-            return std::get<0>(p) == model;
-    });
-    return std::get<1>(*it);
+        delete it.first;
+        delete it.second;
+    }
+    _modelData.clear();
 }
-double* ParserMgr::Data(ds::PMODEL model)
+void ParserMgr::DeepCopy(const ParserMgr& other)
 {
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Data", std::this_thread::get_id());
-#endif
-    return std::get<1>(_models[model]);
-}
-ParamModelBase* ParserMgr::Model(ds::PMODEL model)
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::Model", std::this_thread::get_id());
-#endif
-    return std::get<0>(_models[model]);
-}
-double* ParserMgr::TempData(const ParamModelBase* model)
-{
-#ifdef DEBUG_PM_FUNC
-    ScopeTracker st("ParserMgr::TempData", std::this_thread::get_id());
-#endif
-    auto it = std::find_if(_models.cbegin(), _models.cend(),
-                        [&](std::tuple<ParamModelBase*,double*,double*> p)
+    _inputsPerUnitTime      = other._inputsPerUnitTime;
+    _stepCt                 = 0;
+
+    AllocModelData();
+    for (size_t i=0; i<ds::NUM_MODELS; ++i)
     {
-            return std::get<0>(p) == model;
-    });
-    return std::get<2>(*it);
+        ds::PMODEL mi = (ds::PMODEL)i;
+        const size_t num_pars = _modelMgr->Model(mi)->NumPars();
+        memcpy(_modelData[i].first, other._modelData[i].first, num_pars);
+        memcpy(_modelData[i].second, other._modelData[i].second, num_pars);
+    }
+
+    InitParsers();
 }
 double* ParserMgr::TempData(ds::PMODEL model)
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::TempData", std::this_thread::get_id());
 #endif
-    return std::get<2>(_models[model]);
+    return _modelData[model].second;
 }
 

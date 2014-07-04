@@ -3,7 +3,7 @@
 
 NotesGui::NotesGui(QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::NotesGui), _notes(new Notes())
+    ui(new Ui::NotesGui), _modelMgr(ModelMgr::Instance())
 {
     ui->setupUi(this);
 }
@@ -15,7 +15,7 @@ NotesGui::~NotesGui()
 
 void NotesGui::UpdateNotes()
 {
-    ui->txtNotes->document()->setPlainText( _notes->Text().c_str() );
+    ui->txtNotes->document()->setPlainText( _modelMgr->GetNotes()->Text().c_str() );
 }
 
 void NotesGui::showEvent(QShowEvent* event)
@@ -27,15 +27,13 @@ void NotesGui::showEvent(QShowEvent* event)
 
 void NotesGui::on_btnSave_clicked()
 {
-    _notes->SetText(
-                ui->txtNotes->document()->toPlainText().toStdString() );
+    _modelMgr->SetNotes( ui->txtNotes->document()->toPlainText().toStdString() );
     emit SaveNotes();
 }
 
 void NotesGui::on_btnSaveClose_clicked()
 {
-    _notes->SetText(
-                ui->txtNotes->document()->toPlainText().toStdString() );
+    _modelMgr->SetNotes( ui->txtNotes->document()->toPlainText().toStdString() );
     emit SaveNotes();
     close();
 }

@@ -1,7 +1,7 @@
 #include "initialcondmodel.h"
 
 InitialCondModel::InitialCondModel(QObject *parent, const std::string& name) :
-    ParamModelBase(parent, name)
+    NumericModelBase(parent, name)
 {
 }
 

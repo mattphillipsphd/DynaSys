@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "../globals/scopetracker.h"
+#include "../memrep/modelmgr.h"
 #include "../memrep/notes.h"
 #include "../models/parammodelbase.h"
 #include "../models/conditionmodel.h"
@@ -14,10 +15,7 @@ class SysFileOut
     public:
         SysFileOut(const std::string& name);
 
-        void Save(const std::vector<const ParamModelBase*>& models,
-                  double model_step,
-                  const ConditionModel* conditions,
-                  const Notes* notes) const;
+        void Save() const;
         void Save(const VecStr& vmodels, double model_step, const Notes* notes) const;
 
     private:

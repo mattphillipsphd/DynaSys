@@ -46,7 +46,9 @@ class Input
         TYPE Type() const { return _type; }
 
     private:
-        Input& operator=(const Input&);
+#ifdef __GNUG__
+        Input& operator=(const Input&) = delete;
+#endif
 
         void DeepCopy(const Input& other);
         template<typename T>

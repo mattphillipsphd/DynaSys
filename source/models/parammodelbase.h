@@ -11,6 +11,9 @@
 
 #include "../globals/globals.h"
 
+//Value is the string contents of the Value field.
+//Expression is the statement formed from the key and value, e.g. 'a = 5'.
+
 typedef std::pair<std::string, std::string> StrPair;
 class ParamModelBase : public QAbstractTableModel
 {
@@ -20,33 +23,35 @@ class ParamModelBase : public QAbstractTableModel
         {
             FREEZE = 0,
             VALUE,
-            MIN,
-            MAX,
-            NUM_COLUMNS
+            NUM_BASE_COLUMNS
         };
 
         struct Param
         {
-            static const std::string DEFAULT_MAX, DEFAULT_MIN, DEFAULT_VAL;
+            static const std::string DEFAULT_VAL;
             Param()
-                : key(""), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL), is_freeze(false)
+                : key(""), value(DEFAULT_VAL), is_freeze(false)
             {}
             Param(const std::string& k)
-                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(DEFAULT_VAL), is_freeze(false)
+                : key(k), value(DEFAULT_VAL), is_freeze(false)
             {}
             Param(const std::string& k, const std::string& v)
-                : key(k), max(DEFAULT_MAX), min(DEFAULT_MIN), value(v), is_freeze(false)
+                : key(k), value(v), is_freeze(false)
             {}
-            std::string key, max, min, value;
+            std::string key, value;
             bool is_freeze;
         };
 
+        static ParamModelBase* Create(ds::PMODEL mi);
+
         explicit ParamModelBase(QObject* parent, const std::string& name);
-//        ParamModelBase(const ParamModelBase&) = delete;
-//        ParamModelBase& operator=(const ParamModelBase&) = delete;
+#ifdef __GNUG__
+        ParamModelBase(const ParamModelBase&) = delete;
+        ParamModelBase& operator=(const ParamModelBase&) = delete;
+#endif
         virtual ~ParamModelBase();
 
-        virtual bool DoEvaluate() const = 0; //Whether the paameter expression
+        virtual bool DoEvaluate() const = 0; //Whether the parameter expression
             //gets evaluated by the parser (on each cycle)
         virtual bool DoInitialize() const = 0; //Whether the model values
             //are used to initialize the variables
@@ -59,14 +64,13 @@ class ParamModelBase : public QAbstractTableModel
         std::string Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
-        double Maximum(size_t idx) const;
-        double Minimum(size_t idx) const;
         std::string Name() const;
         size_t NumPars() const { return _parameters.size(); }
+        virtual void ProcessParamFileLine(const std::string& key, std::string rem) = 0;
         virtual std::string ShortKey(size_t i) const;
         virtual int ShortKeyIndex(const std::string& par_name) const;
         VecStr ShortKeys() const;
-        std::string String() const;
+        virtual std::string String() const = 0;
         virtual std::string TempExpression(size_t i) const;
         virtual VecStr TempExpressions() const;
         std::string TempKey(size_t i) const;
@@ -74,16 +78,12 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Value(size_t i) const;
         VecStr Values() const;
 
-        void AddParameter(const std::string& key, const std::string& value = "");
-        void SetMaximum(size_t idx, double val);
-        void SetMinimum(size_t idx, double val);
-        void SetPar(const std::string& key, const std::string& value);
-        void SetPar(int i, const std::string& value);
-        void SetPar(int i, double value);
-        void SetRange(size_t idx, double min, double max);
+        virtual void AddParameter(const std::string& key, const std::string& value = "");
+        void SetValue(const std::string& key, const std::string& value);
+        void SetValue(int i, const std::string& value);
 
         int columnCount() const;
-        virtual int columnCount(const QModelIndex &parent) const override;
+        virtual int columnCount(const QModelIndex &parent) const override = 0;
         virtual QVariant data(const QModelIndex &index, int role) const override;
         virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
         QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
@@ -94,10 +94,16 @@ class ParamModelBase : public QAbstractTableModel
         virtual bool setData(const QModelIndex &index, const QVariant &value, int role) override;
         virtual bool setHeaderData(int section, Qt::Orientation orientation, const QVariant &value, int role) override;
 
+    protected:
+        void SetParameter(int row, Param* parameter) { _parameters[row] = parameter; }
+        virtual Param* Parameter(int row) { return _parameters[row]; }
+        virtual const Param* Parameter(int row) const { return _parameters.at(row); }
+
+
     private:
         const ds::PMODEL _id;
         mutable std::mutex _mutex;
-        std::vector<Param> _parameters;
+        std::vector<Param*> _parameters;
 };
 
 #endif // PARAMMODELBASE_H

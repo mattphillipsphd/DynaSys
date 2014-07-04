@@ -1,10 +1,10 @@
 #ifndef VARIABLEMODEL_H
 #define VARIABLEMODEL_H
 
-#include "parammodelbase.h"
+#include "numericmodelbase.h"
 #include "../memrep/input.h"
 
-class VariableModel : public ParamModelBase
+class VariableModel : public NumericModelBase
 {
     Q_OBJECT
 

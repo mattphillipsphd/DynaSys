@@ -1,9 +1,9 @@
 #ifndef PARAMMODEL_H
 #define PARAMMODEL_H
 
-#include "parammodelbase.h"
+#include "numericmodelbase.h"
 
-class ParamModel : public ParamModelBase
+class ParamModel : public NumericModelBase
 {
     Q_OBJECT
 

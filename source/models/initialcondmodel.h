@@ -1,9 +1,9 @@
 #ifndef INITIALCONDMODEL_H
 #define INITIALCONDMODEL_H
 
-#include "parammodelbase.h"
+#include "numericmodelbase.h"
 
-class InitialCondModel : public ParamModelBase
+class InitialCondModel : public NumericModelBase
 {
     Q_OBJECT
 

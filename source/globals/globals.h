@@ -35,11 +35,11 @@ namespace ds
 
     enum PMODEL
     {
-        INPUTS = 0,
-        VARIABLES,
-        DIFFERENTIALS,
-        INIT_CONDS,
-        CONDITIONS,
+        INP = 0,
+        VAR,
+        DIFF,
+        INIT,
+        COND,
         NUM_MODELS //Nice trick from SO
     };
 
@@ -48,14 +48,18 @@ namespace ds
 
     void AddThread(std::thread::id tid);
 
+    std::string Join(const VecStr& vec, const std::string& delim);
+
     PMODEL Model(const std::string& model);
-    std::string Model(PMODEL model);
+    std::string Model(PMODEL mi);
 
     void RemoveThread(std::thread::id tid);
     void RemoveWhitespace(std::string& s);
+    VecStr RemoveWhitespace(const VecStr& vec);
 
     double sgn(double val);
 
+    VecStr Split(const std::string& str, const std::string& delim);
     std::string StripPath(const std::string& file_name);
     std::string StripQuotes(const std::string& str);
 

@@ -50,14 +50,10 @@
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
 #include "../globals/scopetracker.h"
-#include "../models/conditionmodel.h"
-#include "../models/differentialmodel.h"
-#include "../models/initialcondmodel.h"
-#include "../models/parammodel.h"
-#include "../models/tpvtablemodel.h"
-#include "../models/variablemodel.h"
 #include "../memrep/arrowhead.h"
+#include "../memrep/modelmgr.h"
 #include "../memrep/parsermgr.h"
+#include "../models/tpvtablemodel.h"
 
 //#define DEBUG_FUNC
 
@@ -107,6 +103,7 @@ class MainWindow : public QMainWindow
                         DEFAULT_VF_STEP,
                         DEFAULT_VF_TAIL,
                         MAX_BUF_SIZE,
+                        NUM_VV_INCS,
                         SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         TP_SAMPLES_SHOWN,
@@ -130,7 +127,6 @@ class MainWindow : public QMainWindow
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
-        void SaveNotes();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
         void StartFit();
@@ -142,6 +138,7 @@ class MainWindow : public QMainWindow
 
     signals:
         void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
+        void DoAttachVV(bool attach);
         void DoInitParserMgr();
         void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
@@ -240,8 +237,7 @@ class MainWindow : public QMainWindow
         void InitBuffers();
         void InitDefaultModel();
         void InitDraw();
-        void InitModels(const std::vector<ParamModelBase*>* models = nullptr,
-                        ConditionModel* conditions = nullptr);
+        void InitModels();
         void InitPlots();
         const std::vector<QColor> InitTPColors() const;
         bool IsVFPresent() const;
@@ -272,19 +268,13 @@ class MainWindow : public QMainWindow
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
 
-        // ### Get rid of all of these, store in ParserMgr, just refer to them by name
-        ConditionModel* _conditions;
-        ParamModelBase* _differentials,
-                * _initConds,
-                * _inputs, //Must be numeric
-                * _variables;   //Can invoke other expressions
-
         std::condition_variable _condVar;
         std::string _fileName;
         volatile bool _finishedReplot;
         volatile bool _isVFAttached, _isVVAttached;
         std::vector<JobRecord> _jobs;
         Log* const _log;
+        ModelMgr* const _modelMgr;
         std::mutex _mutex;
         volatile bool _needClearVF, _needClearVV, _needInitialize, _needUpdateExprns,
                     _needUpdateNullclines, _needUpdateVF;

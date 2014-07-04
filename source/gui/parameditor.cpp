@@ -64,7 +64,7 @@ void ParamEditor::on_btnSave_clicked()
         if ( *(text.end()-2)=='\n' ) text.erase(text.end()-1);
         const ds::PMODEL mi = (ds::PMODEL)i;
         int num_pars = std::count(text.cbegin(), text.cend(), '\n');
-        if (mi==ds::CONDITIONS)
+        if (mi==ds::COND)
         {
             const size_t len = text.length();
             if (len<=2)
@@ -149,7 +149,7 @@ void ParamEditor::UpdateBuffer(int idx)
 #endif
     std::string text = _editors.at(idx)->document()->toPlainText().toStdString();
     TrimNewlines(text);
-    if ((ds::PMODEL)(idx-1)==ds::VARIABLES || (ds::PMODEL)(idx-1)==ds::DIFFERENTIALS)
+    if ((ds::PMODEL)(idx-1)==ds::VAR || (ds::PMODEL)(idx-1)==ds::DIFF)
     {
         std::stringstream ss(text);
         std::string line, text_temp;
@@ -175,7 +175,7 @@ void ParamEditor::UpdateEditors()
     {
         int mi = i-1;
         std::string text = _models.at(mi);
-        if ((ds::PMODEL)(mi)==ds::VARIABLES || (ds::PMODEL)(mi)==ds::DIFFERENTIALS)
+        if ((ds::PMODEL)(mi)==ds::VAR || (ds::PMODEL)(mi)==ds::DIFF)
         {
             std::stringstream ss(text);
             std::string line, text_temp;

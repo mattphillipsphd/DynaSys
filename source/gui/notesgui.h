@@ -4,6 +4,7 @@
 #include <QWidget>
 
 #include "../globals/globals.h"
+#include "../memrep/modelmgr.h"
 #include "../memrep/notes.h"
 
 namespace Ui {
@@ -22,8 +23,6 @@ class NotesGui : public QWidget
 
         void SetFileName(const std::string& file_name) { _fileName = file_name; }
 
-        Notes* GetNotes() { return _notes; }
-
     protected:
         virtual void showEvent(QShowEvent* event) override;
 
@@ -38,7 +37,7 @@ class NotesGui : public QWidget
         Ui::NotesGui *ui;
 
         std::string _fileName;
-        Notes* _notes;
+        ModelMgr* const _modelMgr;
 };
 
 #endif // NOTESGUI_H

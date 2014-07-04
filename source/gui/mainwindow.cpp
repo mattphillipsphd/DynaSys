@@ -7,6 +7,7 @@ const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
+const int MainWindow::NUM_VV_INCS = 1000;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::TP_SAMPLES_SHOWN = 2 * 1024;
@@ -21,9 +22,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _fitGui(new FitGui()),
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
-    _conditions(nullptr), _differentials(nullptr), _initConds(nullptr),
-    _inputs(nullptr), _variables(nullptr),
-    _fileName(""), _isVFAttached(false), _isVVAttached(false), _log(Log::Instance()),
+    _fileName(""), _isVFAttached(false), _isVVAttached(false),
+    _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
     _needClearVF(false), _needClearVV(false), _needInitialize(true), _needUpdateExprns(false),
     _needUpdateNullclines(false), _needUpdateVF(false), _numTPSamples(TP_WINDOW_LENGTH),
     _playState(STOPPED), _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionFit->setEnabled(false);
 
     QStringList modes;
-    modes << "Single" << "Vector field";
+    modes << "Single" << "Vector field" << "Variable View";
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
 
     ui->edModelStep->setText( QString("%1").arg(ds::DEFAULT_MODEL_STEP) );
@@ -82,6 +82,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ConnectModels();
 
     connect(this, SIGNAL(DoAttachVF(bool)), this, SLOT(AttachVectorField(bool)), Qt::BlockingQueuedConnection);
+    connect(this, SIGNAL(DoAttachVV(bool)), this, SLOT(AttachVariableView(bool)), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoInitParserMgr()), this, SLOT(InitParserMgr()), Qt::BlockingQueuedConnection);
     connect(this, SIGNAL(DoReplot(const ViewRect&, const ViewRect&)),
             this, SLOT(Replot(const ViewRect&, const ViewRect&)), Qt::BlockingQueuedConnection);
@@ -94,12 +95,13 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_fitGui, SIGNAL(StartFit()), this, SLOT(StartFit()));
     connect(_fitGui, SIGNAL(Finished()), this, SLOT(FitFinished()));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
-    connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(SaveNotes()));
+    connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(on_actionSave_Model_triggered()));
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
     connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
 
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
     connect(ui->qwtPhasePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
+    connect(ui->qwtTimePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
     connect(ui->qwtTimePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
 
     connect(_log, SIGNAL(OpenGui()), this, SLOT(Error()));
@@ -175,7 +177,7 @@ void MainWindow::LoadTempModel(void* models) //slot
     try
     {
         SysFileOut out(ds::TEMP_MODEL_FILE);
-        out.Save(*(static_cast<VecStr*>(models)), _parserMgr.ModelStep(), _notesGui->GetNotes());
+        out.Save();
 
         LoadModel(ds::TEMP_MODEL_FILE);
         SaveModel(_fileName);
@@ -226,25 +228,6 @@ void MainWindow::Pause() //slot
             ResumeDraw();
             break;
     }
-}
-void MainWindow::SaveNotes() //slot
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::SaveNotes", _tid);
-#endif
-    SysFileIn in(_fileName);
-    std::vector<ParamModelBase*> models;
-    ConditionModel* conditions = new ConditionModel(this);
-    std::string model_step;
-    in.Load(models, model_step, conditions, nullptr);
-
-    SysFileOut out(_fileName);
-    std::vector<const ParamModelBase*> cmodels;
-    for (auto it : models)
-        cmodels.push_back(it);
-    const Notes* notes = _notesGui->GetNotes();
-    out.Save(cmodels, std::atof(model_step.c_str()),
-             conditions, notes);
 }
 void MainWindow::StartCompiled(int duration, int save_mod_n)
 {
@@ -357,7 +340,7 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
     {
 //        DDM::SetMEXFilesDir(file_name);
         CudaKernel cuda_kernel(file_name);
-        cuda_kernel.Make(_parserMgr);
+        cuda_kernel.Make();
         _log->AddMesg("CUDA kernel file " + file_name + " created.");
     }
     catch (std::exception& e)
@@ -378,8 +361,8 @@ void MainWindow::on_actionCreate_MEX_file_triggered()
     {
         DDM::SetMEXFilesDir(file_name);
         MEXFile mex_file(file_name);
-        mex_file.Make(_parserMgr);
-        mex_file.MakeMFiles(_parserMgr);
+        mex_file.Make();
+        mex_file.MakeMFiles();
         _log->AddMesg("MEX file " + file_name + " and associated m-files created.");
     }
     catch (std::exception& e)
@@ -400,7 +383,7 @@ void MainWindow::on_actionCreate_SO_triggered()
     try
     {
         SharedObj so(file_name);
-        so.Compile(_parserMgr);
+        so.Compile();
         _log->AddMesg("SO created.");
     }
     catch (std::exception& e)
@@ -568,7 +551,7 @@ void MainWindow::on_btnAddCondition_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!cond.empty())
     {
-        _conditions->AddCondition(cond, VecStr());
+        _modelMgr->AddParameter(ds::COND, cond);
         _parserMgr.SetConditions();
     }
 }
@@ -579,10 +562,11 @@ void MainWindow::on_btnPulse_clicked()
 #endif
     _pulseParIdx = ui->cmbPulsePars->currentIndex();
     if (_pulseParIdx==-1) _pulseParIdx = 0;
-    _pulseResetValue = _inputs->Value(_pulseParIdx);
-    _pulseStepsRemaining = (int)( ui->edPulseDuration->text().toDouble() / _parserMgr.ModelStep() );
-    std::string val = ui->edPulseValue->text().toStdString();
-    _inputs->SetPar((int)_pulseParIdx, val);
+    _pulseResetValue = _modelMgr->Value(ds::INP, _pulseParIdx);
+    _pulseStepsRemaining = (int)( ui->edPulseDuration->text().toDouble() / _modelMgr->ModelStep() );
+    double pulse = ui->edPulseValue->text().toDouble(),
+            val = std::stod(_modelMgr->Value(ds::INP,_pulseParIdx));
+    _modelMgr->SetValue(ds::INP, (int)_pulseParIdx, std::to_string(val+pulse) );
 
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
@@ -597,8 +581,8 @@ void MainWindow::on_btnAddDiff_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!diff.empty())
     {
-        _differentials->AddParameter(diff + "'", ParamModelBase::Param::DEFAULT_VAL);
-        _initConds->AddParameter(diff + "(0)", ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::DIFF, diff + "'", ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::INIT, diff + "(0)", ParamModelBase::Param::DEFAULT_VAL);
         UpdateTimePlotTable();
     }
 }
@@ -615,7 +599,7 @@ void MainWindow::on_btnAddExpression_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (expr.empty()) return;
 
-    _conditions->AddExpression(index.row(), expr);
+    _modelMgr->AddCondResult(index.row(), expr);
     ResetResultsList(index.row());
 }
 void MainWindow::on_btnAddParameter_clicked()
@@ -628,8 +612,8 @@ void MainWindow::on_btnAddParameter_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!par.empty())
     {
-        _inputs->AddParameter(par, ParamModelBase::Param::DEFAULT_VAL);
-        _parserMgr.InitModels();
+        _modelMgr->AddParameter(ds::INP, par, ParamModelBase::Param::DEFAULT_VAL);
+        _parserMgr.InitData();
     }
     UpdatePulseVList();
     UpdateSliderPList();
@@ -644,7 +628,7 @@ void MainWindow::on_btnAddVariable_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!var.empty())
     {
-        _variables->AddParameter(var, ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::VAR, var, ParamModelBase::Param::DEFAULT_VAL);
         UpdateTimePlotTable();
     }
 }
@@ -654,12 +638,16 @@ void MainWindow::on_btnFitView_clicked()
     ScopeTracker st("MainWindow::on_btnFitView_clicked", _tid);
 #endif
     ui->cboxFitLimits->setChecked(false);
-    const size_t xidx = ui->cmbDiffX->currentIndex(),
-            yidx = ui->cmbDiffY->currentIndex();
-    _initConds->SetMinimum(xidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).lowerBound());
-    _initConds->SetMaximum(xidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).upperBound());
-    _initConds->SetMinimum(yidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).lowerBound());
-    _initConds->SetMaximum(yidx, ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).upperBound());
+    const size_t xidx = ui->cmbPlotX->currentIndex(),
+            yidx = ui->cmbPlotY->currentIndex();
+    _modelMgr->SetMinimum(ds::INIT, xidx,
+                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).lowerBound());
+    _modelMgr->SetMaximum(ds::INIT, xidx,
+                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).upperBound());
+    _modelMgr->SetMinimum(ds::INIT, yidx,
+                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).lowerBound());
+    _modelMgr->SetMaximum(ds::INIT, yidx,
+                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).upperBound());
     ui->tblInitConds->update();
     if (IsVFPresent()) UpdateVectorField();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
@@ -840,10 +828,9 @@ void MainWindow::on_edModelStep_editingFinished()
     double step = std::stod(text, &pos);
     if (pos>0)
     {
-        _parserMgr.SetModelStep(step);
-        static_cast<DifferentialModel*>(_differentials)->SetModelStep(text);
+        _modelMgr->SetModelStep(step);
         _parserMgr.SetExpressions();
-        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
     }
 }
 void MainWindow::on_edNumTPSamples_editingFinished()
@@ -851,7 +838,7 @@ void MainWindow::on_edNumTPSamples_editingFinished()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_edNumTPSamples_editingFinished", _tid);
 #endif
-    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
@@ -869,10 +856,10 @@ void MainWindow::on_sldParameter_sliderMoved(int value)
     ScopeTracker st("MainWindow::on_sldParameter_sliderMoved", _tid);
 #endif
     const int index = ui->cmbSlidePars->currentIndex();
-    const double range = _parserMgr.Range(_inputs, index);
+    const double range = _modelMgr->Range(ds::INP, index);
     const double pct = (double)value / (double)SLIDER_INT_LIM,
-            dval = pct*range + _parserMgr.Minimum(_inputs, index);
-    _inputs->SetPar(index, std::to_string(dval));
+            dval = pct*range + _modelMgr->Minimum(ds::INP, index);
+    _modelMgr->SetValue(ds::INP, index, std::to_string(dval));
     ui->tblParameters->update();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
 }
@@ -928,6 +915,7 @@ void MainWindow::ClearPlots()
 #endif
     AttachPhasePlot(false);
     AttachVectorField(false);
+    AttachVariableView(false);
     AttachTimePlot(false);
 }
 Executable* MainWindow::CreateExecutable(const std::string& name) const
@@ -936,19 +924,19 @@ Executable* MainWindow::CreateExecutable(const std::string& name) const
     ScopeTracker st("MainWindow::CreateExecutable", _tid);
 #endif
     Executable* exe = new Executable(name);
-    exe->Compile(_parserMgr);
+    exe->Compile();
 
     VecStr values;
     values.push_back( std::to_string(_numSimSteps) );
     values.push_back( std::to_string(_saveModN) );
     values.push_back(name + ".dsdat");
-    for (size_t i=0; i<_inputs->NumPars(); ++i)
-        values.push_back( _inputs->Value(i) );
-    for (size_t i=0; i<_initConds->NumPars(); ++i)
+    for (size_t i=0; i<_modelMgr->Model(ds::INP)->NumPars(); ++i)
+        values.push_back( _modelMgr->Model(ds::INP)->Value(i) );
+    for (size_t i=0; i<_modelMgr->Model(ds::INIT)->NumPars(); ++i)
     {
-        std::string val = _initConds->Value(i);
-        int idx = _inputs->KeyIndex(val);
-        values.push_back( idx==-1 ? val : _inputs->Value(val) );
+        std::string val = _modelMgr->Model(ds::INIT)->Value(i);
+        int idx = _modelMgr->Model(ds::INP)->KeyIndex(val);
+        values.push_back( idx==-1 ? val : _modelMgr->Model(ds::INP)->Value(val) );
     }
     exe->SetArguments(values);
 
@@ -959,17 +947,17 @@ void MainWindow::ConnectModels()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ConnectModels", _tid);
 #endif
-    connect(_inputs, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INP)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(_variables, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::VAR)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(_differentials, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::DIFF)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(_initConds, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INIT)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(_conditions, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::COND)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
             this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    if (_conditions->NumPars()==0)
+    if (_modelMgr->Model(ds::COND)->NumPars()==0)
         delete ui->lsResults->model();
     else
         ResetResultsList(0);
@@ -981,13 +969,13 @@ void MainWindow::DoFastRun()
     ScopeTracker::InitThread(std::this_thread::get_id());
     ScopeTracker st("MainWindow::DoFastRun", std::this_thread::get_id());
 #endif
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
-            * vars = _parserMgr.ConstData(ds::VARIABLES);
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+    const double* diffs = _parserMgr.ConstData(ds::DIFF),
+            * vars = _parserMgr.ConstData(ds::VAR);
 
     _playState = DRAWING;
-    const int num_steps = _numSimSteps / _parserMgr.ModelStep() + 0.5;
+    const int num_steps = _numSimSteps / _modelMgr->ModelStep() + 0.5;
     try
     {
         auto start = std::chrono::system_clock::now();
@@ -996,9 +984,9 @@ void MainWindow::DoFastRun()
         DatFileOut out( _fastRunGui->FullFileName() );
         VecStr save_names;
         for (size_t i=0; i<(size_t)num_diffs; ++i)
-            save_names.push_back(_differentials->ShortKey(i));
+            save_names.push_back(_modelMgr->Model(ds::DIFF)->ShortKey(i));
         for (size_t i=0; i<(size_t)num_vars; ++i)
-            save_names.push_back(_variables->ShortKey(i));
+            save_names.push_back(_modelMgr->Model(ds::VAR)->ShortKey(i));
         out.Open(save_names, _saveModN);
 
         for (int i=0; i<num_steps; ++i)
@@ -1009,7 +997,7 @@ void MainWindow::DoFastRun()
             {
                 out.Write(diffs, num_diffs);
                 out.Write(vars, num_vars);
-                emit UpdateSimPBar(i*_parserMgr.ModelStep());
+                emit UpdateSimPBar(i*_modelMgr->ModelStep());
             }
 
             if (_playState != DRAWING) break;
@@ -1104,18 +1092,18 @@ void MainWindow::DrawNullclines()
     }
     _ncPlotItems.clear();
 
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
-            * vars = _parserMgr.ConstData(ds::VARIABLES);
-    const int xidx = ui->cmbDiffX->currentIndex(),
-            yidx = ui->cmbDiffY->currentIndex();
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+    const double* diffs = _parserMgr.ConstData(ds::DIFF),
+            * vars = _parserMgr.ConstData(ds::VAR);
+    const int xidx = ui->cmbPlotX->currentIndex(),
+            yidx = ui->cmbPlotY->currentIndex();
 
     const int vf_resolution = ui->spnVFResolution->value()*2;
-    const double xmin = _parserMgr.Minimum(_initConds, xidx),
-            xmax = _parserMgr.Maximum(_initConds, xidx),
-            ymin = _parserMgr.Minimum(_initConds, yidx),
-            ymax = _parserMgr.Maximum(_initConds, yidx);
+    const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
+            xmax = _modelMgr->Maximum(ds::INIT, xidx),
+            ymin = _modelMgr->Minimum(ds::INIT, yidx),
+            ymax = _modelMgr->Maximum(ds::INIT, yidx);
     const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
             yinc = (ymax - ymin) / (double)(vf_resolution-1);
 
@@ -1147,8 +1135,8 @@ void MainWindow::DrawNullclines()
 
                 if (num_diffs>2)
                     _parserMgr.ResetValues();
-                _parserMgr.SetData(_differentials, xidx, xij);
-                _parserMgr.SetData(_differentials, yidx, yij);
+                _parserMgr.SetData(ds::DIFF, xidx, xij);
+                _parserMgr.SetData(ds::DIFF, yidx, yij);
                 _parserMgr.ParserEval(false);
                 xdiff[idx] = diffs[xidx] - xij;
                 ydiff[idx] = diffs[yidx] - yij;
@@ -1158,9 +1146,9 @@ void MainWindow::DrawNullclines()
             }
 
         for (int i=0; i<num_diffs; ++i)
-            _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
+            _parserMgr.SetData(ds::DIFF, i, dvals_orig.at(i));
         for (int i=0; i<num_vars; ++i)
-            _parserMgr.SetData(_variables, i, vars_orig.at(i));
+            _parserMgr.SetData(ds::VAR, i, vars_orig.at(i));
     }
     catch (std::exception& e)
     {
@@ -1356,10 +1344,10 @@ void MainWindow::DrawPhasePortrait()
 #endif
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
-    const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
-            * vars = _parserMgr.ConstData(ds::VARIABLES);
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+    const double* diffs = _parserMgr.ConstData(ds::DIFF),
+            * vars = _parserMgr.ConstData(ds::VAR);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
 
@@ -1370,9 +1358,9 @@ void MainWindow::DrawPhasePortrait()
     {
         temp.open(QFile::WriteOnly | QFile::Text);
         for (size_t i=0; i<(size_t)num_diffs; ++i)
-            output += _differentials->ShortKey(i) + "\t";
+            output += _modelMgr->Model(ds::DIFF)->ShortKey(i) + "\t";
         for (size_t i=0; i<(size_t)num_vars; ++i)
-            output += _variables->ShortKey(i)+ "\t";
+            output += _modelMgr->Model(ds::VAR)->ShortKey(i)+ "\t";
         output += "\n";
         temp.write(output.c_str());
         temp.flush();
@@ -1390,14 +1378,14 @@ void MainWindow::DrawPhasePortrait()
         static auto last_step = std::chrono::system_clock::now();
         auto step_diff = std::chrono::system_clock::now() - last_step;
         auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(step_diff);
-        bool need_new_step = diff_ms.count() > 1000.0/((double)_singleStepsSec/_parserMgr.ModelStep());
+        bool need_new_step = diff_ms.count() > 1000.0/((double)_singleStepsSec/_modelMgr->ModelStep());
         if (!need_new_step)
             goto label;
         last_step = std::chrono::system_clock::now();
         {
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
-        int num_steps = ((double)_singleStepsSec/_parserMgr.ModelStep()) / (double)SLEEP_MS + 0.5;
+        int num_steps = ((double)_singleStepsSec/_modelMgr->ModelStep()) / (double)SLEEP_MS + 0.5;
         if (num_steps==0) num_steps = 1;
         if (num_steps>MAX_BUF_SIZE) num_steps = MAX_BUF_SIZE;
 
@@ -1492,8 +1480,8 @@ void MainWindow::DrawPhasePortrait()
             }
 
         //Plot the current state vector
-        const int xidx = ui->cmbDiffX->currentIndex(),
-                yidx = ui->cmbDiffY->currentIndex();
+        const int xidx = ui->cmbPlotX->currentIndex(),
+                yidx = ui->cmbPlotY->currentIndex();
         _marker->setValue(diffs[xidx], diffs[yidx]);
 
         const int num_saved_pts = (int)_diffPts[0].size();
@@ -1517,10 +1505,10 @@ void MainWindow::DrawPhasePortrait()
         double xmin, xmax, ymin, ymax;
         if (ui->cboxFitLimits->isChecked())
         {
-            xmin = _initConds->Minimum(xidx);
-            xmax = _initConds->Maximum(xidx);
-            ymin = _initConds->Minimum(yidx);
-            ymax = _initConds->Maximum(yidx);
+            xmin = _modelMgr->Minimum(ds::INIT, xidx);
+            xmax = _modelMgr->Maximum(ds::INIT, xidx);
+            ymin = _modelMgr->Minimum(ds::INIT, yidx);
+            ymax = _modelMgr->Maximum(ds::INIT, yidx);
         }
         else
         {
@@ -1552,8 +1540,8 @@ MainWindow::ViewRect MainWindow::DrawTimePlot(bool replot_now)
 //#endif
     if (_diffPts.empty()) return ViewRect();
     TPVTableModel* tp_model = qobject_cast<TPVTableModel*>( ui->tblTimePlot->model() );
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars(),
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars(),
             num_tp_points = std::min( (int)_ip.size(), MAX_BUF_SIZE ),
             ip_start  = std::max(0, (int)_ip.size()-num_tp_points),
             dv_start = std::max(0, (int)_diffPts.at(0).size()-num_tp_points),
@@ -1587,25 +1575,25 @@ MainWindow::ViewRect MainWindow::DrawTimePlot(bool replot_now)
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=ip_start+ip_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF((_pastIPSampsCt+k)*_parserMgr.ModelStep(), _ip[k]*scale);
+                points_tp[ct] = QPointF((_pastIPSampsCt+k)*_modelMgr->ModelStep(), _ip[k]*scale);
             curv->setSamples(points_tp);
             continue;
         }
-        int didx = _differentials->ShortKeyIndex(name);
+        int didx = _modelMgr->Model(ds::DIFF)->ShortKeyIndex(name);
         if (didx != -1)
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (_pastDVSampsCt+k)*_parserMgr.ModelStep(), _diffPts.at(didx).at(k)*scale);
+                points_tp[ct] = QPointF( (_pastDVSampsCt+k)*_modelMgr->ModelStep(), _diffPts.at(didx).at(k)*scale);
             curv->setSamples(points_tp);
             continue;
         }
-        int vidx = _variables->KeyIndex(name);
+        int vidx = _modelMgr->Model(ds::VAR)->KeyIndex(name);
         if (vidx != -1)
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (_pastDVSampsCt+k)*_parserMgr.ModelStep(), _varPts.at(vidx).at(k)*scale);
+                points_tp[ct] = QPointF( (_pastDVSampsCt+k)*_modelMgr->ModelStep(), _varPts.at(vidx).at(k)*scale);
             curv->setSamples(points_tp);
         }
     }
@@ -1621,7 +1609,7 @@ MainWindow::ViewRect MainWindow::DrawTimePlot(bool replot_now)
             if (curv->minYValue() < y_tp_min) y_tp_min = curv->minYValue();
         }
 
-    ViewRect tp_lims( (_pastDVSampsCt+dv_start)*_parserMgr.ModelStep(), (_pastDVSampsCt+dv_end)*_parserMgr.ModelStep(), y_tp_min, y_tp_max );
+    ViewRect tp_lims( (_pastDVSampsCt+dv_start)*_modelMgr->ModelStep(), (_pastDVSampsCt+dv_end)*_modelMgr->ModelStep(), y_tp_min, y_tp_max );
 
     if (replot_now)
     {
@@ -1636,8 +1624,39 @@ void MainWindow::DrawVariableView()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::DrawVariableView", std::this_thread::get_id());
 #endif
+//    emit DoAttachVV(false);
+
     // ### Need to create new, or reuse the parser object.  The expressions are evaluated
     //in a new way for this.
+    const int xidx = ui->cmbPlotX->currentIndex(),
+            yidx = ui->cmbPlotY->currentIndex();
+    const double xmin = _modelMgr->Minimum(ds::DIFF, xidx),
+            xmax = _modelMgr->Maximum(ds::DIFF, xidx);
+    double xinc = (xmax - xmin)/((double)NUM_VV_INCS - 1);
+    const double* vars = _parserMgr.ConstData(ds::DIFF);
+
+    QPolygonF points(NUM_VV_INCS);
+    double ymin = std::numeric_limits<double>::max(),
+            ymax = std::numeric_limits<double>::min();
+    for (int i=0; i<NUM_VV_INCS; ++i)
+    {
+        const double xval = xmin+i*xinc;
+        _parserMgr.SetData(ds::DIFF, xidx, xval);
+        _parserMgr.ParserEval(false);
+        const double yval = vars[yidx];
+        if (yval<ymin) ymin = yval;
+        if (yval>ymax) ymax = yval;
+        points[i] = QPointF(xval, yval);
+    }
+    QwtPlotCurve* curve = new QwtPlotCurve;
+    curve->setSamples(points);
+
+    _vvPlotItems.push_back(curve);
+
+    emit DoAttachVV(true);
+
+    ViewRect pp_data(xmin, xmax, ymin, ymax);
+    emit DoReplot(pp_data,  ViewRect());
 }
 void MainWindow::DrawVectorField()
 {
@@ -1661,18 +1680,18 @@ void MainWindow::DrawVectorField()
     {
         auto loop_begin = std::chrono::system_clock::now();
 
-        const int num_diffs = (int)_differentials->NumPars(),
-                num_vars = (int)_variables->NumPars();
-        const double* diffs = _parserMgr.ConstData(ds::DIFFERENTIALS),
-                * vars = _parserMgr.ConstData(ds::VARIABLES);
-        const int xidx = ui->cmbDiffX->currentIndex(),
-                yidx = ui->cmbDiffY->currentIndex();
+        const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+                num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+        const double* diffs = _parserMgr.ConstData(ds::DIFF),
+                * vars = _parserMgr.ConstData(ds::VAR);
+        const int xidx = ui->cmbPlotX->currentIndex(),
+                yidx = ui->cmbPlotY->currentIndex();
 
         const int vf_resolution = ui->spnVFResolution->value();
-        const double xmin = _parserMgr.Minimum(_initConds, xidx),
-                xmax = _parserMgr.Maximum(_initConds, xidx),
-                ymin = _parserMgr.Minimum(_initConds, yidx),
-                ymax = _parserMgr.Maximum(_initConds, yidx);
+        const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
+                xmax = _modelMgr->Maximum(ds::INIT, xidx),
+                ymin = _modelMgr->Minimum(ds::INIT, yidx),
+                ymax = _modelMgr->Maximum(ds::INIT, yidx);
         const double xinc = (xmax - xmin) / (double)(vf_resolution-1),
                 yinc = (ymax - ymin) / (double)(vf_resolution-1),
                 xpix_inc = (double)ui->qwtPhasePlot->width() / (double)(vf_resolution-1),
@@ -1724,8 +1743,8 @@ void MainWindow::DrawVectorField()
 
                     if (num_diffs>2)
                         _parserMgr.ResetValues();
-                    _parserMgr.SetData(_differentials, xidx, x);
-                    _parserMgr.SetData(_differentials, yidx, y);
+                    _parserMgr.SetData(ds::DIFF, xidx, x);
+                    _parserMgr.SetData(ds::DIFF, yidx, y);
                     for (int k=1; k<=_vfTailLen; ++k)
                     {
                         _parserMgr.ParserEval(false);
@@ -1743,9 +1762,9 @@ void MainWindow::DrawVectorField()
             if (_playState==DRAWING && _plotMode==VECTOR_FIELD) _vfTailLen += _vfStepsSec;
 
             for (int i=0; i<num_diffs; ++i)
-                _parserMgr.SetData(_differentials, i, dvals_orig.at(i));
+                _parserMgr.SetData(ds::DIFF, i, dvals_orig.at(i));
             for (int i=0; i<num_vars; ++i)
-                _parserMgr.SetData(_variables, i, vars_orig.at(i));
+                _parserMgr.SetData(ds::VAR, i, vars_orig.at(i));
         }
         catch (std::exception& e)
         {
@@ -1785,8 +1804,8 @@ void MainWindow::InitBuffers()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::InitBuffers", _tid);
 #endif
-    const int num_diffs = (int)_differentials->NumPars(),
-            num_vars = (int)_variables->NumPars();
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
     _diffPts = std::vector< std::deque<double> >(num_diffs);
     _varPts = std::vector< std::deque<double> >(num_vars);
     _ip.clear();
@@ -1799,28 +1818,32 @@ void MainWindow::InitDefaultModel()
 #endif
     InitModels();
 
-    _inputs->AddParameter("a", "4");
-    _inputs->AddParameter("b", "10");
+    _modelMgr->AddParameter(ds::INP, "a", "4");
+    _modelMgr->AddParameter(ds::INP, "b", "10");
 
-    _variables->AddParameter("q", "1"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
-    _variables->AddParameter("r", "u*v");
+    _modelMgr->AddParameter(ds::VAR, "q", "1"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
+    _modelMgr->AddParameter(ds::VAR, "r", "u*v");
 
-    _differentials->AddParameter("v'", "(u + r + a)/b");
-    _differentials->AddParameter("u'", "q*(b - v)");
+    _modelMgr->AddParameter(ds::DIFF, "v'", "(u + r + a)/b");
+    _modelMgr->AddParameter(ds::DIFF, "u'", "q*(b - v)");
 
-    _initConds->AddParameter("v(0)", "1");
-    _initConds->AddParameter("u(0)", "0");
-    _initConds->SetRange(0, -30, 30);
-    _initConds->SetRange(1, -30, 30);
+    _modelMgr->AddParameter(ds::INIT, "v(0)", "1");
+    _modelMgr->AddParameter(ds::INIT, "u(0)", "0");
+    _modelMgr->SetRange(ds::INIT, 0, -30, 30);
+    _modelMgr->SetRange(ds::INIT, 1, -30, 30);
 
     VecStr vs;
     vs.push_back("v = 1"); vs.push_back("u = 2");
-    _conditions->AddCondition("v>30", vs);
-    ui->lsConditions->setModel(_conditions);
-    ui->lsConditions->setModelColumn(0);
+    _modelMgr->AddCondParameter("v>30", vs);
+    ui->lsConditions->setModelColumn(ConditionModel::TEST);
     ResetResultsList(0);
 
-    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+    _modelMgr->SetModelStep(ds::DEFAULT_MODEL_STEP);
+    _modelMgr->SetNotes("This is the default model.  For more interesting models look in the ParameterFiles folder.");
+
+    _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
+
+    _parserMgr.InitData();
 
     UpdateLists();
 
@@ -1836,25 +1859,24 @@ void MainWindow::InitDraw()
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
 }
-void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, ConditionModel* conditions)
+void MainWindow::InitModels()
 {
 #ifdef DEBUG_MW_FUNC
     ScopeTracker st("MainWindow::InitModels", std::this_thread::get_id());
 #endif
-    _parserMgr.ClearModels();
+    _modelMgr->ClearModels();
 
-    if (_inputs) delete _inputs;
-    _inputs = (models) ? (*models)[ds::INPUTS] : new ParamModel(this, ds::Model(ds::INPUTS));
-    ui->tblParameters->setModel(_inputs);
+    ParamModelBase* inputs = ParamModelBase::Create(ds::INP);
+    _modelMgr->SetModel(ds::INP, inputs);
+    ui->tblParameters->setModel(inputs);
     ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
-    _parserMgr.AddModel(_inputs);
 
-    if (_variables) delete _variables;
-    _variables = (models) ? (*models)[ds::VARIABLES] : new VariableModel(this, ds::Model(ds::VARIABLES));
-    ui->tblVariables->setModel(_variables);
-    ui->tblVariables->setColumnHidden(ParamModelBase::MIN,true);
-    ui->tblVariables->setColumnHidden(ParamModelBase::MAX,true);
+    ParamModelBase* vars = ParamModelBase::Create(ds::VAR);
+    _modelMgr->SetModel(ds::VAR, vars);
+    ui->tblVariables->setModel(vars);
+    ui->tblVariables->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblVariables->setColumnHidden(NumericModelBase::MAX,true);
     ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
@@ -1867,32 +1889,28 @@ void MainWindow::InitModels(const std::vector<ParamModelBase*>* models, Conditio
     ComboBoxDelegate* cmbd = new ComboBoxDelegate(vstr);
     ui->tblVariables->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
     connect(cmbd, SIGNAL(ComboBoxChanged(size_t)), this, SLOT(ComboBoxChanged(size_t)));
-    _parserMgr.AddModel(_variables);
 
-    if (_differentials) delete _differentials;
-    _differentials =(models) ? (*models)[ds::DIFFERENTIALS] :  new DifferentialModel(this, ds::Model(ds::DIFFERENTIALS));
-    ui->tblDifferentials->setModel(_differentials);
+    ParamModelBase* diffs = ParamModelBase::Create(ds::DIFF);
+    _modelMgr->SetModel(ds::DIFF, diffs);
+    ui->tblDifferentials->setModel(diffs);
     ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
-    ui->tblDifferentials->setColumnHidden(ParamModelBase::MIN,true);
-    ui->tblDifferentials->setColumnHidden(ParamModelBase::MAX,true);
+    ui->tblDifferentials->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblDifferentials->setColumnHidden(NumericModelBase::MAX,true);
     ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
     CheckBoxDelegate* cbbd_d = new CheckBoxDelegate(std::vector<QColor>(), this);
     ui->tblDifferentials->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
-    _parserMgr.AddModel(_differentials);
 
-    if (_initConds) delete _initConds;
-    _initConds = (models) ? (*models)[ds::INIT_CONDS] : new InitialCondModel(this, ds::Model(ds::INIT_CONDS));
-    ui->tblInitConds->setModel(_initConds);
+    ParamModelBase* init_conds = ParamModelBase::Create(ds::INIT);
+    _modelMgr->SetModel(ds::INIT, init_conds);
+    ui->tblInitConds->setModel(init_conds);
     ui->tblInitConds->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
-    _parserMgr.AddModel(_initConds);
 
-    if (_conditions) delete _conditions;
-    _conditions = (conditions) ? conditions : new ConditionModel(this);
-    ui->lsConditions->setModel(_conditions);
+    ParamModelBase* conditions = ParamModelBase::Create(ds::COND);
+    _modelMgr->SetModel(ds::COND, conditions);
+    ui->lsConditions->setModel(conditions);
     ui->lsConditions->setModelColumn(0);
     ResetResultsList(-1);
-    _parserMgr.SetCondModel(_conditions);
 }
 void MainWindow::InitPlots()
 {
@@ -1924,8 +1942,8 @@ void MainWindow::InitPlots()
             //The time plot
             AttachTimePlot(false);
 
-            const int num_diffs = (int)_differentials->NumPars(),
-                    num_vars = (int)_variables->NumPars();
+            const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
             const int num_all_tplots = 1 + num_diffs + num_vars,
                     num_colors = (int)_tpColors.size();
                 // +1 for inner product.  The strategy is to attach all possible curves
@@ -2020,8 +2038,8 @@ void MainWindow::AttachTimePlot(bool attach) //slot
 void MainWindow::AttachVariableView(bool attach) //slot
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::AttachVectorField", _tid);
-    assert(_tid == std::this_thread::get_id() && "AttachVectorField called from worker thread!");
+    ScopeTracker st("MainWindow::AttachVariableView", _tid);
+    assert(_tid == std::this_thread::get_id() && "AttachVariableView called from worker thread!");
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if (attach)
@@ -2074,7 +2092,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
     std::lock_guard<std::mutex> lock(_mutex);
     try
     {
-        std::string text = _variables->Value(row);
+        std::string text = _modelMgr->Value(ds::VAR, row);
         if (text==Input::INPUT_FILE_STR)
         {
             std::string file_name = QFileDialog::getOpenFileName(nullptr,
@@ -2086,9 +2104,9 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
                 text = "\"" + file_name + "\"";
             else
                 text = "0";
-            _variables->SetPar((size_t)row, text);
+            _modelMgr->SetValue(ds::VAR, (size_t)row, text);
         }
-        _parserMgr.AssignInput(_variables, row, text, true);
+        _modelMgr->AssignInput(row, _parserMgr.Data(ds::VAR), text, true);
     }
     catch (std::exception& e)
     {
@@ -2114,7 +2132,7 @@ void MainWindow::InitParserMgr() //slot
     std::lock_guard<std::mutex> lock(_mutex);
     try
     {
-        _parserMgr.InitModels();
+        _parserMgr.InitData();
         _parserMgr.InitParsers();
         _parserMgr.SetExpressions();
         _parserMgr.SetConditions();
@@ -2131,8 +2149,8 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
     ScopeTracker st("MainWindow::ParamChanged", _tid);
 #endif
     int idx = topLeft.row();
-    std::string exprn = _inputs->Expression(idx);
-    if (_parserMgr.AreModelsInitialized())
+    std::string exprn = _modelMgr->Model(ds::INP)->Expression(idx);
+    if (_modelMgr->AreModelsInitialized())
         _parserMgr.QuickEval(exprn);
     UpdateSlider( ui->cmbSlidePars->currentIndex() );
     if (IsVFPresent()) UpdateVectorField();
@@ -2187,7 +2205,7 @@ void MainWindow::UpdateParams() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateParams", _tid);
 #endif
-    _inputs->SetPar((int)_pulseParIdx, _pulseResetValue);
+    _modelMgr->SetValue(ds::INP, (int)_pulseParIdx, _pulseResetValue);
     if (ui->cboxVectorField->isChecked()) _needUpdateVF = true;
 }
 bool MainWindow::IsVFPresent() const
@@ -2207,21 +2225,14 @@ void MainWindow::LoadModel(const std::string& file_name)
         ClearPlots();
 
         SysFileIn in(file_name);
-        std::vector<ParamModelBase*> models;
-        ConditionModel* conditions = new ConditionModel(this);
-        std::string model_step;
-        Notes* notes = _notesGui->GetNotes();
-        in.Load(models, model_step, conditions, notes);
+        in.Load();
 
         _parserMgr.ClearExpressions();
 
-        //Have to do this before models are deleted!
-        InitModels(&models, conditions);
         ConnectModels();
 
-        ui->edModelStep->setText( model_step.c_str() ); //This does *not* call editingFinished
-        _parserMgr.SetModelStep( std::stod(model_step) );
-        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _parserMgr.ModelStep() );
+        ui->edModelStep->setText( std::to_string(_modelMgr->ModelStep()).c_str() ); //This does *not* call editingFinished
+        _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
 
         ResetPhasePlotAxes();
         if (file_name != ds::TEMP_MODEL_FILE) UpdateLists();
@@ -2241,16 +2252,16 @@ void MainWindow::ResetPhasePlotAxes()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ResetPhasePlotAxes(", _tid);
 #endif
-    QStringList qdiffs = ds::VecStrToQSList( _differentials->ShortKeys() );
+    QStringList qdiffs = ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
 
-    ui->cmbDiffX->clear();
-    ui->cmbDiffX->insertItems(0, qdiffs);
-    ui->cmbDiffX->setCurrentIndex(0);
+    ui->cmbPlotX->clear();
+    ui->cmbPlotX->insertItems(0, qdiffs);
+    ui->cmbPlotX->setCurrentIndex(0);
 
-    const int yidx = _differentials->NumPars() > 1 ? 1 : 0;
-    ui->cmbDiffY->clear();
-    ui->cmbDiffY->insertItems(0, qdiffs);
-    ui->cmbDiffY->setCurrentIndex(yidx);
+    const int yidx = _modelMgr->Model(ds::DIFF)->NumPars() > 1 ? 1 : 0;
+    ui->cmbPlotY->clear();
+    ui->cmbPlotY->insertItems(0, qdiffs);
+    ui->cmbPlotY->setCurrentIndex(yidx);
 }
 void MainWindow::ResetResultsList(int cond_row)
 {
@@ -2259,7 +2270,7 @@ void MainWindow::ResetResultsList(int cond_row)
 #endif
     delete ui->lsResults->model();
     if (cond_row==-1) return;
-    QStringList qexprns = ds::VecStrToQSList( _conditions->Expressions(cond_row) );
+    QStringList qexprns = ds::VecStrToQSList( _modelMgr->CondResults(cond_row) );
     QStringListModel* model = new QStringListModel(qexprns);
     ui->lsResults->setModel(model);
     connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
@@ -2294,15 +2305,8 @@ void MainWindow::SaveModel(const std::string& file_name)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::SaveModel", _tid);
 #endif
-    std::vector<const ParamModelBase*> models;
-    models.push_back(_inputs);
-    models.push_back(_variables);
-    models.push_back(_differentials);
-    models.push_back(_initConds);
-    double model_step = _parserMgr.ModelStep();
-    const Notes* notes = _notesGui->GetNotes();
     SysFileOut out(file_name);
-    out.Save(models, model_step, _conditions, notes);
+    out.Save();
 }
 void MainWindow::SetButtonsEnabled(bool is_enabled)
 {
@@ -2396,7 +2400,7 @@ void MainWindow::UpdatePulseVList()
     ScopeTracker st("MainWindow::UpdatePulseVList", _tid);
 #endif
     ui->cmbPulsePars->clear();
-    VecStr keys = _inputs->Keys();
+    VecStr keys = _modelMgr->Model(ds::INP)->Keys();
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbPulsePars->insertItem((int)i, keys.at(i).c_str());
 }
@@ -2406,9 +2410,9 @@ void MainWindow::UpdateSlider(int index)
     ScopeTracker st("MainWindow::UpdateSlider", _tid);
 #endif
     if (index==-1) return;
-    const double val = std::stod( _inputs->Value(index) ),
-            min = _parserMgr.Minimum(_inputs, index),
-            range = _parserMgr.Range(_inputs, index);
+    const double val = std::stod( _modelMgr->Value(ds::INP, index) ),
+            min = _modelMgr->Minimum(ds::INP, index),
+            range = _modelMgr->Range(ds::INP, index);
     const int scaled_val = ((val-min)/range) * SLIDER_INT_LIM + 0.5;
     ui->sldParameter->setValue( qBound(0, scaled_val, SLIDER_INT_LIM) );
 }
@@ -2418,7 +2422,7 @@ void MainWindow::UpdateSliderPList()
     ScopeTracker st("MainWindow::UpdateSliderPList", _tid);
 #endif
     ui->cmbSlidePars->clear();
-    VecStr keys = _inputs->Keys();
+    VecStr keys = _modelMgr->Model(ds::INP)->Keys();
     for (size_t i=0; i<keys.size(); ++i)
         ui->cmbSlidePars->insertItem((int)i, keys.at(i).c_str());
 }
@@ -2431,7 +2435,7 @@ void MainWindow::UpdateResultsModel(int cond_row)
     VecStr exprns;
     for (const auto& it : items)
         exprns.push_back(it.toStdString());
-    _conditions->SetExpressions(cond_row, exprns);
+    _modelMgr->SetCondValue(cond_row, exprns);
 }
 void MainWindow::UpdateTimePlotTable()
 {
@@ -2440,8 +2444,8 @@ void MainWindow::UpdateTimePlotTable()
 #endif
     delete ui->tblTimePlot->model();
     VecStr vs,
-            dkeys = _differentials->ShortKeys(),
-            vkeys = _variables->Keys();
+            dkeys = _modelMgr->Model(ds::DIFF)->ShortKeys(),
+            vkeys = _modelMgr->Model(ds::VAR)->Keys();
     vs.push_back("IP");
     vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
     vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());

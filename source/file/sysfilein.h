@@ -5,25 +5,25 @@
 #include <fstream>
 
 #include "../globals/scopetracker.h"
+#include "../memrep/modelmgr.h"
 #include "../memrep/notes.h"
-#include "../models/conditionmodel.h"
-#include "../models/differentialmodel.h"
-#include "../models/initialcondmodel.h"
-#include "../models/parammodel.h"
-#include "../models/variablemodel.h"
+#include "../models/parammodelbase.h"
 
 class SysFileIn
 {
     public:
         SysFileIn(const std::string& name);
 
-        void Load(std::vector<ParamModelBase*>& models,
-                  std::string& model_step,
-                  ConditionModel* conditions,
-                  Notes* notes);
+        void Load();
         void Load(VecStr& vmodels);
 
     private:
+        std::vector<ParamModelBase*> ReadModels();
+        double ReadModelStep();
+        Notes* ReadNotes();
+        int ReadNumModels();
+        int ReadVersion();
+
         const std::string _name;
         std::ifstream _in;
 };

@@ -8,31 +8,33 @@ SysFileOut::SysFileOut(const std::string& name)
 #endif
 }
 
-void SysFileOut::Save(const std::vector<const ParamModelBase*>& models,
-                      double model_step,
-                      const ConditionModel* conditions,
-                      const Notes* notes) const
+void SysFileOut::Save() const
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("SysFileOut::Save", std::this_thread::get_id());
 #endif
     _out.open(_name);
 
-    SaveHeader(model_step);
-    _out << models.size() << std::endl;
-    for (auto it : models)
+    ModelMgr* model_mgr = ModelMgr::Instance();
+
+    SaveHeader(model_mgr->ModelStep());
+    _out << ds::NUM_MODELS << std::endl;
+    for (int i=0; i<ds::NUM_MODELS; ++i)
     {
-        const int num_pars = (int)it->NumPars();
-        _out << it->Name() << "\t" << num_pars << std::endl;
+        const ParamModelBase* model = model_mgr->Model((ds::PMODEL)i);
+        const int num_pars = (int)model->NumPars();
+        _out << model->Name() << "\t" << num_pars << std::endl;
         for (int i=0; i<num_pars; ++i)
-            _out << it->Key(i) << "\t" << it->Value(i) << "\t"
-                 << it->Minimum(i) << "\t" << it->Maximum(i) << std::endl;
+        {
+            _out << model->Key(i) << "\t" << model->Value(i);
+            if (const NumericModelBase* nmodel = dynamic_cast<const NumericModelBase*>(model))
+                 _out << "\t" << nmodel->Minimum(i) << "\t" << nmodel->Maximum(i);
+            _out << std::endl;
+        }
         _out << std::endl;
     }
 
-    conditions->Write(_out);
-    _out << std::endl;
-    notes->Write(_out);
+    model_mgr->GetNotes()->Write(_out);
 
     _out.close();
 }
@@ -46,7 +48,7 @@ void SysFileOut::Save(const VecStr& vmodels,
     _out.open(_name);
 
     SaveHeader(model_step);
-    _out << vmodels.size() - 1 << std::endl; //Don't count conditions here
+    _out << vmodels.size() << std::endl; //Don't count conditions here
     for (auto it : vmodels)
         _out << it;
     notes->Write(_out);

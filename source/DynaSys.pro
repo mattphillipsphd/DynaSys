@@ -66,7 +66,9 @@ SOURCES += main.cpp\
     generate/object/sharedobj.cpp \
     generate/object/compilable.cpp \
     generate/object/compilablebase.cpp \
-    generate/script/cudakernel.cpp
+    generate/script/cudakernel.cpp \
+    memrep/modelmgr.cpp \
+    models/numericmodelbase.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -110,7 +112,9 @@ HEADERS  += gui/mainwindow.h \
     generate/object/sharedobj.h \
     generate/object/compilable.h \
     generate/object/compilablebase.h \
-    generate/script/cudakernel.h
+    generate/script/cudakernel.h \
+    memrep/modelmgr.h \
+    models/numericmodelbase.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

@@ -1,8 +1,37 @@
 #include "parammodelbase.h"
+#include "../models/conditionmodel.h"
+#include "../models/differentialmodel.h"
+#include "../models/initialcondmodel.h"
+#include "../models/parammodel.h"
+#include "../models/variablemodel.h"
 
-const std::string ParamModelBase::Param::DEFAULT_MAX = "100";
-const std::string ParamModelBase::Param::DEFAULT_MIN = "-100";
 const std::string ParamModelBase::Param::DEFAULT_VAL = "0";
+
+ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
+{
+    ParamModelBase* model;
+    switch (mi)
+    {
+        case ds::INP:
+            model = new ParamModel(nullptr, ds::Model(mi));
+            break;
+        case ds::VAR:
+            model = new VariableModel(nullptr, ds::Model(mi));
+            break;
+        case ds::DIFF:
+            model = new DifferentialModel(nullptr, ds::Model(mi));
+            break;
+        case ds::INIT:
+            model = new InitialCondModel(nullptr, ds::Model(mi));
+            break;
+        case ds::COND:
+            model = new ConditionModel(nullptr, ds::Model(mi));
+            break;
+        default:
+            throw std::runtime_error("SysFileIn::Load: Bad model name");
+    }
+    return model;
+}
 
 ParamModelBase::ParamModelBase(QObject* parent, const std::string& name) :
     QAbstractTableModel(parent), _id(ds::Model(name))
@@ -10,6 +39,8 @@ ParamModelBase::ParamModelBase(QObject* parent, const std::string& name) :
 }
 ParamModelBase::~ParamModelBase()
 {
+    for (auto it : _parameters)
+        delete it;
 }
 
 std::string ParamModelBase::Expression(size_t i) const
@@ -49,14 +80,6 @@ VecStr ParamModelBase::Keys() const
         vs.push_back(Key(i));
     return vs;
 }
-double ParamModelBase::Maximum(size_t idx) const
-{
-    return data(createIndex((int)idx,MAX),Qt::DisplayRole).toDouble();
-}
-double ParamModelBase::Minimum(size_t idx) const
-{
-    return data(createIndex((int)idx,MIN),Qt::DisplayRole).toDouble();
-}
 std::string ParamModelBase::ShortKey(size_t i) const
 {
     return Key(i);
@@ -68,15 +91,6 @@ VecStr ParamModelBase::ShortKeys() const
     for (size_t i=0; i<num_pars; ++i)
         vs.push_back(ShortKey(i));
     return vs;
-}
-std::string ParamModelBase::String() const
-{
-    std::string str;
-    str += "#" + ds::Model(_id) + "\n";
-    for (auto it : _parameters)
-        str += it.key + "\t" + it.value + "\t" + it.min + "\t" + it.max + "\n";
-    str += "\n";
-    return str;
 }
 std::string ParamModelBase::TempExpression(size_t i) const
 {
@@ -101,7 +115,7 @@ const std::string& ParamModelBase::Value(const std::string& key) const
 const std::string& ParamModelBase::Value(size_t i) const
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    return _parameters.at(i).value;
+    return _parameters.at(i)->value;
         //Don't go through data, for speed
 //    return data(createIndex(i,0),Qt::DisplayRole).toString().toStdString();
 }
@@ -120,7 +134,7 @@ void ParamModelBase::AddParameter(const std::string& key, const std::string& val
     int row = (int)_parameters.size();
     QModelIndex row_index = createIndex(row, 0);
     insertRows(row, 1, QModelIndex());
-    _parameters[row] = Param(key, value);
+    _parameters[row] = new Param(key, value);
     emit dataChanged(row_index, row_index);
     emit headerDataChanged(Qt::Vertical, row, row);
 }
@@ -128,30 +142,13 @@ std::string ParamModelBase::Name() const
 {
     return ds::Model(_id);
 }
-void ParamModelBase::SetMaximum(size_t idx, double val)
+void ParamModelBase::SetValue(const std::string& key, const std::string& value)
 {
-    setData(createIndex((int)idx,MAX),val,Qt::EditRole);
+    SetValue( KeyIndex(key), value );
 }
-void ParamModelBase::SetMinimum(size_t idx, double val)
-{
-    setData(createIndex((int)idx,MIN),val,Qt::EditRole);
-}
-void ParamModelBase::SetPar(const std::string& key, const std::string& value)
-{
-    SetPar( KeyIndex(key), value );
-}
-void ParamModelBase::SetPar(int i, const std::string& value)
+void ParamModelBase::SetValue(int i, const std::string& value)
 {
     setData( createIndex(i,VALUE), value.c_str(), Qt::EditRole );
-}
-void ParamModelBase::SetPar(int i, double value)
-{
-    setData( createIndex(i,VALUE), value, Qt::EditRole );
-}
-void ParamModelBase::SetRange(size_t idx, double min, double max)
-{
-    SetMinimum(idx, min);
-    SetMaximum(idx, max);
 }
 
 int ParamModelBase::columnCount() const
@@ -160,7 +157,7 @@ int ParamModelBase::columnCount() const
 }
 int ParamModelBase::columnCount(const QModelIndex&) const
 {
-    return NUM_COLUMNS;
+    return NUM_BASE_COLUMNS;
 }
 QVariant ParamModelBase::data(const QModelIndex &index, int role) const
 {
@@ -170,7 +167,7 @@ QVariant ParamModelBase::data(const QModelIndex &index, int role) const
     {
         case Qt::CheckStateRole:
             if (index.column()!=FREEZE) break;
-            value = _parameters.at( index.row() ).is_freeze;
+            value = _parameters.at( index.row() )->is_freeze;
             break;
         case Qt::EditRole:
         case Qt::DisplayRole:
@@ -180,13 +177,7 @@ QVariant ParamModelBase::data(const QModelIndex &index, int role) const
 //                    value = _parameters.at( index.row() ).is_freeze;
                     break;
                 case VALUE:
-                    value = _parameters.at( index.row() ).value.c_str();
-                    break;
-                case MIN:
-                    value = _parameters.at( index.row() ).min.c_str();
-                    break;
-                case MAX:
-                    value = _parameters.at( index.row() ).max.c_str();
+                    value = _parameters.at( index.row() )->value.c_str();
                     break;
             }
             break;
@@ -220,18 +211,12 @@ QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, in
                 case VALUE:
                     header = "Value";
                     break;
-                case MIN:
-                    header = "Min";
-                    break;
-                case MAX:
-                    header = "Max";
-                    break;
             }
             break;
         case Qt::Vertical:
             if (section>(int)_parameters.size())
                 throw std::runtime_error("ParamModelBase::headerData: Bad parameter index.");
-            header = _parameters.at(section).key.c_str();
+            header = _parameters.at(section)->key.c_str();
             break;
     }
     return header;
@@ -240,7 +225,7 @@ QVariant ParamModelBase::headerData(int section, Qt::Orientation orientation, in
 bool ParamModelBase::insertRows(int row, int count, const QModelIndex &parent)
 {
     beginInsertRows(parent, row, row+count-1);
-    std::vector<Param> new_rows(count);
+    std::vector<Param*> new_rows(count);
     _parameters.insert(_parameters.begin()+row, new_rows.begin(), new_rows.end());
     endInsertRows();
     return true;
@@ -278,16 +263,10 @@ bool ParamModelBase::setData(const QModelIndex &index, const QVariant &value, in
             switch (index.column())
             {
                 case FREEZE:
-                    _parameters[ index.row() ].is_freeze = value.toBool();
+                    _parameters[ index.row() ]->is_freeze = value.toBool();
                     break;
                 case VALUE:
-                    _parameters[ index.row() ].value = val;
-                    break;
-                case MIN:
-                    _parameters[ index.row() ].min = val;
-                    break;
-                case MAX:
-                    _parameters[ index.row() ].max = val;
+                    _parameters[ index.row() ]->value = val;
                     break;
             }
             break;
@@ -309,9 +288,9 @@ bool ParamModelBase::setHeaderData(int, Qt::Orientation, const QVariant&, int)
 int ParamModelBase::KeyIndex(const std::string& par_name) const
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    auto it = std::find_if(_parameters.cbegin(), _parameters.cend(), [=](const Param& par)
+    auto it = std::find_if(_parameters.cbegin(), _parameters.cend(), [=](const Param* par)
     {
-        return par_name == par.key;
+        return par_name == par->key;
     });
     if (it == _parameters.cend()) return -1;
     return it - _parameters.cbegin();

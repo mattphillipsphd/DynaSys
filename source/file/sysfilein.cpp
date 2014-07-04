@@ -8,107 +8,34 @@ SysFileIn::SysFileIn(const std::string& name)
 #endif
 }
 
-void SysFileIn::Load(std::vector<ParamModelBase*>& models,
-                     std::string& model_step,
-                     ConditionModel* conditions,
-                     Notes* notes)
+void SysFileIn::Load()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
 #endif
+    ModelMgr* model_mgr = ModelMgr::Instance();
+
     _in.open(_name);
-    std::string line;
 
-    std::getline(_in, line);
-    int version = ds::VersionNum(line);
-    bool has_minmax = (version>=4), //I.e. >= 0.0.4
-            has_model_step = (version>=103),
-            old_par_name = (version<104);
+    int version = ReadVersion();
+    bool has_new_conds = (version>=202);
+    if (!has_new_conds)
+        throw std::runtime_error("SysFileIn::Load: Obsolete parameter file!");
 
-    if (has_model_step)
-    {
-        std::getline(_in, line);
-        size_t pos = line.find_last_of(':');
-        model_step = line.substr(pos+1);
-        model_step.erase( std::remove_if(
-                        model_step.begin(), model_step.end(), ::isspace ),
-                          model_step.end() );
-    }
-    else
-        model_step = "1.0";
+    //Model step
+    double model_step = ReadModelStep();
+    model_mgr->SetModelStep(model_step);
 
-    std::getline(_in, line);
-    const int num_models = std::stoi(line);
-    if (num_models != ds::NUM_MODELS-1)
-        throw std::runtime_error("SysFileIn::Load: Wrong number of models");
+    //Number of models
+    const int num_models = ReadNumModels();
 
+    //Model data
+    std::vector<ParamModelBase*> models = ReadModels();
     for (int i=0; i<num_models; ++i)
-    {
-        std::getline(_in, line);
-        size_t tab = line.find_first_of('\t');
-        std::string name = line.substr(0,tab),
-                num = line.substr(tab+1);
-        const int num_pars = std::stoi(num);
-        ParamModelBase* model;
-        if (old_par_name && name=="Parameters") name = "Inputs";
-        switch (ds::Model(name))
-        {
-            case ds::INPUTS:
-                model = new ParamModel(nullptr, name);
-                break;
-            case ds::VARIABLES:
-                model = new VariableModel(nullptr, name);
-                break;
-            case ds::DIFFERENTIALS:
-                model = new DifferentialModel(nullptr, name);
-                break;
-            case ds::INIT_CONDS:
-                model = new InitialCondModel(nullptr, name);
-                break;
-            default:
-                throw std::runtime_error("SysFileIn::Load: Bad model name");
-        }
-            // ### Should create a proper factory
-        models.push_back(model);
+        model_mgr->SetModel((ds::PMODEL)i, models[i]);
 
-        for (int j=0; j<num_pars; ++j)
-        {
-            std::getline(_in, line);
-            size_t tab = line.find_first_of('\t');
-            std::string key = line.substr(0,tab),
-                    value = line.substr(tab+1);
-            std::string pmin, pmax;
-            if (has_minmax)
-            {
-                size_t tab = value.find_first_of('\t');
-                if (tab==std::string::npos)
-                {
-                    pmin = ParamModelBase::Param::DEFAULT_MIN;
-                    pmax = ParamModelBase::Param::DEFAULT_MAX;
-                }
-                else
-                {
-                    std::string rest = value.substr(tab+1);
-                    value = value.substr(0,tab);
-                    tab = rest.find_first_of('\t');
-                    pmin = rest.substr(0,tab);
-                    pmax = rest.substr(tab+1);
-                }
-            }
-            model->AddParameter(key, value);
-            if (has_minmax)
-            {
-                model->SetMinimum(j, std::stod(pmin));
-                model->SetMaximum(j, std::stod(pmax));
-            }
-        }
-
-        std::getline(_in, line);
-    }
-
-    conditions->Read(_in);
-
-    if (notes) notes->Read(_in);
+    //Notes
+    model_mgr->SetNotes( ReadNotes() );
 
     _in.close();
 }
@@ -117,22 +44,95 @@ void SysFileIn::Load(VecStr& vmodels)
 #ifdef DEBUG_FUNC
     ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
 #endif
-    std::vector<ParamModelBase*> models;
-    std::string model_step;
-    ConditionModel* conditions = new ConditionModel();
-    Notes* notes = new Notes();
+    _in.open(_name);
 
-    Load(models, model_step, conditions, notes);
+    ReadVersion();
+    ReadModelStep();
+    ReadNumModels();
 
+    std::vector<ParamModelBase*> models = ReadModels();
     for (auto it : models)
     {
         std::string model_str = it->String();
         vmodels.push_back(model_str);
     }
-    vmodels.push_back( conditions->EdString() );
 
     for (auto it : models)
         delete it;
-    delete conditions;
-    delete notes;
+
+    _in.close();
+}
+
+
+std::vector<ParamModelBase*> SysFileIn::ReadModels()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
+#endif
+    std::string line;
+    std::vector<ParamModelBase*> models(ds::NUM_MODELS);
+    for (int i=0; i<ds::NUM_MODELS; ++i)
+    {
+        std::getline(_in, line);
+        size_t tab = line.find_first_of('\t');
+        std::string name = line.substr(0,tab),
+                num = line.substr(tab+1);
+        const int num_pars = std::stoi(num);
+        ParamModelBase* model = ParamModelBase::Create( ds::Model(name) );
+
+        for (int j=0; j<num_pars; ++j)
+        {
+            std::getline(_in, line);
+            size_t tab = line.find_first_of('\t');
+            std::string key = line.substr(0,tab),
+                    rem = line.substr(tab+1);
+            model->ProcessParamFileLine(key, rem);
+        }
+        models[i] = model;
+
+        std::getline(_in, line);
+    }
+    return models;
+}
+double SysFileIn::ReadModelStep()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::ReadModelStep", std::this_thread::get_id());
+#endif
+    std::string line;
+    std::getline(_in, line);
+    size_t pos = line.find_last_of(':');
+    std::string model_step = line.substr(pos+1);
+    ds::RemoveWhitespace(model_step);
+    return std::stod(model_step);
+}
+Notes* SysFileIn::ReadNotes()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::ReadNotes", std::this_thread::get_id());
+#endif
+    Notes* notes = new Notes();
+    notes->Read(_in);
+    return notes;
+}
+int SysFileIn::ReadNumModels()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::ReadNumModels", std::this_thread::get_id());
+#endif
+    std::string line;
+    std::getline(_in, line);
+    const int num_models = std::stoi(line);
+    if (num_models != ds::NUM_MODELS)
+        throw std::runtime_error("SysFileIn::Load: Wrong number of models");
+    return num_models;
+}
+int SysFileIn::ReadVersion()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("SysFileIn::ReadVersion", std::this_thread::get_id());
+#endif
+    std::string line;
+    std::getline(_in, line);
+    return ds::VersionNum(line);
 }

@@ -7,7 +7,7 @@ const int ds::TABLEN = 4;
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_DAT_FILE = ".temp.dsdat";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
-const std::string ds::VERSION_STR = "0.2.1";
+const std::string ds::VERSION_STR = "0.2.2";
 
 #ifndef Q_OS_WIN
 const std::vector<QColor> ds::THREAD_COLORS = {Qt::black, Qt::red, Qt::green, Qt::gray, Qt::blue };
@@ -32,28 +32,38 @@ void ds::AddThread(std::thread::id tid)
     ++thread_ct;
 }
 
+std::string ds::Join(const VecStr& vec, const std::string& delim)
+{
+    if (vec.empty()) return "";
+    std::string out = vec.at(0);
+    const size_t num_elts = vec.size();
+    for (size_t i=1; i<num_elts; ++i)
+        out += delim + vec.at(i);
+    return out;
+}
+
 ds::PMODEL ds::Model(const std::string& model)
 {
-    if (model=="Inputs") return INPUTS;
-    if (model=="Variables") return VARIABLES;
-    if (model=="Differentials") return DIFFERENTIALS;
-    if (model=="InitialConds") return INIT_CONDS;
-    if (model=="Conditions") return CONDITIONS;
+    if (model=="Inputs") return INP;
+    if (model=="Variables") return VAR;
+    if (model=="Differentials") return DIFF;
+    if (model=="InitialConds") return INIT;
+    if (model=="Conditions") return COND;
     throw std::runtime_error("ds::Model: Bad Model");
 }
-std::string ds::Model(PMODEL model)
+std::string ds::Model(PMODEL mi)
 {
-    switch (model)
+    switch (mi)
     {
-        case INPUTS:
+        case INP:
             return "Inputs";
-        case VARIABLES:
+        case VAR:
             return "Variables";
-        case DIFFERENTIALS:
+        case DIFF:
             return "Differentials";
-        case INIT_CONDS:
+        case INIT:
             return "InitialConds";
-        case CONDITIONS:
+        case COND:
             return "Conditions";
         case NUM_MODELS:
             throw std::runtime_error("ds::Model: Not a model");
@@ -70,6 +80,17 @@ void ds::RemoveWhitespace(std::string& s)
 {
     s.erase( std::remove_if(s.begin(), s.end(), ::isspace), s.end() );
 }
+VecStr ds::RemoveWhitespace(const VecStr& vec)
+{
+    VecStr out;
+    for (const auto& it : vec)
+    {
+        std::string s = it;
+        RemoveWhitespace(s);
+        out.push_back(s);
+    }
+    return out;
+}
 
 double ds::sgn(double val)
 {
@@ -77,6 +98,22 @@ double ds::sgn(double val)
         //http://stackoverflow.com/questions/1903954
 }
 
+VecStr ds::Split(const std::string& str, const std::string& delim)
+{
+    VecStr out;
+    std::string haystack = str;
+    int pos = haystack.find(delim.c_str());
+    const int dlen = delim.length();
+    while (pos != std::string::npos)
+    {
+        out.push_back(haystack.substr(0,pos));
+        haystack.erase(0, pos+dlen);
+        pos = haystack.find(delim.c_str());
+    }
+    if (!haystack.empty()) out.push_back(haystack);
+
+    return out;
+}
 std::string ds::StripPath(const std::string& file_name)
 {
     const size_t pos = file_name.find_last_of('/');

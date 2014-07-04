@@ -1,108 +1,111 @@
 #include "conditionmodel.h"
 
-ConditionModel::ConditionModel(QObject *parent) :
-    QStandardItemModel(parent)
+const std::string ConditionModel::DELIM = ",";
+
+ConditionModel::ConditionModel(QObject *parent, const std::string& name) :
+    ParamModelBase(parent, name)
 {
-//    setColumnCount(2);
 }
 
 void ConditionModel::AddCondition(const std::string& condition, const VecStr& exprns)
 {
-    QStandardItem* itm = new QStandardItem(condition.c_str());
-    for (const auto& it : exprns)
-    {
-        QStandardItem* exprn = new QStandardItem(it.c_str());
-        itm->appendRow(exprn);
-    }
-    appendRow(itm);
+    AddParameter(condition, ds::Join(exprns, DELIM));
 }
-void ConditionModel::AddExpression(int row, const std::string& exprn)
+void ConditionModel::AddResult(int row, const std::string& result)
 {
-    QStandardItem* parent = item(row),
-            * exprn_itm = new QStandardItem(exprn.c_str());
-    parent->appendRow(exprn_itm);
+    VecStr result_vec = Results(row);
+    std::string results = ds::Join(result_vec, DELIM);
+    results += results.empty() ? result : DELIM + result;
+    SetValue(row, results);
 }
 
-void ConditionModel::SetExpressions(int row, const VecStr& exprns)
+void ConditionModel::SetResults(int row, const VecStr& exprns)
 {
-    QStandardItem* parent = item(row);
-    parent->setRowCount(0);
-    for (const auto& it : exprns)
-        AddExpression(row, it);
+    SetValue(row, ds::Join(exprns, DELIM));
 }
 
-const std::string ConditionModel::Condition(int row) const
+std::string ConditionModel::Condition(int row) const
 {
-    QStandardItem* cond = item(row);
-    return cond->text().toStdString();
+    return Key((size_t)row);
 }
-std::string ConditionModel::EdString() const
+void ConditionModel::ProcessParamFileLine(const std::string& key, std::string rem)
 {
-    std::string s = String();
-    s.erase(0, s.find_first_of('\n')+1 );
-    s = "#Conditions\n" + s;
-    return s;
+    AddParameter(key, rem);
 }
-const VecStr ConditionModel::Expressions(int row) const
+
+VecStr ConditionModel::Results(int row) const
 {
-    VecStr vstr;
-    QStandardItem* parent = item(row);
-    const int num_exprns = rowCount(parent->index());
-    for (int j=0; j<num_exprns; ++j)
-    {
-        QStandardItem* exprn = parent->child(j);
-        vstr.push_back(exprn->text().toStdString());
-    }
-    return vstr;
-}
-size_t ConditionModel::NumPars() const
-{
-    return rowCount();
+    std::string delimc = DELIM;
+    return ds::Split( Value((size_t)row), delimc );
 }
 std::string ConditionModel::String() const
 {
-    std::stringstream s;
-    Write(s);
-    return s.str();
+    std::string str;
+    str += "#" + ds::Model( Id() ) + "\n";
+    const size_t num_pars = NumPars();
+    for (size_t i=0; i<num_pars; ++i)
+        str += Key(i) + "\t" + Value(i) + "\n";
+    str += "\n";
+    return str;
 }
 
-void ConditionModel::Read(std::istream& in)
+int ConditionModel::columnCount(const QModelIndex&) const
 {
-    clear();
-    std::string line;
-    while (line.empty() && !in.eof())
-        std::getline(in, line);
-    if (in.eof()) return;
-    size_t tab = line.find_first_of('\t');
-    const int num_conds = std::stoi( line.substr(tab+1) );
-    for (int i=0; i<num_conds; ++i)
+    return NUM_COND_COLUMNS;
+}
+QVariant ConditionModel::data(const QModelIndex &index, int role) const
+{
+    std::lock_guard<std::mutex> lock(_cmutex);
+    QVariant value;
+    switch (role)
     {
-        std::getline(in, line);
-        tab = line.find_first_of('\t');
-        std::string cond = line.substr(0,tab);
-        int num_results = std::stoi( line.substr(tab+1) );
-        VecStr results(num_results);
-        for (int j=0; j<num_results; ++j)
+        case Qt::EditRole:
+        case Qt::DisplayRole:
+            switch (index.column())
+            {
+                case FREEZE:
+                case VALUE:
+                    value = ParamModelBase::data(index, role);
+                    break;
+                case TEST:
+                    value = Parameter( index.row() )->key.c_str();
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+    return value;
+}
+bool ConditionModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+    _cmutex.lock();
+    std::string val = value.toString().toStdString();
+    switch (role)
+    {
+         case Qt::EditRole:
         {
-            std::getline(in, line);
-            results[j] = line.substr(1); //The first character is a tab
+            if (index.row()>=rowCount())
+                throw std::runtime_error("NumericModelBase::setData: Index out of bounds");
+            switch (index.column())
+            {
+                case FREEZE:
+                case VALUE:
+                    ParamModelBase::setData(index, value, role);
+                    _cmutex.unlock();
+                    return true;
+                    break;
+                case TEST:
+                    Parameter(index.row())->key = val;
+                    break;
+            }
+            break;
         }
-        AddCondition(cond, results);
+        default:
+            return false;
+            break;
     }
+    _cmutex.unlock();
+    emit dataChanged(index, index);
+    return true;
 }
-void ConditionModel::Write(std::ostream& out) const
-{
-    const int row_count = rowCount();
-    out << "Conditions\t" << row_count << std::endl;
-    for (int i=0; i<row_count; ++i)
-    {
-        QStandardItem* cond = item(i);
-        const int num_exprns = rowCount(cond->index());
-        out << cond->text().toStdString() << "\t" << num_exprns << std::endl;
-        for (int j=0; j<num_exprns; ++j)
-            out << "\t" << cond->child(j)->text().toStdString() << std::endl;
-    }
-    out << std::endl;
-}
-
-

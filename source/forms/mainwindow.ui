@@ -63,7 +63,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="cmbDiffX"/>
+       <widget class="QComboBox" name="cmbPlotX"/>
       </item>
       <item>
        <widget class="QLabel" name="label_10">
@@ -73,7 +73,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QComboBox" name="cmbDiffY"/>
+       <widget class="QComboBox" name="cmbPlotY"/>
       </item>
       <item>
        <widget class="QLabel" name="lblMouseX">
@@ -528,7 +528,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
