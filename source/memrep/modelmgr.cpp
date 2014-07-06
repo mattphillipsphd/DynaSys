@@ -86,7 +86,15 @@ void ModelMgr::AssignInput(size_t i, double* data,
             throw std::runtime_error("ModelMgr::AssignInput: Unknown input.");
     }
 }
-
+void ModelMgr::CreateModels()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::CreateModels", std::this_thread::get_id());
+#endif
+    ClearModels();
+    for (int i=0; i<ds::NUM_MODELS; ++i)
+        _models[i] = ParamModelBase::Create((ds::PMODEL)i);
+}
 void ModelMgr::ClearModels()
 {
 #ifdef DEBUG_FUNC
@@ -137,6 +145,10 @@ void ModelMgr::SetValue(ds::PMODEL mi, size_t idx, const std::string& value)
 {
     _models[mi]->SetValue(idx, value);
 }
+void ModelMgr::SetView(QAbstractItemView* view, ds::PMODEL mi)
+{
+    view->setModel(_models[mi]);
+}
 
 
 bool ModelMgr::AreModelsInitialized() const
@@ -166,6 +178,7 @@ std::string ModelMgr::Value(ds::PMODEL mi, size_t idx) const
 
 ModelMgr::ModelMgr() : _log(Log::Instance()), _models(MakeModelVec()), _notes(nullptr)
 {
+    CreateModels();
 }
 
 ConditionModel* ModelMgr::CondModel()

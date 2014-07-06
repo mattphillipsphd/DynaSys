@@ -5,6 +5,7 @@
 
 class NumericModelBase : public ParamModelBase
 {
+    Q_OBJECT
     public:
         enum COLUMNS
         {

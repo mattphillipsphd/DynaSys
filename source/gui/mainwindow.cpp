@@ -7,7 +7,7 @@ const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
-const int MainWindow::NUM_VV_INCS = 1000;
+const int MainWindow::NUM_VV_INCS = 200;
 const int MainWindow::SLEEP_MS = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::TP_SAMPLES_SHOWN = 2 * 1024;
@@ -169,7 +169,7 @@ void MainWindow::Error()
     SetButtonsEnabled(true);
     _logGui->show();
 }
-void MainWindow::LoadTempModel(void* models) //slot
+void MainWindow::LoadTempModel(void*) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::LoadTempModel", _tid);
@@ -323,7 +323,8 @@ void MainWindow::on_actionClear_triggered()
     if (_playState!=STOPPED)
         throw std::runtime_error("MainWindow::on_actionClear_triggered, Bad state");
     _needUpdateVF = false;
-    InitModels();
+    _modelMgr->CreateModels();
+    InitViews();
     UpdateLists();
 }
 
@@ -539,6 +540,17 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
     ScopeTracker st("MainWindow::on_actionSave_Vector_Field_triggered", _tid);
 #endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
+}
+void MainWindow::on_actionSet_Init_to_Current_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Init_to_Current_triggered", _tid);
+#endif
+    std::lock_guard<std::mutex> lock(_mutex);
+    const size_t num_pars = _modelMgr->Model(ds::DIFF)->NumPars();
+    for (size_t i=0; i<num_pars; ++i)
+        _modelMgr->SetValue( ds::INIT, i, std::to_string(_parserMgr.ConstData(ds::DIFF)[i]) );
+    ui->tblInitConds->update();
 }
 
 void MainWindow::on_btnAddCondition_clicked()
@@ -786,6 +798,16 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
     switch (_plotMode)
     {
         case SINGLE:
+            ui->btnPulse->setEnabled(true);
+            ui->qwtTimePlot->show();
+            ui->tblTimePlot->show();
+            ui->lblTimePlotN->show();
+            ui->edNumTPSamples->show();
+            ui->spnStepsPerSec->setValue(_singleStepsSec);
+            ui->spnStepsPerSec->setMinimum(-1);
+            ui->spnTailLength->setValue(_singleTailLen);
+            _vfTailLen = 1;
+            break;
         case VARIABLE_VIEW:
             ui->btnPulse->setEnabled(true);
             ui->qwtTimePlot->show();
@@ -808,6 +830,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
             ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
             break;
     }
+
+    ResetPhasePlotAxes();
 }
 void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
 {
@@ -1134,7 +1158,7 @@ void MainWindow::DrawNullclines()
                 const int idx = i*vf_resolution+j;
 
                 if (num_diffs>2)
-                    _parserMgr.ResetValues();
+                    _parserMgr.ResetData();
                 _parserMgr.SetData(ds::DIFF, xidx, xij);
                 _parserMgr.SetData(ds::DIFF, yidx, yij);
                 _parserMgr.ParserEval(false);
@@ -1626,37 +1650,62 @@ void MainWindow::DrawVariableView()
 #endif
 //    emit DoAttachVV(false);
 
-    // ### Need to create new, or reuse the parser object.  The expressions are evaluated
-    //in a new way for this.
-    const int xidx = ui->cmbPlotX->currentIndex(),
-            yidx = ui->cmbPlotY->currentIndex();
-    const double xmin = _modelMgr->Minimum(ds::DIFF, xidx),
-            xmax = _modelMgr->Maximum(ds::DIFF, xidx);
-    double xinc = (xmax - xmin)/((double)NUM_VV_INCS - 1);
-    const double* vars = _parserMgr.ConstData(ds::DIFF);
+    if (_needInitialize)
+        emit DoInitParserMgr();
 
-    QPolygonF points(NUM_VV_INCS);
-    double ymin = std::numeric_limits<double>::max(),
-            ymax = std::numeric_limits<double>::min();
-    for (int i=0; i<NUM_VV_INCS; ++i)
+    while (_playState==DRAWING)
     {
-        const double xval = xmin+i*xinc;
-        _parserMgr.SetData(ds::DIFF, xidx, xval);
-        _parserMgr.ParserEval(false);
-        const double yval = vars[yidx];
-        if (yval<ymin) ymin = yval;
-        if (yval>ymax) ymax = yval;
-        points[i] = QPointF(xval, yval);
+        const size_t xidx_raw = ui->cmbPlotX->currentIndex(),
+                yidx = ui->cmbPlotY->currentIndex();
+        const size_t num_inputs = _modelMgr->Model(ds::INP)->NumPars();
+        size_t xidx;
+        ds::PMODEL xmi, xrange_mi;
+        if (xidx_raw<num_inputs)
+        {
+            xrange_mi = xmi = ds::INP;
+            xidx = xidx_raw;
+        }
+        else
+        {
+            xmi = ds::DIFF;
+            xrange_mi = ds::INIT;
+            xidx = xidx_raw - num_inputs;
+        }
+        const double xmin = _modelMgr->Minimum(xrange_mi, xidx),
+                xmax = _modelMgr->Maximum(xrange_mi, xidx);
+        const double xinc = (xmax - xmin)/((double)NUM_VV_INCS - 1);
+
+        ParserMgr parser(_parserMgr);
+        const double* vars = parser.ConstData(ds::VAR);
+
+        QPolygonF points(NUM_VV_INCS);
+        double ymin = std::numeric_limits<double>::max(),
+                ymax = -std::numeric_limits<double>::max();
+        const int num_steps = ui->spnTailLength->value()<1 ? 1 : ui->spnTailLength->value();
+        for (int i=0; i<NUM_VV_INCS; ++i)
+        {
+//            parser.ResetData();
+            const double xval = xmin+i*xinc;
+            parser.SetData(xmi, xidx, xval);
+            for (int k=0; k<num_steps; ++k)
+                parser.ParserEval(false);
+            const double yval = vars[yidx];
+            if (yval<ymin) ymin = yval;
+            if (yval>ymax) ymax = yval;
+            points[i] = QPointF(xval, yval);
+        }
+        QwtPlotCurve* curve = new QwtPlotCurve;
+        curve->setSamples(points);
+
+        _vvPlotItems.push_back(curve);
+
+        emit DoAttachVV(true);
+
+        ViewRect pp_data(xmin, xmax, ymin, ymax);
+        emit DoReplot(pp_data,  ViewRect());
+
+        std::this_thread::sleep_for( std::chrono::milliseconds(100) );
     }
-    QwtPlotCurve* curve = new QwtPlotCurve;
-    curve->setSamples(points);
-
-    _vvPlotItems.push_back(curve);
-
-    emit DoAttachVV(true);
-
-    ViewRect pp_data(xmin, xmax, ymin, ymax);
-    emit DoReplot(pp_data,  ViewRect());
 }
 void MainWindow::DrawVectorField()
 {
@@ -1742,7 +1791,7 @@ void MainWindow::DrawVectorField()
                     marker1->setZ(-1);
 
                     if (num_diffs>2)
-                        _parserMgr.ResetValues();
+                        _parserMgr.ResetData();
                     _parserMgr.SetData(ds::DIFF, xidx, x);
                     _parserMgr.SetData(ds::DIFF, yidx, y);
                     for (int k=1; k<=_vfTailLen; ++k)
@@ -1816,7 +1865,8 @@ void MainWindow::InitDefaultModel()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::InitDefaultModel", _tid);
 #endif
-    InitModels();
+    _modelMgr->CreateModels();
+    InitViews();
 
     _modelMgr->AddParameter(ds::INP, "a", "4");
     _modelMgr->AddParameter(ds::INP, "b", "10");
@@ -1858,59 +1908,6 @@ void MainWindow::InitDraw()
     InitBuffers();
     std::thread t( std::bind(&MainWindow::Draw, this) );
     t.detach();
-}
-void MainWindow::InitModels()
-{
-#ifdef DEBUG_MW_FUNC
-    ScopeTracker st("MainWindow::InitModels", std::this_thread::get_id());
-#endif
-    _modelMgr->ClearModels();
-
-    ParamModelBase* inputs = ParamModelBase::Create(ds::INP);
-    _modelMgr->SetModel(ds::INP, inputs);
-    ui->tblParameters->setModel(inputs);
-    ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
-    ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
-
-    ParamModelBase* vars = ParamModelBase::Create(ds::VAR);
-    _modelMgr->SetModel(ds::VAR, vars);
-    ui->tblVariables->setModel(vars);
-    ui->tblVariables->setColumnHidden(NumericModelBase::MIN,true);
-    ui->tblVariables->setColumnHidden(NumericModelBase::MAX,true);
-    ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
-    ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
-    CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
-    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
-    VecStr vstr;
-    vstr.push_back(Input::INPUT_FILE_STR);
-    vstr.push_back(Input::GAMMA_RAND_STR);
-    vstr.push_back(Input::NORM_RAND_STR);
-    vstr.push_back(Input::UNI_RAND_STR);
-    ComboBoxDelegate* cmbd = new ComboBoxDelegate(vstr);
-    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
-    connect(cmbd, SIGNAL(ComboBoxChanged(size_t)), this, SLOT(ComboBoxChanged(size_t)));
-
-    ParamModelBase* diffs = ParamModelBase::Create(ds::DIFF);
-    _modelMgr->SetModel(ds::DIFF, diffs);
-    ui->tblDifferentials->setModel(diffs);
-    ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
-    ui->tblDifferentials->setColumnHidden(NumericModelBase::MIN,true);
-    ui->tblDifferentials->setColumnHidden(NumericModelBase::MAX,true);
-    ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
-    CheckBoxDelegate* cbbd_d = new CheckBoxDelegate(std::vector<QColor>(), this);
-    ui->tblDifferentials->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
-
-    ParamModelBase* init_conds = ParamModelBase::Create(ds::INIT);
-    _modelMgr->SetModel(ds::INIT, init_conds);
-    ui->tblInitConds->setModel(init_conds);
-    ui->tblInitConds->setColumnHidden(ParamModelBase::FREEZE,true);
-    ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
-
-    ParamModelBase* conditions = ParamModelBase::Create(ds::COND);
-    _modelMgr->SetModel(ds::COND, conditions);
-    ui->lsConditions->setModel(conditions);
-    ui->lsConditions->setModelColumn(0);
-    ResetResultsList(-1);
 }
 void MainWindow::InitPlots()
 {
@@ -1993,6 +1990,47 @@ const std::vector<QColor> MainWindow::InitTPColors() const
     vc.push_back(Qt::darkMagenta);
     vc.push_back(Qt::darkYellow);
     return vc;
+}
+void MainWindow::InitViews()
+{
+#ifdef DEBUG_MW_FUNC
+    ScopeTracker st("MainWindow::InitViews", std::this_thread::get_id());
+#endif
+    _modelMgr->SetView(ui->tblParameters, ds::INP);
+    ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
+    ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
+
+    _modelMgr->SetView(ui->tblVariables, ds::VAR);
+    ui->tblVariables->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblVariables->setColumnHidden(NumericModelBase::MAX,true);
+    ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
+    ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
+    CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
+    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
+    VecStr vstr;
+    vstr.push_back(Input::INPUT_FILE_STR);
+    vstr.push_back(Input::GAMMA_RAND_STR);
+    vstr.push_back(Input::NORM_RAND_STR);
+    vstr.push_back(Input::UNI_RAND_STR);
+    ComboBoxDelegate* cmbd = new ComboBoxDelegate(vstr);
+    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
+    connect(cmbd, SIGNAL(ComboBoxChanged(size_t)), this, SLOT(ComboBoxChanged(size_t)));
+
+    _modelMgr->SetView(ui->tblDifferentials, ds::DIFF);
+    ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
+    ui->tblDifferentials->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblDifferentials->setColumnHidden(NumericModelBase::MAX,true);
+    ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
+    CheckBoxDelegate* cbbd_d = new CheckBoxDelegate(std::vector<QColor>(), this);
+    ui->tblDifferentials->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
+
+    _modelMgr->SetView(ui->tblInitConds, ds::INIT);
+    ui->tblInitConds->setColumnHidden(ParamModelBase::FREEZE,true);
+    ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
+
+    _modelMgr->SetView(ui->lsConditions, ds::COND);
+    ui->lsConditions->setModelColumn(0);
+    ResetResultsList(-1);
 }
 
 void MainWindow::AttachPhasePlot(bool attach) //slot
@@ -2106,7 +2144,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
                 text = "0";
             _modelMgr->SetValue(ds::VAR, (size_t)row, text);
         }
-        _modelMgr->AssignInput(row, _parserMgr.Data(ds::VAR), text, true);
+        _parserMgr.AssignVariable(row, text);
     }
     catch (std::exception& e)
     {
@@ -2118,7 +2156,6 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ExprnChanged", _tid);
 #endif
-//    _parserMgr.ResetVarInitVals();
     _needUpdateExprns = true;
     if (IsVFPresent()) UpdateVectorField();
     if (ui->cboxNullclines->isChecked()) UpdateNullclines();
@@ -2226,10 +2263,10 @@ void MainWindow::LoadModel(const std::string& file_name)
 
         SysFileIn in(file_name);
         in.Load();
+        InitViews();
+        ConnectModels();
 
         _parserMgr.ClearExpressions();
-
-        ConnectModels();
 
         ui->edModelStep->setText( std::to_string(_modelMgr->ModelStep()).c_str() ); //This does *not* call editingFinished
         _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
@@ -2250,17 +2287,36 @@ void MainWindow::LoadModel(const std::string& file_name)
 void MainWindow::ResetPhasePlotAxes()
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::ResetPhasePlotAxes(", _tid);
+    ScopeTracker st("MainWindow::ResetPhasePlotAxes", _tid);
 #endif
-    QStringList qdiffs = ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
+    QStringList xlist, ylist;
 
     ui->cmbPlotX->clear();
-    ui->cmbPlotX->insertItems(0, qdiffs);
+    ui->cmbPlotX->insertItems(0, xlist);
     ui->cmbPlotX->setCurrentIndex(0);
 
-    const int yidx = _modelMgr->Model(ds::DIFF)->NumPars() > 1 ? 1 : 0;
+    int yidx;
+    switch (_plotMode)
+    {
+        case SINGLE:
+        case VECTOR_FIELD:
+            xlist = ylist = ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
+            yidx = _modelMgr->Model(ds::DIFF)->NumPars() > 1 ? 1 : 0;
+            break;
+        case VARIABLE_VIEW:
+            xlist = ds::VecStrToQSList( _modelMgr->Model(ds::INP)->Keys() );
+            xlist += ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
+            ylist = ds::VecStrToQSList( _modelMgr->Model(ds::VAR)->Keys() );
+            yidx = 0;
+            break;
+    }
+
+    ui->cmbPlotX->clear();
+    ui->cmbPlotX->insertItems(0, xlist);
+    ui->cmbPlotX->setCurrentIndex(0);
+
     ui->cmbPlotY->clear();
-    ui->cmbPlotY->insertItems(0, qdiffs);
+    ui->cmbPlotY->insertItems(0, ylist);
     ui->cmbPlotY->setCurrentIndex(yidx);
 }
 void MainWindow::ResetResultsList(int cond_row)

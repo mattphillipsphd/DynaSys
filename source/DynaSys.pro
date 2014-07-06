@@ -68,7 +68,8 @@ SOURCES += main.cpp\
     generate/object/compilablebase.cpp \
     generate/script/cudakernel.cpp \
     memrep/modelmgr.cpp \
-    models/numericmodelbase.cpp
+    models/numericmodelbase.cpp \
+    draw/drawbase.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -114,7 +115,8 @@ HEADERS  += gui/mainwindow.h \
     generate/object/compilablebase.h \
     generate/script/cudakernel.h \
     memrep/modelmgr.h \
-    models/numericmodelbase.h
+    models/numericmodelbase.h \
+    draw/drawbase.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

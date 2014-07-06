@@ -165,6 +165,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Phase_Plot_triggered();
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
+        void on_actionSet_Init_to_Current_triggered();
 
         void on_btnAddCondition_clicked();
         void on_btnPulse_clicked();
@@ -237,9 +238,9 @@ class MainWindow : public QMainWindow
         void InitBuffers();
         void InitDefaultModel();
         void InitDraw();
-        void InitModels();
         void InitPlots();
         const std::vector<QColor> InitTPColors() const;
+        void InitViews();
         bool IsVFPresent() const;
         void LoadModel(const std::string& file_name);
         void ResetPhasePlotAxes();

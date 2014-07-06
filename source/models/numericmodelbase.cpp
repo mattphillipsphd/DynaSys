@@ -153,8 +153,8 @@ bool NumericModelBase::setData(const QModelIndex &index, const QVariant &value, 
             {
                 case FREEZE:
                 case VALUE:
-                    ParamModelBase::setData(index, value, role);
                     _nmutex.unlock();
+                    ParamModelBase::setData(index, value, role);
                     return true;
                     break;
                 case MIN:

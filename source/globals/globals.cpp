@@ -1,6 +1,7 @@
 #include "globals.h"
 
 const double ds::DEFAULT_MODEL_STEP = 0.001;
+const int ds::MAX_NUM_PARS = 1024;
 const double ds::PI = 3.14159265358979;
 const int ds::TABLEN = 4;
 

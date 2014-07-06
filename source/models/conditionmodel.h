@@ -26,6 +26,7 @@ class ConditionModel : public ParamModelBase
         };
 
         explicit ConditionModel(QObject *parent, const std::string& name);
+        virtual ~ConditionModel() override;
 
         virtual bool DoEvaluate() const override { return false; }
         virtual bool DoInitialize() const { return false; }

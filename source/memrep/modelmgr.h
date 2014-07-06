@@ -1,6 +1,8 @@
 #ifndef MODELMGR_H
 #define MODELMGR_H
 
+#include <QAbstractItemView>
+
 #include "../globals/globals.h"
 #include "../globals/scopetracker.h"
 #include "../memrep/input.h"
@@ -24,6 +26,7 @@ class ModelMgr
         void AssignInput(size_t i, double* data,
                          const std::string& type_str, bool do_lock);
             //Assign the source of the data for the variables
+        void CreateModels();
         void ClearModels();
 
         void SetCondValue(size_t row, const VecStr& results);
@@ -35,6 +38,7 @@ class ModelMgr
         void SetNotes(const std::string& text);
         void SetRange(ds::PMODEL mi, size_t idx, double min, double max);
         void SetValue(ds::PMODEL mi, size_t idx, const std::string& value);
+        void SetView(QAbstractItemView* view, ds::PMODEL mi);
 
         //Do not use ModelMgr as a general pass through function, for the models,
         //that is what Model(ds::PMODEL mi) is for.

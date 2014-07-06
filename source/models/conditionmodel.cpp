@@ -6,6 +6,9 @@ ConditionModel::ConditionModel(QObject *parent, const std::string& name) :
     ParamModelBase(parent, name)
 {
 }
+ConditionModel::~ConditionModel()
+{
+}
 
 void ConditionModel::AddCondition(const std::string& condition, const VecStr& exprns)
 {
@@ -91,8 +94,8 @@ bool ConditionModel::setData(const QModelIndex &index, const QVariant &value, in
             {
                 case FREEZE:
                 case VALUE:
-                    ParamModelBase::setData(index, value, role);
                     _cmutex.unlock();
+                    ParamModelBase::setData(index, value, role);
                     return true;
                     break;
                 case TEST:

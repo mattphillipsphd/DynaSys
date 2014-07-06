@@ -18,6 +18,7 @@ typedef std::vector<std::string> VecStr;
 namespace ds
 {
     extern const double DEFAULT_MODEL_STEP;
+    extern const int MAX_NUM_PARS;
     extern const double PI;
     extern const int TABLEN;
 

@@ -25,6 +25,7 @@ class ParserMgr
         ~ParserMgr();
 
         void AddExpression(const std::string& exprn, bool use_mutex = true);
+        void AssignVariable(int row, const std::string& text);
         void ClearExpressions();
         void InitParsers(); //Associates parsers with the data variables and sets the expressions
         void InitData(); //Initializes the data variables to their appropriate initial values
@@ -34,8 +35,9 @@ class ParserMgr
         void ParserEvalAndConds(bool eval_input = true);
         void ParserEvalAndCondsNoLock(bool eval_input = true);
         void QuickEval(const std::string& exprn);
+        void ResetData();
         void ResetDifferentials();
-        void ResetValues();
+        void ResetVariables();
         void ResetVarInitVals();
         void TempEval();
 
@@ -45,28 +47,25 @@ class ParserMgr
         void SetExpression(const std::string& exprn);
         void SetExpression(const VecStr& exprns);
         void SetExpressions();
-        void SetModelStep(double step);
 
         const double* ConstData(ds::PMODEL mi) const;
-        inline double* Data(ds::PMODEL model); // ### Wish there was a better way...
 
     private:
-        void AllocModelData();
         std::string AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const;
         void AssociateVars(mu::Parser& parser);
-        void ClearModelData();
+        double* Data(ds::PMODEL mi);
         void DeepCopy(const ParserMgr& other);
-        inline double* TempData(const ParamModelBase* model);
+        std::vector< std::pair<double*, double*> > MakeModelData();
         inline double* TempData(ds::PMODEL model);
 
         std::vector<Input> _inputs;
         int _inputsPerUnitTime; // ### Needs to be done separately for each input
         Log* const _log;
-        ModelMgr* const _modelMgr;
-        std::vector< std::pair<double*, double*> > _modelData;
+        const std::vector< std::pair<double*, double*> > _modelData;
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
+        ModelMgr* const _modelMgr;
         mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied

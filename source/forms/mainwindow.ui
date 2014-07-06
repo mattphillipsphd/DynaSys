@@ -77,6 +77,12 @@
       </item>
       <item>
        <widget class="QLabel" name="lblMouseX">
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="text">
          <string>0.0</string>
         </property>
@@ -84,6 +90,12 @@
       </item>
       <item>
        <widget class="QLabel" name="lblMouseY">
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="text">
          <string>0.0</string>
         </property>
@@ -400,11 +412,11 @@
        </layout>
       </item>
       <item>
-       <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,2,2,0,0,1,0" rowminimumheight="0,0,0,0,0,0,0">
-        <item row="6" column="3">
-         <widget class="QPushButton" name="btnRemoveExpression">
+       <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0,0,0,0,0">
+        <item row="6" column="1">
+         <widget class="QPushButton" name="btnRemoveCondition">
           <property name="text">
-           <string>Remove Exprn</string>
+           <string>Remove Cond</string>
           </property>
          </widget>
         </item>
@@ -422,10 +434,17 @@
           </property>
          </widget>
         </item>
-        <item row="6" column="1">
-         <widget class="QPushButton" name="btnRemoveCondition">
+        <item row="6" column="3">
+         <widget class="QPushButton" name="btnRemoveExpression">
           <property name="text">
-           <string>Remove Cond</string>
+           <string>Remove Exprn</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0" colspan="2">
+         <widget class="QPushButton" name="btnAddDiff">
+          <property name="text">
+           <string>Add Differential</string>
           </property>
          </widget>
         </item>
@@ -436,13 +455,6 @@
          <widget class="QPushButton" name="btnRemoveDiff">
           <property name="text">
            <string>Remove Differential</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="0" colspan="2">
-         <widget class="QPushButton" name="btnAddDiff">
-          <property name="text">
-           <string>Add Differential</string>
           </property>
          </widget>
         </item>
@@ -464,6 +476,9 @@
           </property>
          </widget>
         </item>
+        <item row="5" column="2" colspan="2">
+         <widget class="QListView" name="lsResults"/>
+        </item>
         <item row="4" column="0" colspan="4">
          <widget class="QLabel" name="label_6">
           <property name="font">
@@ -478,9 +493,6 @@
            <set>Qt::AlignCenter</set>
           </property>
          </widget>
-        </item>
-        <item row="5" column="2" colspan="2">
-         <widget class="QListView" name="lsResults"/>
         </item>
         <item row="5" column="0" colspan="2">
          <widget class="QListView" name="lsConditions"/>
@@ -528,7 +540,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -559,6 +571,7 @@
     </property>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
+    <addaction name="actionSet_Init_to_Current"/>
    </widget>
    <widget class="QMenu" name="menuRun">
     <property name="title">
@@ -683,6 +696,11 @@
   <action name="actionCreate_CUDA_kernel">
    <property name="text">
     <string>Create CUDA kernel</string>
+   </property>
+  </action>
+  <action name="actionSet_Init_to_Current">
+   <property name="text">
+    <string>Set Init to Current</string>
    </property>
   </action>
  </widget>
