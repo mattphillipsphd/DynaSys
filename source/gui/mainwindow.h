@@ -175,6 +175,7 @@ class MainWindow : public QMainWindow
 
         void on_cboxVectorField_stateChanged(int state);
         void on_cboxNullclines_stateChanged(int state);
+        void on_cboxPlotZ_stateChanged(int state);
 
         void on_cmbPlotX_currentIndexChanged(int index);
         void on_cmbPlotY_currentIndexChanged(int index);
@@ -227,10 +228,12 @@ class MainWindow : public QMainWindow
         void ResetResultsList(int cond_row);
         void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;
         void SaveModel(const std::string& file_name);
+        void SetActionBtnsEnabled(bool is_enabled);
         void SetButtonsEnabled(bool is_enabled);
         void SetParamsEnabled(bool is_enabled);
         void SetSaveActionsEnabled(bool is_enabled);
         void SetTPShown(bool is_shown);
+        void SetZPlotShown(bool is_shown);
         void UpdateLists();
         void UpdateNotes();
         void UpdateParamEditor();

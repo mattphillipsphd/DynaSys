@@ -54,6 +54,16 @@ void DrawMgr::Resume()
     if (_drawState==DrawBase::DRAWING) return;
     StartThreads();
 }
+void DrawMgr::Resume(DrawBase::DRAW_TYPE draw_type, int iter_max)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("DrawMgr::Resume", std::this_thread::get_id());
+#endif
+    DrawBase* obj = GetObject(draw_type);
+    if (!obj || obj->IterCt()==0 || obj->DrawState()==DrawBase::DRAWING) return;
+    std::thread t( std::bind(&DrawMgr::StartThread, this, obj, iter_max) );
+    t.detach();
+}
 void DrawMgr::Start()
 {
 #ifdef DEBUG_FUNC
@@ -67,13 +77,15 @@ void DrawMgr::Start()
     }
     StartThreads();
 }
-void DrawMgr::Start(DrawBase::DRAW_TYPE draw_type, int iter_max)
+void DrawMgr::Start(DrawBase::DRAW_TYPE draw_type)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::Start", std::this_thread::get_id());
 #endif
     DrawBase* obj = GetObject(draw_type);
-    std::thread t( std::bind(&DrawMgr::StartThread, this, obj, iter_max) );
+    obj->ClearPlotItems();
+    obj->Initialize();
+    std::thread t( std::bind(&DrawMgr::StartThread, this, obj, -1) );
     t.detach();
 }
 void DrawMgr::Stop()

@@ -348,7 +348,7 @@ void MainWindow::UpdateTimePlot() //slot
         {
             DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
             tp->SetOpaqueSpec("dv_data", pp->ConstData());
-            _drawMgr->Start(DrawBase::TIME_PLOT, 1);
+            _drawMgr->Resume(DrawBase::TIME_PLOT, 1);
         }
     }
 }
@@ -854,6 +854,15 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
     else
         _drawMgr->StopAndRemove(DrawBase::NULL_CLINE);
 }
+void MainWindow::on_cboxPlotZ_stateChanged(int state)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_cboxPlotZ_stateChanged", _tid);
+#endif
+    DrawBase* vv = _drawMgr->GetObject(DrawBase::VARIABLE_VIEW);
+    if (vv)
+        vv->SetSpec("use_z", state==Qt::Checked);
+}
 void MainWindow::on_cboxVectorField_stateChanged(int state)
 {
 #ifdef DEBUG_FUNC
@@ -875,6 +884,7 @@ void MainWindow::on_cmbPlotX_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotX_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("xidx", index);
+    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
 }
 void MainWindow::on_cmbPlotY_currentIndexChanged(int index)
 {
@@ -882,6 +892,7 @@ void MainWindow::on_cmbPlotY_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotY_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("yidx", index);
+    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
 }
 void MainWindow::on_cmbPlotZ_currentIndexChanged(int index)
 {
@@ -889,6 +900,7 @@ void MainWindow::on_cmbPlotZ_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotZ_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("zidx", index);
+    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
 }
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
@@ -909,9 +921,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         case SINGLE:
         {
             SetTPShown(true);
-            ui->btnPulse->setEnabled(true);
-            ui->cmbPlotZ->hide();
-            ui->lblPlotZ->hide();
+            SetActionBtnsEnabled(true);
+            SetZPlotShown(false);
             ui->spnStepsPerSec->setValue(_singleStepsSec);
             ui->spnStepsPerSec->setMinimum(-1);
             ui->spnTailLength->setValue(_singleTailLen);
@@ -924,9 +935,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         case VARIABLE_VIEW:
         {
             SetTPShown(true);
-            ui->btnPulse->setEnabled(false);
-            ui->cmbPlotZ->show();
-            ui->lblPlotZ->show();
+            SetActionBtnsEnabled(false);
+            SetZPlotShown(true);
             ui->spnStepsPerSec->setValue(_singleStepsSec);
             ui->spnStepsPerSec->setMinimum(-1);
             ui->spnTailLength->setValue(_singleTailLen);
@@ -938,9 +948,8 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         case VECTOR_FIELD:
         {
             SetTPShown(false);
-            ui->btnPulse->setEnabled(false);
-            ui->cmbPlotZ->hide();
-            ui->lblPlotZ->hide();
+            SetActionBtnsEnabled(false);
+            SetZPlotShown(false);
             ui->spnStepsPerSec->setValue(_vfStepsSec);
             ui->spnStepsPerSec->setMinimum(1);
             ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
@@ -1542,6 +1551,16 @@ void MainWindow::SaveModel(const std::string& file_name)
     SysFileOut out(file_name);
     out.Save();
 }
+void MainWindow::SetActionBtnsEnabled(bool is_enabled)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetActionBtnsEnabled", _tid);
+#endif
+    ui->btnPulse->setEnabled(is_enabled);
+    ui->cboxNullclines->setEnabled(is_enabled);
+    ui->cboxRecord->setEnabled(is_enabled);
+    ui->cboxVectorField->setEnabled(is_enabled);
+}
 void MainWindow::SetButtonsEnabled(bool is_enabled)
 {
 #ifdef DEBUG_FUNC
@@ -1610,6 +1629,24 @@ void MainWindow::SetTPShown(bool is_shown)
         ui->tblTimePlot->hide();
         ui->lblTimePlotN->hide();
         ui->edNumTPSamples->hide();
+    }
+}
+void MainWindow::SetZPlotShown(bool is_shown)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetZPlotShown", _tid);
+#endif
+    if (is_shown)
+    {
+        ui->cboxPlotZ->show();
+        ui->cmbPlotZ->show();
+        ui->lblPlotZ->show();
+    }
+    else
+    {
+        ui->cboxPlotZ->hide();
+        ui->cmbPlotZ->hide();
+        ui->lblPlotZ->hide();
     }
 }
 void MainWindow::UpdateLists()
@@ -1712,6 +1749,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
             draw_object->SetSpec("zidx", ui->cmbPlotZ->currentIndex());
             draw_object->SetSpec("tail_length", ui->spnTailLength->value());
+            draw_object->SetSpec("use_z", ui->cboxPlotZ->checkState()==Qt::Checked);
             break;
         case DrawBase::VECTOR_FIELD:
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());

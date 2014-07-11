@@ -152,7 +152,8 @@ void Nullcline::MakePlotItems()
 #endif
     const int xidx = Spec_toi("xidx"),
             yidx = Spec_toi("yidx"),
-            resolution = NumParserMgrs();
+            resolution2 = NumParserMgrs(),
+            resolution = (int)sqrt(resolution2);
 
     Record* record = static_cast<Record*>( Data() );
     std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,

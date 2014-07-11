@@ -62,6 +62,7 @@ class DrawBase : public QObject
 
         const void* ConstData() const { return _data; }
         const ParserMgr& GetParserMgr(size_t i) const { return _parserMgrs.at(i); }
+        long long int IterCt() const { return _iterCt; }
         size_t NumPlotItems() const;
         size_t NumParserMgrs() const;
         const void* OpaqueSpec(const std::string& key) const;
@@ -114,12 +115,12 @@ class DrawBase : public QObject
     private:
         void DetachItems();
         void ResetIterCt() { _iterCt = 0; }
-        void SetIterMax(int iter_max) { _iterMax = iter_max; }
+        void SetIterMax(long long int iter_max) { _iterMax = iter_max; }
 
         void* _data;
         DRAW_STATE _drawState;
         DRAW_TYPE _drawType;
-        int _iterCt, _iterMax;
+        long long int _iterCt, _iterMax;
         std::chrono::time_point<std::chrono::system_clock> _lastStep;
         mutable std::mutex _mutex;
         bool _needRecompute;

@@ -83,6 +83,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QCheckBox" name="cboxPlotZ">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QComboBox" name="cmbPlotZ"/>
       </item>
       <item>

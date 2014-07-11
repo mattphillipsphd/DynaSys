@@ -8,9 +8,8 @@ class VariableView : public DrawBase
     Q_OBJECT
 
     public:
-        static const int NUM_FUNCS,
-                        NUM_INCREMENTS,
-                        NUM_PARSERS;
+        static const int NUM_ZFUNCS,
+                        NUM_INCREMENTS;
 
         VariableView(DSPlot* plot);
         virtual ~VariableView() override;
@@ -20,7 +19,7 @@ class VariableView : public DrawBase
         virtual void Initialize() override;
         virtual void MakePlotItems() override;
 
-        virtual int SleepMs() { return 500; }
+        virtual int SleepMs() { return 250; }
 
     private:
         struct VSpec
@@ -30,6 +29,8 @@ class VariableView : public DrawBase
             ds::PMODEL mi;
         };
         VSpec MakeVSpec(size_t raw_idx, double num_divs);
+
+        int _numFuncs;
 };
 
 #endif // VARIABLEVIEW_H

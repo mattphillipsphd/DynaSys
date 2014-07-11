@@ -1,10 +1,9 @@
 #include "variableview.h"
 
-const int VariableView::NUM_FUNCS = 11;
+const int VariableView::NUM_ZFUNCS = 11;
 const int VariableView::NUM_INCREMENTS = 200;
-const int VariableView::NUM_PARSERS = VariableView::NUM_FUNCS * VariableView::NUM_INCREMENTS;
 
-VariableView::VariableView(DSPlot* plot) : DrawBase(plot)
+VariableView::VariableView(DSPlot* plot) : DrawBase(plot), _numFuncs(-1)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("VariableView::VariableView", std::this_thread::get_id());
@@ -38,7 +37,7 @@ void VariableView::ComputeData()
                 zidx_raw = Spec_toi("zidx");
         const int tail_len = Spec_toi("tail_length");
         const VSpec xspec = MakeVSpec(xidx_raw, NUM_INCREMENTS),
-                zspec = MakeVSpec(zidx_raw, NUM_FUNCS);
+                zspec = MakeVSpec(zidx_raw, _numFuncs);
         const size_t xidx = xspec.idx,
                     zidx = zspec.idx;
         ds::PMODEL xmi = xspec.mi,
@@ -48,11 +47,11 @@ void VariableView::ComputeData()
                 xmin = xspec.min,
                 zval = std::stod( _modelMgr->Value(zmi==ds::INP?zmi:ds::INIT,zidx) ),
                 zinc = zspec.inc/10.0,
-                zmin = zval - zinc*(NUM_FUNCS/2);
+                zmin = zval - zinc*(_numFuncs/2);
                 //So, we cluster the range of functions tightly around the range of z
 
-        QPolygonF* points = new QPolygonF[NUM_FUNCS];
-        for (int k=0; k<NUM_FUNCS; ++k)
+        QPolygonF* points = new QPolygonF[_numFuncs];
+        for (int k=0; k<_numFuncs; ++k)
             points[k] = QPolygonF(NUM_INCREMENTS);
         double ymin = std::numeric_limits<double>::max(),
                 ymax = -std::numeric_limits<double>::max();
@@ -61,13 +60,13 @@ void VariableView::ComputeData()
         try
         {
             std::lock_guard<std::mutex> lock( Mutex() );
-            for (int k=0; k<NUM_FUNCS; ++k)
+            for (int k=0; k<_numFuncs; ++k)
             {
                 const double zval = zmin+k*zinc;
                 for (int i=0; i<NUM_INCREMENTS; ++i)
                 {
                     const double xval = xmin+i*xinc;
-                    ParserMgr& parser_mgr = GetParserMgr(k*NUM_FUNCS+i);
+                    ParserMgr& parser_mgr = GetParserMgr(k*_numFuncs+i);
                     parser_mgr.SetData(xmi, xidx, xval);
                     parser_mgr.SetData(zmi, zidx, zval);
                     for (int j=0; j<num_steps; ++j)
@@ -104,12 +103,13 @@ void VariableView::Initialize()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VariableView::Initialize", std::this_thread::get_id());
 #endif
-    InitParserMgrs(NUM_PARSERS);
+    _numFuncs = Spec_toi("use_z")==0 ? 1 : NUM_ZFUNCS;
+    InitParserMgrs(NUM_INCREMENTS*_numFuncs);
 
     ClearPlotItems();
-    const double cinc = 255.0 / (double)(NUM_FUNCS-1);
-    const int mid = NUM_FUNCS/2;
-    for (int k=0; k<NUM_FUNCS; ++k)
+    const double cinc = _numFuncs==1 ? 0 : 255.0 / (double)(_numFuncs-1);
+    const int mid = _numFuncs/2;
+    for (int k=0; k<_numFuncs; ++k)
     {
         QwtPlotCurve* curve = new QwtPlotCurve;
         curve->setPen( QColor(255 - k*cinc, 0.25, k*cinc), (k==mid)?3:1 );
@@ -126,7 +126,7 @@ void VariableView::MakePlotItems()
 #endif
     QPolygonF* points = static_cast<QPolygonF*>( Data() );
 
-    for (int k=0; k<NUM_FUNCS; ++k)
+    for (int k=0; k<_numFuncs; ++k)
     {
         QwtPlotCurve* curve = static_cast<QwtPlotCurve*>( PlotItem(k) );
         curve->setSamples(points[k]);
@@ -151,7 +151,7 @@ VariableView::VSpec VariableView::MakeVSpec(size_t raw_idx, double num_divs)
     }
     const double min = _modelMgr->Minimum(range_mi, idx),
             max = _modelMgr->Maximum(range_mi, idx);
-    double inc = (max - min)/((double)num_divs - 1);
+    double inc = num_divs==1 ? 0 : (max - min)/((double)num_divs - 1);
 #ifdef __GNUC__
     const VSpec vspec = {idx, inc, max, min, mi};
 #else
