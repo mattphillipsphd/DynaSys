@@ -51,7 +51,7 @@ SOURCES += main.cpp\
     gui/loggui.cpp \
     globals/scopetracker.cpp \
     gui/dspinboxdelegate.cpp \
-    memrep/arrowhead.cpp \
+    draw/arrowhead.cpp \
     gui/fastrungui.cpp \
     file/datfileout.cpp \
     generate/object/executable.cpp \
@@ -69,7 +69,13 @@ SOURCES += main.cpp\
     generate/script/cudakernel.cpp \
     memrep/modelmgr.cpp \
     models/numericmodelbase.cpp \
-    draw/drawbase.cpp
+    draw/drawbase.cpp \
+    draw/phaseplot.cpp \
+    draw/timeplot.cpp \
+    draw/vectorfield.cpp \
+    draw/variableview.cpp \
+    draw/nullcline.cpp \
+    memrep/drawmgr.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -98,7 +104,7 @@ HEADERS  += gui/mainwindow.h \
     gui/loggui.h \
     globals/scopetracker.h \
     gui/dspinboxdelegate.h \
-    memrep/arrowhead.h \
+    draw/arrowhead.h \
     gui/fastrungui.h \
     file/datfileout.h \
     generate/object/executable.h \
@@ -116,7 +122,13 @@ HEADERS  += gui/mainwindow.h \
     generate/script/cudakernel.h \
     memrep/modelmgr.h \
     models/numericmodelbase.h \
-    draw/drawbase.h
+    draw/drawbase.h \
+    draw/phaseplot.h \
+    draw/timeplot.h \
+    draw/vectorfield.h \
+    draw/variableview.h \
+    draw/nullcline.h \
+    memrep/drawmgr.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

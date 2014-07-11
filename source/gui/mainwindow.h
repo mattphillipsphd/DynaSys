@@ -29,8 +29,6 @@
 #include <qwt_plot_renderer.h>
 #include <qwt_symbol.h>
 
-#include <muParser.h>
-
 #include "aboutgui.h"
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
@@ -50,9 +48,8 @@
 #include "../file/sysfilein.h"
 #include "../file/sysfileout.h"
 #include "../globals/scopetracker.h"
-#include "../memrep/arrowhead.h"
+#include "../memrep/drawmgr.h"
 #include "../memrep/modelmgr.h"
-#include "../memrep/parsermgr.h"
 #include "../models/tpvtablemodel.h"
 
 //#define DEBUG_FUNC
@@ -71,12 +68,6 @@ class MainWindow : public QMainWindow
             SINGLE,
             VECTOR_FIELD,
             VARIABLE_VIEW
-        };
-        enum PLAY_STATE
-        {
-            STOPPED,
-            DRAWING,
-            PAUSED
         };
 
         struct ViewRect
@@ -100,17 +91,14 @@ class MainWindow : public QMainWindow
 
         static const int DEFAULT_SINGLE_STEP,
                         DEFAULT_SINGLE_TAIL,
+                        DEFAULT_VF_RES,
                         DEFAULT_VF_STEP,
                         DEFAULT_VF_TAIL,
                         MAX_BUF_SIZE,
-                        NUM_VV_INCS,
-                        SLEEP_MS,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         TP_SAMPLES_SHOWN,
                         TP_WINDOW_LENGTH,
-                        XY_SAMPLES_SHOWN,
-                        VF_RESOLUTION,
-                        VF_SLEEP_MS;
+                        XY_SAMPLES_SHOWN;
         static const double MIN_MODEL_STEP;
             //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
             //error
@@ -124,14 +112,20 @@ class MainWindow : public QMainWindow
         void FastRunFinished();
         void FitFinished();
         void LoadTempModel(void* models);
+        void NullclineData();
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
+        void PhasePlotData();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
         void StartFit();
+        void TimePlotData();
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
+        void UpdateTPData();
+        void VariableViewData();
+        void VectorFieldData();
 
     protected:
         virtual void closeEvent(QCloseEvent *) override;
@@ -139,8 +133,6 @@ class MainWindow : public QMainWindow
     signals:
         void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
         void DoAttachVV(bool attach);
-        void DoInitParserMgr();
-        void DoReplot(const ViewRect& pp_data, const ViewRect& tp_data);
         void DoUpdateParams();
         void UpdateSimPBar(int n);
 
@@ -184,6 +176,9 @@ class MainWindow : public QMainWindow
         void on_cboxVectorField_stateChanged(int state);
         void on_cboxNullclines_stateChanged(int state);
 
+        void on_cmbPlotX_currentIndexChanged(int index);
+        void on_cmbPlotY_currentIndexChanged(int index);
+        void on_cmbPlotZ_currentIndexChanged(int index);
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
 
@@ -196,15 +191,10 @@ class MainWindow : public QMainWindow
 
         void on_spnStepsPerSec_valueChanged(int value);
         void on_spnTailLength_valueChanged(int value);
-        void on_spnVFResolution_valueChanged(int);
+        void on_spnVFResolution_valueChanged(int value);
 
-        void AttachPhasePlot(bool attach = true);
-        void AttachTimePlot(bool attach = true);
-        void AttachVariableView(bool attach = true);
-        void AttachVectorField(bool attach = true);
         void ComboBoxChanged(size_t row);
         void ExprnChanged(QModelIndex, QModelIndex);
-        void InitParserMgr();
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
         void Replot(const ViewRect& pp_data, const ViewRect& tp_data);
@@ -224,43 +214,32 @@ class MainWindow : public QMainWindow
 
         Ui::MainWindow *ui;
 
-        void ClearPlots();
         Executable* CreateExecutable(const std::string& name) const;
+        DrawBase* CreateObject(DrawBase::DRAW_TYPE draw_type);
         void ConnectModels();
         void DoFastRun();
         void DoFit();
-        void Draw();
-        void DrawNullclines();
-        void DrawPhasePortrait();
-        ViewRect DrawTimePlot(bool replot_now);
-        void DrawVariableView();
-        void DrawVectorField();
-        void InitBuffers();
         void InitDefaultModel();
-        void InitDraw();
-        void InitPlots();
         const std::vector<QColor> InitTPColors() const;
         void InitViews();
-        bool IsVFPresent() const;
         void LoadModel(const std::string& file_name);
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
-        void ResumeDraw();
         void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;
         void SaveModel(const std::string& file_name);
         void SetButtonsEnabled(bool is_enabled);
         void SetParamsEnabled(bool is_enabled);
         void SetSaveActionsEnabled(bool is_enabled);
+        void SetTPShown(bool is_shown);
         void UpdateLists();
         void UpdateNotes();
-        void UpdateNullclines();
         void UpdateParamEditor();
         void UpdatePulseVList(); // ### There should be a way to make this automatic...
         void UpdateSlider(int index);
         void UpdateSliderPList();
         void UpdateResultsModel(int cond_row);
+        void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
-        void UpdateVectorField();
 
         AboutGui* _aboutGui;
         FastRunGui* _fastRunGui;
@@ -269,23 +248,14 @@ class MainWindow : public QMainWindow
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
 
-        std::condition_variable _condVar;
+        DrawMgr* const _drawMgr;
         std::string _fileName;
-        volatile bool _finishedReplot;
-        volatile bool _isVFAttached, _isVVAttached;
         std::vector<JobRecord> _jobs;
         Log* const _log;
         ModelMgr* const _modelMgr;
         std::mutex _mutex;
-        volatile bool _needClearVF, _needClearVV, _needInitialize, _needUpdateExprns,
-                    _needUpdateNullclines, _needUpdateVF;
-        std::vector<QwtPlotItem*> _ncPlotItems;
         int _numSimSteps, _numTPSamples;
-        ParserMgr _parserMgr;
-        int _pastDVSampsCt, _pastIPSampsCt; //Samples outside the buffer
-        volatile PLAY_STATE _playState;
         PLOT_MODE _plotMode;
-        std::vector<QwtPlotItem*> _ppPlotItems;
         std::string _pulseResetValue;
         int _pulseParIdx;
         int _pulseStepsRemaining,
@@ -293,15 +263,7 @@ class MainWindow : public QMainWindow
             _saveModN, _singleStepsSec, _singleTailLen;
         const std::thread::id _tid;
         const std::vector<QColor> _tpColors;
-        std::vector<QwtPlotItem*> _vfPlotItems, _vvPlotItems;
         int _vfStepsSec, _vfTailLen;
-
-        std::vector< std::deque<double> > _diffPts, _varPts;
-        std::deque<double> _ip;
-
-        QwtPlotCurve* _curve;
-        QwtPlotMarker* _marker;
-        std::vector<QwtPlotCurve*> _tpCurves;
 };
 
 Q_DECLARE_METATYPE(MainWindow::ViewRect)

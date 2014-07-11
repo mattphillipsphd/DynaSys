@@ -9,8 +9,7 @@
 #include "../memrep/notes.h"
 #include "../models/conditionmodel.h"
 #include "../models/numericmodelbase.h"
-
-//#define DEBUG_MM_FUNC
+#include "../models/tpvtablemodel.h"
 
 class ModelMgr
 {
@@ -37,6 +36,7 @@ class ModelMgr
         void SetNotes(Notes *notes);
         void SetNotes(const std::string& text);
         void SetRange(ds::PMODEL mi, size_t idx, double min, double max);
+        void SetTPVModel(TPVTableModel* tpv_model);
         void SetValue(ds::PMODEL mi, size_t idx, const std::string& value);
         void SetView(QAbstractItemView* view, ds::PMODEL mi);
 
@@ -52,6 +52,7 @@ class ModelMgr
         inline const ParamModelBase* Model(ds::PMODEL mi) const { return _models.at(mi); }
         inline double ModelStep() const { return _modelStep; }
         double Range(ds::PMODEL mi, size_t idx) const;
+        TPVTableModel* TPVModel() { return _tpvModel; }
         std::string Value(ds::PMODEL mi, size_t idx) const;
 
     private:
@@ -76,6 +77,7 @@ class ModelMgr
         mutable std::mutex _mutex;
         Notes* _notes;
         int _stepCt;
+        TPVTableModel* _tpvModel;
         double* _varInitVals; //For temporary model resets
 };
 

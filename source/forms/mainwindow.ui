@@ -76,6 +76,16 @@
        <widget class="QComboBox" name="cmbPlotY"/>
       </item>
       <item>
+       <widget class="QLabel" name="lblPlotZ">
+        <property name="text">
+         <string>Z:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="cmbPlotZ"/>
+      </item>
+      <item>
        <widget class="QLabel" name="lblMouseX">
         <property name="maximumSize">
          <size>
@@ -540,7 +550,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

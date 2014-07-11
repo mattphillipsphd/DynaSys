@@ -8,7 +8,7 @@ const int ds::TABLEN = 4;
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_DAT_FILE = ".temp.dsdat";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
-const std::string ds::VERSION_STR = "0.2.2";
+const std::string ds::VERSION_STR = "0.3.0";
 
 #ifndef Q_OS_WIN
 const std::vector<QColor> ds::THREAD_COLORS = {Qt::black, Qt::red, Qt::green, Qt::gray, Qt::blue };

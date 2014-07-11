@@ -3,7 +3,6 @@
 
 #include <cstdlib>
 #include <exception>
-#include <mutex>
 
 #include <QDebug>
 
@@ -21,24 +20,22 @@ class ParserMgr
         ParserMgr(const ParserMgr& other);
 #ifdef __GNUG__
         ParserMgr& operator=(const ParserMgr& other) = delete;
+#else
+        ParserMgr& operator=(const ParserMgr& other) { return ParserMgr(); }
 #endif
         ~ParserMgr();
 
-        void AddExpression(const std::string& exprn, bool use_mutex = true);
+        void AddExpression(const std::string& exprn);
         void AssignVariable(int row, const std::string& text);
         void ClearExpressions();
-        void InitParsers(); //Associates parsers with the data variables and sets the expressions
         void InitData(); //Initializes the data variables to their appropriate initial values
+        void InitializeFull();
+        void InitParsers(); //Associates parsers with the data variables and sets the expressions
         void InputEval(int idx = -1);
         const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
         void ParserEvalAndConds(bool eval_input = true);
-        void ParserEvalAndCondsNoLock(bool eval_input = true);
         void QuickEval(const std::string& exprn);
-        void ResetData();
-        void ResetDifferentials();
-        void ResetVariables();
-        void ResetVarInitVals();
         void TempEval();
 
         void SetConditions();
@@ -66,12 +63,10 @@ class ParserMgr
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
         ModelMgr* const _modelMgr;
-        mutable std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
         int _stepCt;
-        double* _varInitVals; //For temporary model resets
 };
 
 #endif // PARSERMGR_H

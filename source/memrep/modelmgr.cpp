@@ -48,7 +48,7 @@ void ModelMgr::AssignInput(size_t i, double* data,
                             const std::string& type_str, bool do_lock)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("ModelMgr::AssignInput", std::this_thread::get_id());
+//    ScopeTracker st("ModelMgr::AssignInput", std::this_thread::get_id());
 #endif
     std::unique_lock<std::mutex> ulock(_mutex, std::defer_lock);
     if (do_lock) ulock.lock();
@@ -141,6 +141,11 @@ void ModelMgr::SetRange(ds::PMODEL mi, size_t idx, double min, double max)
     SetMinimum(mi, idx, min);
     SetMaximum(mi, idx, max);
 }
+void ModelMgr::SetTPVModel(TPVTableModel* tpv_model)
+{
+//    if (_tpvModel) delete _tpvModel;
+    _tpvModel = tpv_model;
+}
 void ModelMgr::SetValue(ds::PMODEL mi, size_t idx, const std::string& value)
 {
     _models[mi]->SetValue(idx, value);
@@ -176,7 +181,8 @@ std::string ModelMgr::Value(ds::PMODEL mi, size_t idx) const
     return _models.at(mi)->Value(idx);
 }
 
-ModelMgr::ModelMgr() : _log(Log::Instance()), _models(MakeModelVec()), _notes(nullptr)
+ModelMgr::ModelMgr() : _log(Log::Instance()), _models(MakeModelVec()),
+    _notes(nullptr), _tpvModel(nullptr)
 {
     CreateModels();
 }
