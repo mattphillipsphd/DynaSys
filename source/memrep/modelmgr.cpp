@@ -44,48 +44,6 @@ void ModelMgr::AddParameter(ds::PMODEL mi, const std::string& key, const std::st
 }
 
 
-void ModelMgr::AssignInput(size_t i, double* data,
-                            const std::string& type_str, bool do_lock)
-{
-#ifdef DEBUG_FUNC
-//    ScopeTracker st("ModelMgr::AssignInput", std::this_thread::get_id());
-#endif
-    std::unique_lock<std::mutex> ulock(_mutex, std::defer_lock);
-    if (do_lock) ulock.lock();
-
-    Input::TYPE type = Input::Type(type_str);
-    switch (type)
-    {
-        case Input::UNI_RAND:
-        case Input::GAMMA_RAND:
-        case Input::NORM_RAND:
-        {
-            Input input(&data[i]);
-            input.GenerateInput(type);
-            _inputs.push_back(input);
-            break;
-        }
-        case Input::INPUT_FILE:
-        {
-            Input input(&data[i]);
-            std::string file_name = type_str;
-            file_name.erase(
-                std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
-                {
-                    return c=='"';
-                }),
-                    file_name.end());
-            input.LoadInput(file_name);
-            _inputsPerUnitTime = input.SamplesPerStep();
-            _inputs.push_back(input);
-            break;
-        }
-        case Input::USER:
-            break;
-        case Input::UNKNOWN:
-            throw std::runtime_error("ModelMgr::AssignInput: Unknown input.");
-    }
-}
 void ModelMgr::CreateModels()
 {
 #ifdef DEBUG_FUNC
@@ -111,6 +69,10 @@ void ModelMgr::SetCondValue(size_t row, const VecStr& results)
     ScopeTracker st("ModelMgr::SetCondParameter", std::this_thread::get_id());
 #endif
     CondModel()->SetResults(row, results);
+}
+void ModelMgr::SetIsFreeze(ds::PMODEL mi, size_t idx, bool is_freeze)
+{
+    _models[mi]->SetFreeze(idx, is_freeze);
 }
 void ModelMgr::SetMaximum(ds::PMODEL mi, size_t idx, double val)
 {
@@ -163,6 +125,10 @@ bool ModelMgr::AreModelsInitialized() const
 VecStr ModelMgr::CondResults(size_t row) const
 {
     return CondModel()->Results(row);
+}
+bool ModelMgr::IsFreeze(ds::PMODEL mi, size_t idx) const
+{
+    return _models[mi]->IsFreeze(idx);
 }
 double ModelMgr::Maximum(ds::PMODEL mi, size_t idx) const
 {

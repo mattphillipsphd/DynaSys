@@ -63,6 +63,7 @@ class DrawBase : public QObject
         const void* ConstData() const { return _data; }
         const ParserMgr& GetParserMgr(size_t i) const { return _parserMgrs.at(i); }
         long long int IterCt() const { return _iterCt; }
+        long long int IterMax() const { return _iterMax; }
         size_t NumPlotItems() const;
         size_t NumParserMgrs() const;
         const void* OpaqueSpec(const std::string& key) const;
@@ -70,20 +71,21 @@ class DrawBase : public QObject
         virtual int SamplesShown() const { return 128 * 1024; }
         virtual int SleepMs() const { return 50; }
         const std::string& Spec(const std::string& key) const;
+        bool Spec_tob(const std::string& key) const;
         double Spec_tod(const std::string& key) const;
         int Spec_toi(const std::string& key) const;
         const MapStr& Specs() const;
         DRAW_TYPE Type() const { return _drawType; }
 
     signals:
-        void ComputeComplete();
+        void ComputeComplete(int num_iters);
         void Error() const;
         void Flag1();
         void Flag2();
         void Flag3();
 
     protected slots:
-        void IterCompleted();
+        void IterCompleted(int num_iters);
 
     protected:
         DrawBase(DSPlot* plot);
@@ -91,6 +93,7 @@ class DrawBase : public QObject
         void AddPlotItem(QwtPlotItem* plot_item);
         void ClearPlotItems();
         virtual void ComputeData() = 0;
+        void FreezeNonUser();
         virtual void Initialize() = 0;
         void InitParserMgrs(size_t num);
         virtual void MakePlotItems() = 0;

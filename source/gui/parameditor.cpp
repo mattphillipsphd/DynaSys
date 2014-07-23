@@ -55,24 +55,24 @@ void ParamEditor::on_btnSave_clicked()
 #ifdef DEBUG_FUNC
     ScopeTracker st("ParamEditor::on_btnSave_clicked", _tid);
 #endif
+/*    int current_idx = ui->tbwParameters->currentIndex();
+    for (int i=1; i<ds::NUM_MODELS; ++i)
+    {
+        UpdateBuffer(i);
+        WriteBuffer();
+    }
+    UpdateBuffer(current_idx);
+*/
     VecStr models(ds::NUM_MODELS);
     for (int i=0; i<ds::NUM_MODELS; ++i)
     {
         std::string text = _models.at(i);
         text.erase(0, text.find_first_of('\n') + 1);
         TrimNewlines(text);
-        if ( *(text.end()-2)=='\n' ) text.erase(text.end()-1);
+        if (text.size()<3) text = "";
+        else if ( *(text.end()-2)=='\n' ) text.erase(text.end()-1);
         const ds::PMODEL mi = (ds::PMODEL)i;
         int num_pars = std::count(text.cbegin(), text.cend(), '\n');
-        if (mi==ds::COND)
-        {
-            const size_t len = text.length();
-            if (len<=2)
-                num_pars = 0;
-            else
-                for (size_t j=1; j<len; ++j)
-                    if (text.at(j)=='\t' && text.at(j-1)=='\n') --num_pars;
-        }
         text = ds::Model(mi) + "\t" + std::to_string(num_pars) + "\n" + text + "\n";
         models[i] = text;
     }
@@ -138,8 +138,12 @@ void ParamEditor::TrimNewlines(std::string& text)
 #ifdef DEBUG_FUNC
     ScopeTracker st("ParamEditor::TrimNewlines", _tid);
 #endif
-    while (*(text.end()-1) == '\n')
-        text.erase( text.end()-1 );
+    size_t pos = std::find_if(text.begin(), text.end(), static_cast<int(*)(int)>(&std::isalnum))
+            - text.begin();
+    text.erase(0,pos);
+    if (!text.empty())
+        while (*(text.end()-1) == '\n')
+            text.erase( text.end()-1 );
     text += "\n\n";
 }
 void ParamEditor::UpdateBuffer(int idx)
@@ -149,20 +153,6 @@ void ParamEditor::UpdateBuffer(int idx)
 #endif
     std::string text = _editors.at(idx)->document()->toPlainText().toStdString();
     TrimNewlines(text);
-    if ((ds::PMODEL)(idx-1)==ds::VAR || (ds::PMODEL)(idx-1)==ds::DIFF)
-    {
-        std::stringstream ss(text);
-        std::string line, text_temp;
-        std::getline(ss, line);
-        while (!line.empty())
-        {
-            if (std::count(line.cbegin(), line.cend(), '\t')>=3) continue;
-            line += "\t-100\t100\n";
-            text_temp += line;
-            std::getline(ss, line);
-        }
-        text = text_temp;
-    }
     _buffer = std::make_pair(idx,text);
 }
 void ParamEditor::UpdateEditors()
@@ -231,7 +221,7 @@ void ParamEditor::WriteBuffer()
         else
         {
             ds::PMODEL mi = (ds::PMODEL)(idx-1);
-            _models[idx-1] = "#" + ds::Model(mi) + "\n" + text; //ed->toPlainText().toStdString();
+            _models[idx-1] = "#" + ds::Model(mi) + "\n" + text;
         }
     }
     catch (std::exception& e)

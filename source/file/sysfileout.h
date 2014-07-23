@@ -16,10 +16,10 @@ class SysFileOut
         SysFileOut(const std::string& name);
 
         void Save() const;
-        void Save(const VecStr& vmodels, double model_step, const Notes* notes) const;
+        void Save(const VecStr& vmodels, const Notes* notes) const;
 
     private:
-        void SaveHeader(double model_step) const;
+        void SaveHeader() const;
 
         const std::string _name;
         mutable std::ofstream _out;

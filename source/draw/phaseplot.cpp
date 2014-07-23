@@ -17,6 +17,11 @@ PhasePlot::~PhasePlot()
     if (data) delete data;
 }
 
+int PhasePlot::SleepMs() const
+{
+    return _makePlots ? 50 : 0;
+}
+
 void PhasePlot::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -34,7 +39,7 @@ void PhasePlot::ComputeData()
     std::deque<double>& inner_product = std::get<0>(*data);
     DataVec& diff_pts = std::get<1>(*data);
     DataVec& var_pts = std::get<2>(*data);
-    const bool is_recording = std::stoi(Spec("is_recording"));
+    const bool is_recording = Spec_tob("is_recording");
 
     QFile temp(ds::TEMP_FILE.c_str());
     std::string output;
@@ -62,7 +67,9 @@ void PhasePlot::ComputeData()
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
         int steps_per_sec = Spec_toi("steps_per_sec");
-        int num_steps = ((double)steps_per_sec/_modelMgr->ModelStep()) / (double)SleepMs() + 0.5;
+        int num_steps = _makePlots
+                ? ((double)steps_per_sec/_modelMgr->ModelStep()) / (double)SleepMs() + 0.5
+                : 100;
         if (num_steps==0) num_steps = 1;
         if (num_steps>MAX_BUF_SIZE) num_steps = MAX_BUF_SIZE;
 
@@ -128,7 +135,7 @@ void PhasePlot::ComputeData()
         }
         catch (mu::ParserError& e)
         {
-            _log->AddExcept("MainWindow::DrawPhasePortrait: " + e.GetMsg());
+            _log->AddExcept("PhasePlot::ComputeData: " + e.GetMsg());
             throw std::runtime_error("PhasePlot::ComputeData: Parser error");
         }
         catch (std::exception& e)
@@ -147,11 +154,13 @@ void PhasePlot::ComputeData()
         SetSpec("past_dv_samps_ct", _pastDVSampsCt);
         SetSpec("past_ip_samps_ct", _pastIPSampsCt);
 
-        emit Flag2();
+        if (_makePlots)
+        {
+            emit Flag2();
+            MakePlotItems();
+        }
 
-        MakePlotItems();
-
-        emit ComputeComplete();
+        emit ComputeComplete(num_steps);
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
@@ -171,18 +180,22 @@ void PhasePlot::Initialize()
                 inner_product, diff_pts, var_pts)
              );
 
-    QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-        QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
-    _marker = new QwtPlotMarker();
-    _marker->setSymbol(symbol);
-    _marker->setZ(1);
-    AddPlotItem(_marker);
+    _makePlots = Spec_tob("make_plots");
+    if (_makePlots)
+    {
+        QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+            QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
+        _marker = new QwtPlotMarker();
+        _marker->setSymbol(symbol);
+        _marker->setZ(1);
+        AddPlotItem(_marker);
 
-    //The 'tail' of the plot
-    _curve = new QwtPlotCurve();
-    _curve->setPen( Qt::black, 1 );
-    _curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-    AddPlotItem(_curve);
+        //The 'tail' of the plot
+        _curve = new QwtPlotCurve();
+        _curve->setPen( Qt::black, 1 );
+        _curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+        AddPlotItem(_curve);
+    }
 
     InitParserMgrs(1);
     DrawBase::Initialize();

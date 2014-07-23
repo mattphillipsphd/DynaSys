@@ -56,8 +56,6 @@ SOURCES += main.cpp\
     file/datfileout.cpp \
     generate/object/executable.cpp \
     file/defaultdirmgr.cpp \
-    gui/fitgui.cpp \
-    generate/fit.cpp \
     file/fdatfilein.cpp \
     generate/script/cfilebase.cpp \
     generate/script/mexfile.cpp \
@@ -75,7 +73,8 @@ SOURCES += main.cpp\
     draw/vectorfield.cpp \
     draw/variableview.cpp \
     draw/nullcline.cpp \
-    memrep/drawmgr.cpp
+    memrep/drawmgr.cpp \
+    memrep/inputmgr.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -109,8 +108,6 @@ HEADERS  += gui/mainwindow.h \
     file/datfileout.h \
     generate/object/executable.h \
     file/defaultdirmgr.h \
-    gui/fitgui.h \
-    generate/fit.h \
     file/fdatfilein.h \
     generate/script/cfilebase.h \
     generate/script/mexfile.h \
@@ -128,7 +125,8 @@ HEADERS  += gui/mainwindow.h \
     draw/vectorfield.h \
     draw/variableview.h \
     draw/nullcline.h \
-    memrep/drawmgr.h
+    memrep/drawmgr.h \
+    memrep/inputmgr.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -136,8 +134,7 @@ FORMS    += forms/mainwindow.ui \
     forms/parameditor.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
-    forms/fastrungui.ui \
-    forms/fitgui.ui
+    forms/fastrungui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

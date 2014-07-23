@@ -11,6 +11,8 @@ class PhasePlot : public DrawBase
         PhasePlot(DSPlot* plot);
         virtual ~PhasePlot() override;
 
+        virtual int SleepMs() const override;
+
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
@@ -18,6 +20,7 @@ class PhasePlot : public DrawBase
 
     private:
         QwtPlotCurve* _curve;
+        bool _makePlots;
         QwtPlotMarker* _marker;
         int _pastDVSampsCt, _pastIPSampsCt; //Samples outside the buffer
 };

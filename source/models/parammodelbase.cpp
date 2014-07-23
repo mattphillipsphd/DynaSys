@@ -128,13 +128,13 @@ VecStr ParamModelBase::Values() const
     return vs;
 }
 
-void ParamModelBase::AddParameter(const std::string& key, const std::string& value)
+void ParamModelBase::AddParameter(const std::string& param, const std::string& value)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     int row = (int)_parameters.size();
     QModelIndex row_index = createIndex(row, 0);
     insertRows(row, 1, QModelIndex());
-    _parameters[row] = new Param(key, value);
+    _parameters[row] = new Param(param, value);
     emit dataChanged(row_index, row_index);
     emit headerDataChanged(Qt::Vertical, row, row);
 }
@@ -142,9 +142,13 @@ std::string ParamModelBase::Name() const
 {
     return ds::Model(_id);
 }
-void ParamModelBase::SetValue(const std::string& key, const std::string& value)
+void ParamModelBase::SetFreeze(int i, bool is_freeze)
 {
-    SetValue( KeyIndex(key), value );
+    setData( createIndex(i,FREEZE), is_freeze, Qt::CheckStateRole );
+}
+void ParamModelBase::SetValue(const std::string& param, const std::string& value)
+{
+    SetValue( KeyIndex(param), value );
 }
 void ParamModelBase::SetValue(int i, const std::string& value)
 {

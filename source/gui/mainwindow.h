@@ -34,7 +34,6 @@
 #include "comboboxdelegate.h"
 #include "dspinboxdelegate.h"
 #include "fastrungui.h"
-#include "fitgui.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
@@ -110,29 +109,25 @@ class MainWindow : public QMainWindow
         void Error();
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
-        void FitFinished();
         void LoadTempModel(void* models);
-        void NullclineData();
+        void NullclineData(int);
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
-        void PhasePlotData();
+        void PhasePlotData(int);
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
-        void StartFit();
-        void TimePlotData();
+        void TimePlotData(int);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
         void UpdateTPData();
-        void VariableViewData();
-        void VectorFieldData();
+        void VariableViewData(int);
+        void VectorFieldData(int);
 
     protected:
         virtual void closeEvent(QCloseEvent *) override;
 
     signals:
-        void DoAttachVF(bool attach); //Can't have default parameter values in signals!!
-        void DoAttachVV(bool attach);
         void DoUpdateParams();
         void UpdateSimPBar(int n);
 
@@ -144,7 +139,6 @@ class MainWindow : public QMainWindow
         void on_actionCreate_SO_triggered();
         void on_actionCompile_Run_triggered();
         void on_actionExit_triggered();
-        void on_actionFit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
         void on_actionNotes_triggered();
@@ -165,7 +159,6 @@ class MainWindow : public QMainWindow
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
-        void on_btnFitView_clicked();
         void on_btnRemoveCondition_clicked();
         void on_btnRemoveExpression_clicked();
         void on_btnRemoveDiff_clicked();
@@ -219,7 +212,6 @@ class MainWindow : public QMainWindow
         DrawBase* CreateObject(DrawBase::DRAW_TYPE draw_type);
         void ConnectModels();
         void DoFastRun();
-        void DoFit();
         void InitDefaultModel();
         const std::vector<QColor> InitTPColors() const;
         void InitViews();
@@ -227,6 +219,7 @@ class MainWindow : public QMainWindow
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
         void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;
+        void SaveData(const std::string& file_name);
         void SaveModel(const std::string& file_name);
         void SetActionBtnsEnabled(bool is_enabled);
         void SetButtonsEnabled(bool is_enabled);
@@ -246,7 +239,6 @@ class MainWindow : public QMainWindow
 
         AboutGui* _aboutGui;
         FastRunGui* _fastRunGui;
-        FitGui* _fitGui;
         LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;

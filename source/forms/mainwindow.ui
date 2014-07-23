@@ -209,7 +209,7 @@
            </spacer>
           </item>
           <item>
-           <widget class="QLabel" name="label_2">
+           <widget class="QLabel" name="lblTailLength">
             <property name="text">
              <string>tail length:</string>
             </property>
@@ -596,7 +596,6 @@
     </property>
     <addaction name="actionRun_Offline"/>
     <addaction name="actionCompile_Run"/>
-    <addaction name="actionFit"/>
     <addaction name="actionCreate_MEX_file"/>
     <addaction name="actionCreate_SO"/>
     <addaction name="actionCreate_CUDA_kernel"/>

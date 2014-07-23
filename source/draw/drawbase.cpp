@@ -33,7 +33,7 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
             draw_object->_drawType = VECTOR_FIELD;
             break;
     }
-    connect(draw_object, SIGNAL(ComputeComplete()), draw_object, SLOT(IterCompleted()));
+    connect(draw_object, SIGNAL(ComputeComplete(int)), draw_object, SLOT(IterCompleted(int)), Qt::DirectConnection);
     return draw_object;
 }
 
@@ -46,13 +46,6 @@ DrawBase::~DrawBase()
     }
 }
 
-void DrawBase::Initialize()
-{
-    if (!_plot)
-        throw std::runtime_error("DrawBase::Initialize: Null plot object");
-    for (auto it : _plotItems)
-        it->attach(_plot);
-}
 void DrawBase::QuickEval(const std::string& exprn)
 {
 #ifdef DEBUG_FUNC
@@ -112,6 +105,10 @@ const std::string& DrawBase::Spec(const std::string& key) const
     std::lock_guard<std::mutex> lock(_mutex);
     return _specs.at(key);
 }
+bool DrawBase::Spec_tob(const std::string& key) const
+{
+    return Spec_toi(key);
+}
 double DrawBase::Spec_tod(const std::string& key) const
 {
     try
@@ -144,9 +141,9 @@ const MapStr& DrawBase::Specs() const
     return _specs;
 }
 
-void DrawBase::IterCompleted() //slot
+void DrawBase::IterCompleted(int num_iters) //slot
 {
-    if (++_iterCt == _iterMax)
+    if ((_iterCt+=num_iters) >= _iterMax)
         _drawState = STOPPED;
 }
 
@@ -190,12 +187,27 @@ void DrawBase::AddPlotItem(QwtPlotItem* plot_item)
     _plotItems.push_back(plot_item);
 }
 
+void DrawBase::Initialize()
+{
+    if (!_plot)
+        throw std::runtime_error("DrawBase::Initialize: Null plot object");
+    for (auto it : _plotItems)
+        it->attach(_plot);
+}
 void DrawBase::InitParserMgrs(size_t num)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     _parserMgrs.resize(num);
     for (auto& it : _parserMgrs)
         it.InitializeFull();
+}
+void DrawBase::FreezeNonUser()
+{
+    const ParamModelBase* vars = _modelMgr->Model(ds::VAR);
+    const size_t num_vars = vars->NumPars();
+    for (size_t i=0; i<num_vars; ++i)
+        if ( Input::Type(vars->Value(i)) != Input::USER )
+            _modelMgr->SetIsFreeze(ds::VAR, i, true);
 }
 bool DrawBase::NeedNewStep()
 {

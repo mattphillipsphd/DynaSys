@@ -8,6 +8,7 @@
 
 #include <muParser.h>
 
+#include "inputmgr.h"
 #include "modelmgr.h"
 #include "../globals/scopetracker.h"
 
@@ -31,7 +32,6 @@ class ParserMgr
         void InitData(); //Initializes the data variables to their appropriate initial values
         void InitializeFull();
         void InitParsers(); //Associates parsers with the data variables and sets the expressions
-        void InputEval(int idx = -1);
         const std::string& ParserContents() const;
         void ParserEval(bool eval_input = true);
         void ParserEvalAndConds(bool eval_input = true);
@@ -55,8 +55,7 @@ class ParserMgr
         std::vector< std::pair<double*, double*> > MakeModelData();
         inline double* TempData(ds::PMODEL model);
 
-        std::vector<Input> _inputs;
-        int _inputsPerUnitTime; // ### Needs to be done separately for each input
+        InputMgr* const _inputMgr;
         Log* const _log;
         const std::vector< std::pair<double*, double*> > _modelData;
             //Model evaluation happens in a two-step process so that all variables and differentials
@@ -66,7 +65,6 @@ class ParserMgr
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
-        int _stepCt;
 };
 
 #endif // PARSERMGR_H

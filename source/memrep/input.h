@@ -42,7 +42,7 @@ class Input
         void LoadInput(const std::string& file_name);
         void NextInput(int n = 1);
 
-        int SamplesPerStep() const { return _samplesPerStep; }
+        int SamplesPerUnitTime() const { return _samplesPerUnitTime; }
         TYPE Type() const { return _type; }
 
     private:
@@ -60,7 +60,7 @@ class Input
         size_t _ct;
         double* _input;
         Log* const _log;
-        int _samplesPerStep; //I.e. per unit time
+        int _samplesPerUnitTime;
         TYPE _type;
         double* const _value;
 };

@@ -3,10 +3,9 @@
 
 #include <QAbstractItemView>
 
+#include "notes.h"
 #include "../globals/globals.h"
 #include "../globals/scopetracker.h"
-#include "../memrep/input.h"
-#include "../memrep/notes.h"
 #include "../models/conditionmodel.h"
 #include "../models/numericmodelbase.h"
 #include "../models/tpvtablemodel.h"
@@ -22,13 +21,11 @@ class ModelMgr
         void AddCondParameter(const std::string& test, const VecStr& results);
         void AddCondResult(int row, const std::string& result);
         void AddParameter(ds::PMODEL mi, const std::string& key, const std::string& value = "");
-        void AssignInput(size_t i, double* data,
-                         const std::string& type_str, bool do_lock);
-            //Assign the source of the data for the variables
         void CreateModels();
         void ClearModels();
 
         void SetCondValue(size_t row, const VecStr& results);
+        void SetIsFreeze(ds::PMODEL mi, size_t idx, bool is_freeze);
         void SetMaximum(ds::PMODEL mi, size_t idx, double val);
         void SetMinimum(ds::PMODEL mi, size_t idx, double val);
         void SetModel(ds::PMODEL mi, ParamModelBase* model);
@@ -47,6 +44,7 @@ class ModelMgr
         bool AreModelsInitialized() const;
         VecStr CondResults(size_t row) const;
         const Notes* GetNotes() const { return _notes; }
+        bool IsFreeze(ds::PMODEL mi, size_t idx) const;
         double Maximum(ds::PMODEL mi, size_t idx) const;
         double Minimum(ds::PMODEL mi, size_t idx) const;
         inline const ParamModelBase* Model(ds::PMODEL mi) const { return _models.at(mi); }
@@ -69,16 +67,12 @@ class ModelMgr
         inline const ConditionModel* CondModel() const;
         std::vector<ParamModelBase*> MakeModelVec() const;
 
-        std::vector<Input> _inputs;
-        int _inputsPerUnitTime; // ### Needs to be done separately for each input
         Log* const _log;
         std::vector<ParamModelBase*> _models;
         double _modelStep;
         mutable std::mutex _mutex;
         Notes* _notes;
-        int _stepCt;
         TPVTableModel* _tpvModel;
-        double* _varInitVals; //For temporary model resets
 };
 
 #endif // MODELMGR_H

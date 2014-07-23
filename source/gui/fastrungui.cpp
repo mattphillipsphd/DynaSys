@@ -1,7 +1,7 @@
 #include "fastrungui.h"
 #include "ui_fastrungui.h"
 
-const int FastRunGui::DEFAULT_DURATION = 1000;
+const int FastRunGui::DEFAULT_DURATION = 100;
 const int FastRunGui::DEFAULT_MODN = 1000;
 
 FastRunGui::FastRunGui(QWidget *parent) :
@@ -71,8 +71,6 @@ void FastRunGui::showEvent(QShowEvent*)
 
 void FastRunGui::on_btnFileName_clicked()
 {
-//    size_t sep = _fileName.find_last_of('/');
-//    std::string path = (sep==std::string::npos) ? "" : _fileName.substr(0, sep);
     std::string full_file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
                                                          DDM::SaveDataDir().c_str()).toStdString();
@@ -131,7 +129,7 @@ void FastRunGui::on_edFullFileName_editingFinished()
     size_t sep = full_file_name.find_last_of('/');
     std::string path = (sep==std::string::npos) ? "" : full_file_name.substr(0, sep);
 
-    QFile qf(full_file_name.c_str());
+    QFile qf(path.c_str());
     if (!path.empty() && !qf.exists())
     {
         ui->edFullFileName->setText( FullFileName().c_str() );

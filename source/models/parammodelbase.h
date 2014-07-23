@@ -78,8 +78,9 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Value(size_t i) const;
         VecStr Values() const;
 
-        virtual void AddParameter(const std::string& key, const std::string& value = "");
-        void SetValue(const std::string& key, const std::string& value);
+        virtual void AddParameter(const std::string& param, const std::string& value = "");
+        void SetFreeze(int i, bool is_freeze);
+        void SetValue(const std::string& param, const std::string& value);
         void SetValue(int i, const std::string& value);
 
         int columnCount() const;

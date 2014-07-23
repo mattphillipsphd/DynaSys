@@ -103,8 +103,8 @@ VecStr ds::Split(const std::string& str, const std::string& delim)
 {
     VecStr out;
     std::string haystack = str;
-    int pos = haystack.find(delim.c_str());
-    const int dlen = delim.length();
+    size_t pos = haystack.find(delim.c_str());
+    const size_t dlen = delim.length();
     while (pos != std::string::npos)
     {
         out.push_back(haystack.substr(0,pos));

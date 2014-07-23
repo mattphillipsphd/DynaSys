@@ -129,7 +129,7 @@ void Nullcline::ComputeData()
 
         MakePlotItems();
 
-        emit ComputeComplete();
+        emit ComputeComplete(1);
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );

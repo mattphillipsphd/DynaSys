@@ -67,10 +67,12 @@ void VariableView::ComputeData()
                 {
                     const double xval = xmin+i*xinc;
                     ParserMgr& parser_mgr = GetParserMgr(k*_numFuncs+i);
-                    parser_mgr.SetData(xmi, xidx, xval);
-                    parser_mgr.SetData(zmi, zidx, zval);
                     for (int j=0; j<num_steps; ++j)
+                    {
+                        parser_mgr.SetData(xmi, xidx, xval);
+                        parser_mgr.SetData(zmi, zidx, zval);
                         parser_mgr.ParserEval(false);
+                    }
                     const double yval = parser_mgr.ConstData(ds::VAR)[yidx];
                     if (yval<ymin) ymin = yval;
                     if (yval>ymax) ymax = yval;
@@ -91,7 +93,7 @@ void VariableView::ComputeData()
 
         MakePlotItems();
 
-        emit ComputeComplete();
+        emit ComputeComplete(num_steps);
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
@@ -103,6 +105,7 @@ void VariableView::Initialize()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VariableView::Initialize", std::this_thread::get_id());
 #endif
+    FreezeNonUser();
     _numFuncs = Spec_toi("use_z")==0 ? 1 : NUM_ZFUNCS;
     InitParserMgrs(NUM_INCREMENTS*_numFuncs);
 
@@ -146,7 +149,7 @@ VariableView::VSpec VariableView::MakeVSpec(size_t raw_idx, double num_divs)
     else
     {
         mi = ds::DIFF;
-        range_mi = ds::INP;
+        range_mi = ds::INIT;
         idx = raw_idx - num_inputs;
     }
     const double min = _modelMgr->Minimum(range_mi, idx),

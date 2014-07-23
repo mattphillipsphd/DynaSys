@@ -17,7 +17,7 @@ const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()), _fitGui(new FitGui()),
+    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()),
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(TP_WINDOW_LENGTH),
@@ -84,8 +84,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)));
     connect(_fastRunGui, SIGNAL(Finished()), this, SLOT(FastRunFinished()));
     connect(this, SIGNAL(UpdateSimPBar(int)), _fastRunGui, SLOT(UpdatePBar(int)));
-    connect(_fitGui, SIGNAL(StartFit()), this, SLOT(StartFit()));
-    connect(_fitGui, SIGNAL(Finished()), this, SLOT(FitFinished()));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(on_actionSave_Model_triggered()));
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
@@ -144,13 +142,8 @@ void MainWindow::FastRunFinished()
     ScopeTracker st("MainWindow::FastRunFinished", std::this_thread::get_id());
 #endif
     setEnabled(true);
-}
-void MainWindow::FitFinished()
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::FitFinished", std::this_thread::get_id());
-#endif
-    _log->AddMesg("FitGui finished");
+    _drawMgr->Stop();
+    ui->btnStart->setText("Start");
 }
 void MainWindow::Error()
 {
@@ -160,17 +153,23 @@ void MainWindow::Error()
     _drawMgr->Stop();
     ui->btnStart->setText("Start");
     SetButtonsEnabled(true);
+    SetParamsEnabled(true);
+    SetSaveActionsEnabled(true);
+    SetActionBtnsEnabled(true);
+    setEnabled(true);
+    _paramEditor->setEnabled(true);
     _logGui->show();
 }
-void MainWindow::LoadTempModel(void*) //slot
+void MainWindow::LoadTempModel(void* models) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::LoadTempModel", _tid);
 #endif
     try
     {
+        const VecStr& vmodels = *static_cast<VecStr*>(models);
         SysFileOut out(ds::TEMP_MODEL_FILE);
-        out.Save();
+        out.Save(vmodels, _modelMgr->GetNotes());
 
         LoadModel(ds::TEMP_MODEL_FILE);
         SaveModel(_fileName);
@@ -180,7 +179,7 @@ void MainWindow::LoadTempModel(void*) //slot
         _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
     }
 }
-void MainWindow::NullclineData() //slot
+void MainWindow::NullclineData(int) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::NullclineData", _tid);
@@ -220,6 +219,7 @@ void MainWindow::Pause() //slot
     switch (_drawMgr->DrawState())
     {
         case DrawBase::STOPPED:
+            SetSaveActionsEnabled(true);
             break;
         case DrawBase::DRAWING:
             _drawMgr->Pause();
@@ -233,32 +233,49 @@ void MainWindow::Pause() //slot
             break;
     }
 }
-void MainWindow::PhasePlotData() //slot
+void MainWindow::PhasePlotData(int) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::PhasePlotData", std::this_thread::get_id());
 #endif
     DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
-    const int xidx = pp->Spec_toi("xidx"),
-            yidx = pp->Spec_toi("yidx");
-    double xmin, xmax, ymin, ymax;
-    if (ui->cboxFitLimits->isChecked())
+    if ( pp->Spec_tob("make_plots") )
     {
-        xmin = _modelMgr->Minimum(ds::INIT, xidx);
-        xmax = _modelMgr->Maximum(ds::INIT, xidx);
-        ymin = _modelMgr->Minimum(ds::INIT, yidx);
-        ymax = _modelMgr->Maximum(ds::INIT, yidx);
+        const int xidx = pp->Spec_toi("xidx"),
+                yidx = pp->Spec_toi("yidx");
+        double xmin, xmax, ymin, ymax;
+        if (ui->cboxFitLimits->isChecked())
+        {
+            xmin = _modelMgr->Minimum(ds::INIT, xidx);
+            xmax = _modelMgr->Maximum(ds::INIT, xidx);
+            ymin = _modelMgr->Minimum(ds::INIT, yidx);
+            ymax = _modelMgr->Maximum(ds::INIT, yidx);
+        }
+        else
+        {
+            xmin = pp->Spec_tod("xidx");
+            xmax = pp->Spec_tod("xmax");
+            ymin = pp->Spec_tod("ymin");
+            ymax = pp->Spec_tod("ymax");
+        }
+        ViewRect pp_lims(xmin, xmax, ymin, ymax);
+
+        Replot(pp_lims, ViewRect());
     }
     else
     {
-        xmin = pp->Spec_tod("xidx");
-        xmax = pp->Spec_tod("xmax");
-        ymin = pp->Spec_tod("ymin");
-        ymax = pp->Spec_tod("ymax");
+        int num_steps = pp->IterCt()*_modelMgr->ModelStep();
+        if (num_steps<_numSimSteps)
+            UpdateSimPBar(num_steps);
+        else
+        {
+            UpdateSimPBar(-1);
+            connect(pp, SIGNAL(Flag1()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
+            connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
+            SaveData(_fastRunGui->FullFileName());
+        }
     }
-    ViewRect pp_lims(xmin, xmax, ymin, ymax);
 
-    Replot(pp_lims, ViewRect());
 }
 void MainWindow::StartCompiled(int duration, int save_mod_n) //slot
 {
@@ -302,15 +319,7 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     std::thread t( std::bind(&MainWindow::DoFastRun, this) );
     t.detach();
 }
-void MainWindow::StartFit()
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::StartFit", std::this_thread::get_id());
-#endif
-    std::thread t( std::bind(&MainWindow::DoFit, this) );
-    t.detach();
-}
-void MainWindow::TimePlotData()
+void MainWindow::TimePlotData(int)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::TimePlotData", std::this_thread::get_id());
@@ -352,7 +361,7 @@ void MainWindow::UpdateTimePlot() //slot
         }
     }
 }
-void MainWindow::UpdateTPData()
+void MainWindow::UpdateTPData() //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateTPData", _tid);
@@ -363,7 +372,7 @@ void MainWindow::UpdateTPData()
     tp->SetSpecs(specs);
     tp->SetOpaqueSpec("dv_data", pp->ConstData());
 }
-void MainWindow::VariableViewData() //slot
+void MainWindow::VariableViewData(int) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::VariableViewData", _tid);
@@ -377,7 +386,7 @@ void MainWindow::VariableViewData() //slot
     ViewRect vv_lims(xmin, xmax, ymin, ymax);
     Replot(vv_lims, ViewRect());
 }
-void MainWindow::VectorFieldData() //slot
+void MainWindow::VectorFieldData(int) //slot
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::VectorFieldData", _tid);
@@ -505,14 +514,6 @@ void MainWindow::on_actionExit_triggered()
     close();
 }
 
-void MainWindow::on_actionFit_triggered()
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::on_actionFit_triggered", _tid);
-#endif
-    _fitGui->show();
-}
-
 void MainWindow::on_actionLoad_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -578,14 +579,11 @@ void MainWindow::on_actionSave_Data_triggered()
     ScopeTracker st("MainWindow::on_actionSave_Data_triggered", _tid);
 #endif
     if ( !QFile(ds::TEMP_FILE.c_str()).exists() ) return;
-    QString file_name = QFileDialog::getSaveFileName(nullptr,
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Save generated data",
-                                                         DDM::SaveDataDir().c_str());
-    if (file_name.isEmpty()) return;
-    DDM::SetSaveDataDir(file_name.toStdString());
-    QFile old(file_name);
-    if (old.exists()) old.remove();
-    QFile::rename(ds::TEMP_FILE.c_str(), file_name);
+                                                         DDM::SaveDataDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    SaveData(file_name);
 }
 void MainWindow::on_actionSave_Model_triggered()
 {
@@ -736,32 +734,15 @@ void MainWindow::on_btnAddVariable_clicked()
         UpdateTimePlotTable();
     }
 }
-void MainWindow::on_btnFitView_clicked()
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::on_btnFitView_clicked", _tid);
-#endif
-    ui->cboxFitLimits->setChecked(false);
-    const size_t xidx = ui->cmbPlotX->currentIndex(),
-            yidx = ui->cmbPlotY->currentIndex();
-    _modelMgr->SetMinimum(ds::INIT, xidx,
-                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).lowerBound());
-    _modelMgr->SetMaximum(ds::INIT, xidx,
-                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::xBottom).upperBound());
-    _modelMgr->SetMinimum(ds::INIT, yidx,
-                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).lowerBound());
-    _modelMgr->SetMaximum(ds::INIT, yidx,
-                          ui->qwtPhasePlot->axisScaleDiv(QwtPlot::yLeft).upperBound());
-    ui->tblInitConds->update();
-}
 void MainWindow::on_btnRemoveCondition_clicked()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_btnRemoveCondition_clicked", _tid);
 #endif
-    QModelIndexList rows = ui->lsConditions->selectionModel()->selectedRows();
-    if (rows.isEmpty()) return;
-    ui->lsConditions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    int row = ui->lsConditions->selectionModel()->currentIndex().row();
+    if (row==-1) return;
+    ui->lsConditions->model()->removeRows(row, 1, QModelIndex());
+    ResetResultsList( ui->lsConditions->selectionModel()->currentIndex().row() );
 }
 void MainWindow::on_btnRemoveDiff_clicked()
 {
@@ -816,19 +797,24 @@ void MainWindow::on_btnStart_clicked()
     switch (_drawMgr->DrawState())
     {
         case DrawBase::DRAWING:
-            ui->btnStart->setText("Start");
-            SetButtonsEnabled(true);
             _drawMgr->Stop();
+            ui->btnStart->setText("Start");
+            SetButtonsEnabled(true);            
+            _paramEditor->setEnabled(true);
             break;
         case DrawBase::PAUSED:
+            _drawMgr->Resume();
             ui->btnStart->setText("Stop");
             SetButtonsEnabled(false);
-            _drawMgr->Resume();
+            _paramEditor->setEnabled(true);
             break;
         case DrawBase::STOPPED:
         {
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
+            _paramEditor->setEnabled(false);
+            if (!_drawMgr->GetObject(DrawBase::TIME_PLOT))
+                CreateObject(DrawBase::TIME_PLOT);
             size_t num_objects = _drawMgr->NumDrawObjects();
             for (size_t i=0; i<num_objects; ++i)
             {
@@ -923,6 +909,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
             SetTPShown(true);
             SetActionBtnsEnabled(true);
             SetZPlotShown(false);
+            ui->lblTailLength->setText("tail length:");
             ui->spnStepsPerSec->setValue(_singleStepsSec);
             ui->spnStepsPerSec->setMinimum(-1);
             ui->spnTailLength->setValue(_singleTailLen);
@@ -937,8 +924,9 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
             SetTPShown(true);
             SetActionBtnsEnabled(false);
             SetZPlotShown(true);
+            ui->lblTailLength->setText("# model evals:");
             ui->spnStepsPerSec->setValue(_singleStepsSec);
-            ui->spnStepsPerSec->setMinimum(-1);
+            ui->spnStepsPerSec->setMinimum(1);
             ui->spnTailLength->setValue(_singleTailLen);
             _vfTailLen = 1;
 
@@ -950,6 +938,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
             SetTPShown(false);
             SetActionBtnsEnabled(false);
             SetZPlotShown(false);
+            ui->lblTailLength->setText("tail length:");
             ui->spnStepsPerSec->setValue(_vfStepsSec);
             ui->spnStepsPerSec->setMinimum(1);
             ui->spnTailLength->setValue(_vfTailLen); //This updates the vector field
@@ -1087,7 +1076,7 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::CreateObject", _tid);
 #endif
-    DSPlot* plot;
+    DSPlot* plot(nullptr);
     switch (draw_type)
     {
         case DrawBase::NULL_CLINE:
@@ -1105,26 +1094,26 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     switch (draw_type)
     {
         case DrawBase::NULL_CLINE:
-        connect(draw_object, SIGNAL(ComputeComplete()),
-                this, SLOT(NullclineData()), Qt::BlockingQueuedConnection);
+        connect(draw_object, SIGNAL(ComputeComplete(int)),
+                this, SLOT(NullclineData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::PHASE_PLOT:
             connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
-            connect(draw_object, SIGNAL(ComputeComplete()),
-                    this, SLOT(PhasePlotData()), Qt::BlockingQueuedConnection);
+            connect(draw_object, SIGNAL(ComputeComplete(int)),
+                    this, SLOT(PhasePlotData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::TIME_PLOT:
-        connect(draw_object, SIGNAL(ComputeComplete()),
-                this, SLOT(TimePlotData()), Qt::BlockingQueuedConnection);
+        connect(draw_object, SIGNAL(ComputeComplete(int)),
+                this, SLOT(TimePlotData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::VARIABLE_VIEW:
-        connect(draw_object, SIGNAL(ComputeComplete()),
-                this, SLOT(VariableViewData()), Qt::BlockingQueuedConnection);
+        connect(draw_object, SIGNAL(ComputeComplete(int)),
+                this, SLOT(VariableViewData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::VECTOR_FIELD:
-        connect(draw_object, SIGNAL(ComputeComplete()),
-                this, SLOT(VectorFieldData()), Qt::BlockingQueuedConnection);
+        connect(draw_object, SIGNAL(ComputeComplete(int)),
+                this, SLOT(VectorFieldData(int)), Qt::BlockingQueuedConnection);
             break;
     }
     connect(draw_object, SIGNAL(Error()), this, SLOT(Error()));
@@ -1160,86 +1149,18 @@ void MainWindow::DoFastRun()
     ScopeTracker::InitThread(std::this_thread::get_id());
     ScopeTracker st("MainWindow::DoFastRun", std::this_thread::get_id());
 #endif
-/*    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    const double* diffs = _parserMgr.ConstData(ds::DIFF),
-            * vars = _parserMgr.ConstData(ds::VAR);
 
-    _playState = DRAWING;
-    const int num_steps = _numSimSteps / _modelMgr->ModelStep() + 0.5;
-    try
-    {
-        auto start = std::chrono::system_clock::now();
-        emit DoInitParserMgr();
+    _drawMgr->ClearObjects();
+    DrawBase* pp = CreateObject(DrawBase::PHASE_PLOT);
+    UpdateDOSpecs(DrawBase::PHASE_PLOT);
 
-        DatFileOut out( _fastRunGui->FullFileName() );
-        VecStr save_names;
-        for (size_t i=0; i<(size_t)num_diffs; ++i)
-            save_names.push_back(_modelMgr->Model(ds::DIFF)->ShortKey(i));
-        for (size_t i=0; i<(size_t)num_vars; ++i)
-            save_names.push_back(_modelMgr->Model(ds::VAR)->ShortKey(i));
-        out.Open(save_names, _saveModN);
+    pp->SetSpec("make_plots", false);
+    pp->SetSpec("is_recording", true);
+    disconnect(pp, SIGNAL(Flag1()), this, SLOT(UpdateParams()));
+    disconnect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()));
 
-        for (int i=0; i<num_steps; ++i)
-        {
-            _parserMgr.ParserEvalAndCondsNoLock();
-
-            if (i%_saveModN==0)
-            {
-                out.Write(diffs, num_diffs);
-                out.Write(vars, num_vars);
-                emit UpdateSimPBar(i*_modelMgr->ModelStep());
-            }
-
-            if (_playState != DRAWING) break;
-        }
-
-        out.Close();
-
-        auto dur = std::chrono::system_clock::now() - start;
-        int dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
-        std::string dur_str = dur_ms>10000
-                ? std::to_string(dur_ms/1000) + "sec."
-                : std::to_string(dur_ms) + "ms.";
-        _log->AddMesg("Time required by simulation: " + dur_str);
-
-        _playState = STOPPED;
-    }
-    catch (mu::ParserError& e)
-    {
-        _log->AddExcept("MainWindow::DoFastRun: " + e.GetMsg());
-        ds::RemoveThread(std::this_thread::get_id());
-    }
-    catch (std::exception& e)
-    {
-        _log->AddExcept("MainWindow::DoFastRun: " + std::string(e.what()));
-        ds::RemoveThread(std::this_thread::get_id());
-    }
-
-    emit UpdateSimPBar(-1);
-
-    ds::RemoveThread(std::this_thread::get_id());
-*/}
-void MainWindow::DoFit()
-{
-    ds::AddThread(std::this_thread::get_id());
-#ifdef DEBUG_FUNC
-    ScopeTracker::InitThread(std::this_thread::get_id());
-    ScopeTracker st("MainWindow::DoFit", std::this_thread::get_id());
-#endif
-    try
-    {
-        Executable* exe = CreateExecutable("error");
-        Fit* fit = new Fit(exe, "firingrate.out", "target4.dsfdat");
-        fit->Launch();
-        _log->AddMesg("Finished fit!");
-    }
-    catch (std::exception& e)
-    {
-        _log->AddExcept("MainWindow::DoFit: " + std::string(e.what()));
-    }
-
-    ds::RemoveThread(std::this_thread::get_id());
+    const int num_iters = _numSimSteps / _modelMgr->ModelStep() + 0.5;
+    _drawMgr->Start(DrawBase::PHASE_PLOT, num_iters);
 }
 
 void MainWindow::InitDefaultModel()
@@ -1341,7 +1262,7 @@ void MainWindow::InitViews()
     ui->tblInitConds->horizontalHeader()->setStretchLastSection(true);
 
     _modelMgr->SetView(ui->lsConditions, ds::COND);
-    ui->lsConditions->setModelColumn(0);
+    ui->lsConditions->setModelColumn(ConditionModel::TEST);
     ResetResultsList(-1);
 }
 
@@ -1367,7 +1288,6 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
                 text = "0";
             _modelMgr->SetValue(ds::VAR, (size_t)row, text);
         }
-//        _parserMgr.AssignVariable(row, text);
     }
     catch (std::exception& e)
     {
@@ -1389,7 +1309,14 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
     int idx = topLeft.row();
     std::string exprn = _modelMgr->Model(ds::INP)->Expression(idx);
     if (_modelMgr->AreModelsInitialized())
-        _drawMgr->QuickEval(exprn);
+        try
+        {
+            _drawMgr->QuickEval(exprn);
+        }
+        catch (std::exception& e)
+        {
+            _log->AddMesg("MainWindow::ParamChanged: " + std::string(e.what()));
+        }
     UpdateSlider( ui->cmbSlidePars->currentIndex() );
 }
 void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
@@ -1485,7 +1412,7 @@ void MainWindow::ResetPhasePlotAxes()
     ui->cmbPlotX->insertItems(0, xlist);
     ui->cmbPlotX->setCurrentIndex(0);
 
-    int yidx, zidx;
+    int yidx(0), zidx(0);
     switch (_plotMode)
     {
         case SINGLE:
@@ -1520,7 +1447,11 @@ void MainWindow::ResetResultsList(int cond_row)
     ScopeTracker st("MainWindow::ResetResultsList", _tid);
 #endif
     delete ui->lsResults->model();
-    if (cond_row==-1) return;
+    if (cond_row==-1)
+    {
+        ui->lsResults->setModel( new QStringListModel() );
+        return;
+    }
     QStringList qexprns = ds::VecStrToQSList( _modelMgr->CondResults(cond_row) );
     QStringListModel* model = new QStringListModel(qexprns);
     ui->lsResults->setModel(model);
@@ -1542,6 +1473,19 @@ void MainWindow::SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& siz
     if (file_name.empty()) return;
     QwtPlotRenderer renderer;
     renderer.renderDocument(fig, file_name.c_str(), "pdf", size);
+}
+void MainWindow::SaveData(const std::string& file_name)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SaveData", _tid);
+#endif
+    size_t sep = file_name.find_last_of('/');
+    std::string path = (sep==std::string::npos) ? "" : file_name.substr(0, sep);
+    DDM::SetSaveDataDir(path);
+    QFile old(file_name.c_str());
+    if (old.exists()) old.remove();
+    if ( !QFile::rename(ds::TEMP_FILE.c_str(), file_name.c_str()) )
+        _log->AddExcept(" : Save of \"" + file_name + "\" failed.");
 }
 void MainWindow::SaveModel(const std::string& file_name)
 {
@@ -1585,8 +1529,6 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     SetSaveActionsEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
-
-    _paramEditor->setEnabled(!is_enabled);
 }
 void MainWindow::SetParamsEnabled(bool is_enabled)
 {
@@ -1740,6 +1682,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
             draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
             draw_object->SetSpec("tail_length", ui->spnTailLength->text().toStdString());
+            draw_object->SetSpec("make_plots", true);
             break;
         case DrawBase::TIME_PLOT:
             draw_object->SetOpaqueSpec("colors", &_tpColors);

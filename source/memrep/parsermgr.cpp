@@ -1,7 +1,7 @@
 #include "parsermgr.h"
 
 ParserMgr::ParserMgr()
-    : _log(Log::Instance()), _modelData( MakeModelData() ),
+    : _inputMgr(InputMgr::Instance()), _log(Log::Instance()), _modelData( MakeModelData() ),
       _modelMgr(ModelMgr::Instance())
 {
 #ifdef DEBUG_PM_FUNC
@@ -10,7 +10,7 @@ ParserMgr::ParserMgr()
 #endif
 }
 ParserMgr::ParserMgr(const ParserMgr& other)
-    : _inputs(other._inputs), _log(other._log),
+    : _inputMgr(other._inputMgr), _log(other._log),
       _modelData( MakeModelData() ), _modelMgr(other._modelMgr)
 {
 #ifdef DEBUG_PM_FUNC
@@ -48,7 +48,7 @@ void ParserMgr::AssignVariable(int row, const std::string& text)
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::AssignVariable", std::this_thread::get_id());
 #endif
-    _modelMgr->AssignInput(row, _modelData[ds::VAR].first, text, true);
+    _inputMgr->AssignInput(&_modelData[ds::VAR].first[row], text);
 }
 void ParserMgr::ClearExpressions()
 {
@@ -69,8 +69,6 @@ void ParserMgr::InitData()
         AssociateVars(_parserResult);
         for (auto& itp : _parserConds)
             AssociateVars(itp);
-
-        _inputs.clear();
 
         VecStr initializations, expressions;
         for (size_t i=0; i<ds::NUM_MODELS; ++i)
@@ -94,23 +92,35 @@ void ParserMgr::InitData()
 
         for (const auto& it : initializations)
             QuickEval(it);
+
+        const ParamModelBase* vars = _modelMgr->Model(ds::VAR);
+        const size_t num_vars = vars->NumPars();
+        for (size_t i=0; i<num_vars; ++i)
+            if ( Input::Type(vars->Value(i)) == Input::USER )
+                QuickEval(vars->Expression(i));
+            //This initializes the functions--necessary since they can invoke each other.
+            //But don't do it with differentials because they need to start at their initialized
+            //value
+
+        _inputMgr->ClearInputs();
         for (size_t i=0; i<ds::NUM_MODELS; ++i)
         {
             const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
             if (!model->DoInitialize()) continue;
             double* data = _modelData[i].first,
-                    *temp_data = _modelData[i].second;
+                    * temp_data = _modelData[i].second;
             const size_t num_pars = model->NumPars();
             for (size_t k=0; k<num_pars; ++k)
             {
                 const std::string& value = model->Value(k);
 
                 //Assign the source of the data--i.e. attach an input source if needed
-                _modelMgr->AssignInput(k, temp_data, value, false);
+                if (!model->IsFreeze(k))
+                    _inputMgr->AssignInput(&temp_data[k], value);
 
                 //Initialize
                 if (model->Id()==ds::INP) // ###
-                    data[k] = std::stod(value.c_str());
+                    data[k] = temp_data[k] = std::stod(value.c_str());
             }
         }
     }
@@ -149,9 +159,7 @@ void ParserMgr::InitParsers()
             }
         }
         SetExpression(expressions);
-            //Note that the expressions are not actually evaluated
-
-        _stepCt = std::numeric_limits<int>::max() - 1;
+            //Note that the expressions are not actually evaluated at this point
     }
     catch (mu::ParserError& e)
     {
@@ -159,16 +167,6 @@ void ParserMgr::InitParsers()
     }
 }
 
-void ParserMgr::InputEval(int idx)
-{
-    if (idx==-1)
-    {
-        for (auto& it : _inputs)
-            it.NextInput();
-    }
-    else
-        _inputs[idx].NextInput();
-}
 const std::string& ParserMgr::ParserContents() const
 {
 #ifdef DEBUG_PM_FUNC
@@ -182,11 +180,7 @@ void ParserMgr::ParserEval(bool eval_input)
     {
         _parser.Eval();
         TempEval();
-        if (eval_input && ++_stepCt*_modelMgr->ModelStep()*_inputsPerUnitTime>1.0)
-        {
-            _stepCt = 0;
-            InputEval();
-        }
+        if (eval_input) _inputMgr->InputEval();
     }
     catch (mu::ParserError& e)
     {
@@ -197,13 +191,7 @@ void ParserMgr::ParserEval(bool eval_input)
 }
 void ParserMgr::ParserEvalAndConds(bool eval_input)
 {
-    _parser.Eval();
-    TempEval();
-    if (eval_input && ++_stepCt*_modelMgr->ModelStep()*_inputsPerUnitTime>1.0)
-    {
-        _stepCt = 0;
-        InputEval();
-    }
+    ParserEval(eval_input);
 
     const int num_conds = (int)_modelMgr->Model(ds::COND)->NumPars();
     for (int k=0; k<num_conds; ++k)
@@ -261,8 +249,7 @@ void ParserMgr::TempEval()
             const size_t num_pars = model->NumPars();
             double* data = _modelData[i].first;
             const double* temp = _modelData.at(i).second;
-            for (size_t i=0; i<num_pars; ++i)
-                data[i] = temp[i];
+            memcpy(data, temp, num_pars*sizeof(double));
         }
     }
 }
@@ -406,9 +393,6 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
 }
 void ParserMgr::DeepCopy(const ParserMgr& other)
 {
-    _inputsPerUnitTime      = other._inputsPerUnitTime;
-    _stepCt                 = 0;
-
     for (size_t i=0; i<ds::NUM_MODELS; ++i)
     {
         const size_t num_pars = _modelMgr->Model((ds::PMODEL)i)->NumPars();
@@ -416,8 +400,8 @@ void ParserMgr::DeepCopy(const ParserMgr& other)
         memcpy(_modelData[i].second, other._modelData.at(i).second, num_pars*sizeof(double));
     }
 
-    InitParsers();
     InitData();
+    InitParsers();
 }
 std::vector< std::pair<double*,double*> > ParserMgr::MakeModelData()
 {

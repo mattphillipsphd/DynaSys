@@ -51,7 +51,7 @@ void TimePlot::ComputeData()
 
         SetOpaqueSpec("dv_data", nullptr);
 
-        emit ComputeComplete();
+        emit ComputeComplete(-1);
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );

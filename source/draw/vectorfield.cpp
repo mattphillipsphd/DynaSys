@@ -86,10 +86,10 @@ void VectorField::ComputeData()
 
         MakePlotItems(); //Since these aren't used by any other plot element, no reason
             //not to do this in this thread
+        emit ComputeComplete(_tailLength);
+
         if (grow_tail)
             _tailLength += steps_per_sec*tail_len;
-
-        emit ComputeComplete();
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
@@ -145,9 +145,13 @@ void VectorField::MakePlotItems()
 
 void VectorField::ResetPPs()
 {
+#ifdef DEBUG_FUNC
+    ScopeTracker st("VectorField::ResetPPs", std::this_thread::get_id());
+#endif
     const int resolution = Spec_toi("resolution"),
             resolution2 = resolution*resolution;
 
+    FreezeNonUser();
     InitParserMgrs(resolution2);
 
     ReservePlotItems(resolution2*3);

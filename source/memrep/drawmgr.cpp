@@ -70,14 +70,23 @@ void DrawMgr::Start()
     ScopeTracker st("DrawMgr::Start", std::this_thread::get_id());
 #endif
     if (_drawState==DrawBase::DRAWING) return;
-    for (auto it : _objects)
+    try
     {
-        it->ClearPlotItems();
-        it->Initialize();
+        for (auto it : _objects)
+        {
+            it->ClearPlotItems();
+            it->Initialize();
+        }
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("DrawMgr::StartThread: " + std::string(e.what()));
+        emit Error();
+        return;
     }
     StartThreads();
 }
-void DrawMgr::Start(DrawBase::DRAW_TYPE draw_type)
+void DrawMgr::Start(DrawBase::DRAW_TYPE draw_type, int iter_max)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::Start", std::this_thread::get_id());
@@ -85,7 +94,7 @@ void DrawMgr::Start(DrawBase::DRAW_TYPE draw_type)
     DrawBase* obj = GetObject(draw_type);
     obj->ClearPlotItems();
     obj->Initialize();
-    std::thread t( std::bind(&DrawMgr::StartThread, this, obj, -1) );
+    std::thread t( std::bind(&DrawMgr::StartThread, this, obj, iter_max) );
     t.detach();
 }
 void DrawMgr::Stop()
@@ -174,7 +183,7 @@ void DrawMgr::StartThread(DrawBase* obj, int iter_max)
     {
         obj->SetDrawState(DrawBase::DRAWING);
         obj->ResetIterCt();
-        obj->SetIterMax(iter_max);
+        obj->SetIterMax(iter_max==-1 ? std::numeric_limits<int>::max() : iter_max);
         obj->ComputeData();
     }
     catch (std::exception& e)

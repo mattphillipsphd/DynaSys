@@ -17,7 +17,7 @@ void SysFileOut::Save() const
 
     ModelMgr* model_mgr = ModelMgr::Instance();
 
-    SaveHeader(model_mgr->ModelStep());
+    SaveHeader();
     _out << ds::NUM_MODELS << std::endl;
     for (int i=0; i<ds::NUM_MODELS; ++i)
     {
@@ -39,7 +39,6 @@ void SysFileOut::Save() const
     _out.close();
 }
 void SysFileOut::Save(const VecStr& vmodels,
-                      double model_step,
                       const Notes* notes) const
 {
 #ifdef DEBUG_FUNC
@@ -47,8 +46,8 @@ void SysFileOut::Save(const VecStr& vmodels,
 #endif
     _out.open(_name);
 
-    SaveHeader(model_step);
-    _out << vmodels.size() << std::endl; //Don't count conditions here
+    SaveHeader();
+    _out << vmodels.size() << std::endl;
     for (auto it : vmodels)
         _out << it;
     notes->Write(_out);
@@ -56,11 +55,12 @@ void SysFileOut::Save(const VecStr& vmodels,
     _out.close();
 }
 
-void SysFileOut::SaveHeader(double model_step) const
+void SysFileOut::SaveHeader() const
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("SysFileOut::SaveHeader", std::this_thread::get_id());
 #endif
+    double model_step = ModelMgr::Instance()->ModelStep();
     _out << "DynaSys " << ds::VERSION_STR << std::endl;
     _out << "Model step: " << model_step << std::endl;
 }

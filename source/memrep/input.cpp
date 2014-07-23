@@ -25,7 +25,7 @@ Input::TYPE Input::Type(const std::string& text)
 
 Input::Input(double* const value)
     : _ct(0), _input(nullptr), _log(Log::Instance()),
-      _samplesPerStep(1), _type(UNKNOWN), _value(value)
+      _samplesPerUnitTime(-1), _type(UNKNOWN), _value(value)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("Input::Input", std::this_thread::get_id());
@@ -33,7 +33,7 @@ Input::Input(double* const value)
 }
 Input::Input(const Input& other)
     : _ct(other._ct), _input(nullptr), _log(Log::Instance()),
-      _samplesPerStep(other._samplesPerStep), _type(other._type), _value(other._value)
+      _samplesPerUnitTime(other._samplesPerUnitTime), _type(other._type), _value(other._value)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("Input::Input(const Input& other)", std::this_thread::get_id());
@@ -85,6 +85,7 @@ void Input::GenerateInput(TYPE type)
             throw std::runtime_error("Input::GenerateInput: type not defined for string " + std::to_string(type));
     }
 
+    _samplesPerUnitTime = 1;
     _type = type;
     *_value = _input[_ct];
 }
@@ -109,7 +110,7 @@ void Input::LoadInput(const std::string& file_name)
     }
     catch (std::exception& e)
     {
-        _log->AddExcept("MainWindow::InitInput: " + std::string(e.what()));
+        _log->AddExcept("Input::LoadInput: " + std::string(e.what()));
         throw(e);
     }
 }
@@ -155,14 +156,14 @@ void Input::LoadBinInput(const std::string& file_name)
     int vnum;
     size_t br = fread(&vnum, sizeof(int), 1, fp);
 
-    br = fread(&_samplesPerStep, sizeof(int), 1, fp);
+    br = fread(&_samplesPerUnitTime, sizeof(int), 1, fp);
 
     int num_elts;
     br = fread(&num_elts, sizeof(int), 1, fp);
 
     _input = new double[INPUT_SIZE];
     br = fread(_input, sizeof(double), std::min((int)INPUT_SIZE, num_elts), fp);
-    _log->AddMesg(std::to_string(br) + " bytes read from " + file_name);
+    _log->AddMesg(std::to_string(br) + " elements read from " + file_name);
 }
 void Input::LoadTextInput(const std::string& file_name)
 {
@@ -179,7 +180,7 @@ void Input::LoadTextInput(const std::string& file_name)
 
     std::string line;
     std::getline(file, line);
-    _samplesPerStep = std::stoi(line);
+    _samplesPerUnitTime = std::stoi(line);
 
     std::getline(file, line);
     const int num_elts = std::stoi(line);

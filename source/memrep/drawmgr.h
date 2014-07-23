@@ -26,7 +26,7 @@ class DrawMgr : public QObject
         void Resume();
         void Resume(DrawBase::DRAW_TYPE draw_type, int iter_max = -1);
         void Start();
-        void Start(DrawBase::DRAW_TYPE draw_type);
+        void Start(DrawBase::DRAW_TYPE draw_type, int iter_max = -1);
         void Stop();
         void StopAndRemove(DrawBase::DRAW_TYPE draw_type);
 
