@@ -6,6 +6,7 @@
 #include "vectorfield.h"
 
 const int DrawBase::MAX_BUF_SIZE = 8 * 1024 * 1024;
+const int DrawBase::TP_WINDOW_LENGTH = 1000;
 
 DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
 {
@@ -39,11 +40,12 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
 
 DrawBase::~DrawBase()
 {
-    for (auto it : _plotItems)
-    {
-        it->detach();
-        delete it;
-    }
+    DetachItems();
+//    for (auto it : _plotItems)
+//    {
+//        it->detach();
+//        delete it;
+//    }
 }
 
 void DrawBase::QuickEval(const std::string& exprn)
@@ -82,9 +84,19 @@ void DrawBase::SetSpec(const std::string& key, int value)
 void DrawBase::SetSpecs(const MapStr& specs)
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    _specs = specs;
+    for (auto it : specs)
+        _specs[it.first] = it.second;
 }
 
+void* DrawBase::DataCopy() const
+{
+    return nullptr;
+}
+bool DrawBase::IsSpec(const std::string& key) const
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _specs.find(key) != _specs.end();
+}
 size_t DrawBase::NumPlotItems() const
 {
     std::lock_guard<std::mutex> lock(_mutex);
@@ -145,13 +157,16 @@ void DrawBase::IterCompleted(int num_iters) //slot
 {
     if ((_iterCt+=num_iters) >= _iterMax)
         _drawState = STOPPED;
+    _lastStep = std::chrono::system_clock::now();
 }
 
 DrawBase::DrawBase(DSPlot* plot)
     : _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
-      _data(nullptr), _iterCt(0), _iterMax(-1), _lastStep(std::chrono::system_clock::now()),
-      _plot(plot)
+      _data(nullptr), _deleteOnFinish(false),
+      _iterCt(0), _iterMax(-1), _lastStep(std::chrono::system_clock::now()),
+      _needRecompute(false), _plot(plot)
 {
+    connect(this, SIGNAL(ReadyToDelete()), this, SLOT(deleteLater()), Qt::QueuedConnection);
 }
 
 void DrawBase::ClearPlotItems()
@@ -215,7 +230,6 @@ bool DrawBase::NeedNewStep()
     auto step_diff = std::chrono::system_clock::now() - _lastStep;
     auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(step_diff);
     bool need_new_step = diff_ms.count() > 1000.0/((double)steps_per_sec/_modelMgr->ModelStep());
-    if (need_new_step) _lastStep = std::chrono::system_clock::now();
     return need_new_step;
 }
 int DrawBase::RemainingSleepMs() const

@@ -65,6 +65,7 @@ class ParserMgr
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;
+        double _rkTemps[4]; //Runge-Kutta temporary variables
 };
 
 #endif // PARSERMGR_H

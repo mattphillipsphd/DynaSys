@@ -97,11 +97,12 @@ void Input::LoadInput(const std::string& file_name)
     ResetInput();
     try
     {
-        std::string suffix = file_name.substr(file_name.find_last_of('.')+1);
+        std::string fn = ExpandFileName(file_name);
+        std::string suffix = fn.substr(fn.find_last_of('.')+1);
         if (suffix=="txt")
-            LoadTextInput(file_name);
+            LoadTextInput(fn);
         else if (suffix=="dsin")
-            LoadBinInput(file_name);
+            LoadBinInput(fn);
         else
             throw std::runtime_error("Input::LoadInput: Bad file extension.");
 
@@ -122,6 +123,14 @@ void Input::NextInput(int n)
     _ct &= INPUT_MASK;
     *_value = _input[_ct];
 }
+double Input::NextInputHalf() const
+{
+    return (*_value + SeeNextInput()) / 2.0;
+}
+double Input::SeeNextInput() const
+{
+    return _input[_ct+1];
+}
 
 void Input::DeepCopy(const Input& other)
 {
@@ -131,6 +140,17 @@ void Input::DeepCopy(const Input& other)
     if (!other._input) return;
     _input = new double[INPUT_SIZE];
     memcpy(_input,  other._input, INPUT_SIZE*sizeof(_input[0]));
+}
+std::string Input::ExpandFileName(const std::string& file_name) const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("Input::ExpandFileName", std::this_thread::get_id());
+#endif
+    std::string out = file_name;
+    const size_t pos = out.find("$HOME");
+    if (pos!=std::string::npos)
+        out.replace(pos, 5, DDM::InputFilesDir());
+    return out;
 }
 template<typename T>
 void Input::GenerateRandInput(T& distribution)

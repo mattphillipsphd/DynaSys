@@ -42,6 +42,9 @@ class DrawMgr : public QObject
     signals:
         void Error();
 
+    private slots:
+        void Erase();
+
     private:
         DrawMgr();
 #ifdef __GNUG__

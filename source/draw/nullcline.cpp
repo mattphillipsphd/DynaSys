@@ -19,13 +19,12 @@ void Nullcline::ComputeData()
 #ifdef DEBUG_FUNC
     ScopeTracker st("Nullcline::ComputeData", std::this_thread::get_id());
 #endif
-    SetDrawState(DRAWING);
-
     while (DrawState()==DRAWING)
     {
         if (!NeedNewStep() && !NeedRecompute())
             goto label;{
 
+        FreezeNonUser();
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
                 resolution = Spec_toi("resolution")*2,
@@ -134,6 +133,8 @@ void Nullcline::ComputeData()
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
+
+    if (DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void Nullcline::Initialize()
@@ -150,19 +151,21 @@ void Nullcline::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("Nullcline::MakePlotItems", std::this_thread::get_id());
 #endif
+    ClearPlotItems();
+
     const int xidx = Spec_toi("xidx"),
             yidx = Spec_toi("yidx"),
             resolution2 = NumParserMgrs(),
             resolution = (int)sqrt(resolution2);
 
-    Record* record = static_cast<Record*>( Data() );
-    std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
+    const Record* record = static_cast<Record*>( Data() );
+    const std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
             & xcross_v = record->xcross_v,
             & ycross_h = record->ycross_h,
             & ycross_v = record->ycross_v;
-    double* x = record->x,
+    const double* x = record->x,
             * y = record->y;
-    double xinc = record->xinc,
+    const double xinc = record->xinc,
             yinc = record->yinc;
 
     const size_t xnum_pts_h = xcross_h.size(),
@@ -170,7 +173,9 @@ void Nullcline::MakePlotItems()
             ynum_pts_h = ycross_h.size(),
             ynum_pts_v = ycross_v.size();
 
-    QColor xcolor = _colors.at(xidx+1);
+    ReservePlotItems(xnum_pts_h + xnum_pts_v + ynum_pts_h + ynum_pts_v);
+
+    const QColor& xcolor = _colors.at(xidx+1);
     for (size_t i=0; i<xnum_pts_h; ++i)
     {
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,

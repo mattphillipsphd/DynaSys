@@ -13,6 +13,14 @@
 class ModelMgr
 {
     public:
+        enum DIFF_METHOD
+        {
+            UNKNOWN = -1,
+            EULER,
+            EULER2,
+            RUNGE_KUTTA
+        };
+
         static ModelMgr* Instance();
 
         ~ModelMgr();
@@ -25,6 +33,7 @@ class ModelMgr
         void ClearModels();
 
         void SetCondValue(size_t row, const VecStr& results);
+        void SetDiffMethod(DIFF_METHOD diff_method) { _diffMethod = diff_method; }
         void SetIsFreeze(ds::PMODEL mi, size_t idx, bool is_freeze);
         void SetMaximum(ds::PMODEL mi, size_t idx, double val);
         void SetMinimum(ds::PMODEL mi, size_t idx, double val);
@@ -43,6 +52,7 @@ class ModelMgr
         //OR for symmetry, when there is a corresponding setter
         bool AreModelsInitialized() const;
         VecStr CondResults(size_t row) const;
+        DIFF_METHOD DiffMethod() const { return _diffMethod; }
         const Notes* GetNotes() const { return _notes; }
         bool IsFreeze(ds::PMODEL mi, size_t idx) const;
         double Maximum(ds::PMODEL mi, size_t idx) const;
@@ -67,6 +77,7 @@ class ModelMgr
         inline const ConditionModel* CondModel() const;
         std::vector<ParamModelBase*> MakeModelVec() const;
 
+        DIFF_METHOD _diffMethod;
         Log* const _log;
         std::vector<ParamModelBase*> _models;
         double _modelStep;

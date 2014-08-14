@@ -9,6 +9,7 @@
 #include <random>
 #include <string>
 
+#include "../file/defaultdirmgr.h"
 #include "../globals/log.h"
 #include "../globals/scopetracker.h"
 
@@ -41,6 +42,8 @@ class Input
         void GenerateInput(TYPE type);
         void LoadInput(const std::string& file_name);
         void NextInput(int n = 1);
+        double NextInputHalf() const;
+        double SeeNextInput() const;
 
         int SamplesPerUnitTime() const { return _samplesPerUnitTime; }
         TYPE Type() const { return _type; }
@@ -51,6 +54,7 @@ class Input
 #endif
 
         void DeepCopy(const Input& other);
+        std::string ExpandFileName(const std::string& file_name) const;
         template<typename T>
         void GenerateRandInput(T& distribution);
         void LoadBinInput(const std::string& file_name);

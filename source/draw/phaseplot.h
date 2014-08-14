@@ -11,6 +11,7 @@ class PhasePlot : public DrawBase
         PhasePlot(DSPlot* plot);
         virtual ~PhasePlot() override;
 
+        virtual void* DataCopy() const override;
         virtual int SleepMs() const override;
 
     protected:

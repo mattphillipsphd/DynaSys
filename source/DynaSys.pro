@@ -74,7 +74,9 @@ SOURCES += main.cpp\
     draw/variableview.cpp \
     draw/nullcline.cpp \
     memrep/drawmgr.cpp \
-    memrep/inputmgr.cpp
+    memrep/inputmgr.cpp \
+    generate/script/matlabbase.cpp \
+    generate/script/cudakernelwithmeasure.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -126,7 +128,9 @@ HEADERS  += gui/mainwindow.h \
     draw/variableview.h \
     draw/nullcline.h \
     memrep/drawmgr.h \
-    memrep/inputmgr.h
+    memrep/inputmgr.h \
+    generate/script/matlabbase.h \
+    generate/script/cudakernelwithmeasure.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

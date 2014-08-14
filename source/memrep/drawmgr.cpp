@@ -20,6 +20,7 @@ void DrawMgr::AddObject(DrawBase* object)
     ScopeTracker st("DrawMgr::AddObject", std::this_thread::get_id());
 #endif
     _objects.push_back(object);
+    connect(object, SIGNAL(ReadyToDelete()), this, SLOT(Erase()));
 }
 void DrawMgr::ClearObjects()
 {
@@ -113,9 +114,8 @@ void DrawMgr::StopAndRemove(DrawBase::DRAW_TYPE draw_type)
     DrawBase* obj = GetObject(draw_type);
     if (obj)
     {
+        obj->SetDeleteOnFinish(true);
         obj->SetDrawState(DrawBase::STOPPED);
-        delete obj;
-        _objects.erase( std::find(_objects.begin(), _objects.end(), obj) );
     }
 }
 
@@ -162,6 +162,12 @@ int DrawMgr::NumDrawObjects() const
     ScopeTracker st("DrawMgr::NumDrawObjects", std::this_thread::get_id());
 #endif
     return _objects.size();
+}
+
+void DrawMgr::Erase() //slot
+{
+    QObject* dobj = sender();
+    _objects.erase( std::find(_objects.begin(), _objects.end(), dobj) );
 }
 
 DrawMgr::DrawMgr() : _drawState(DrawBase::STOPPED), _log(Log::Instance())

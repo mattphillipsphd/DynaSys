@@ -344,6 +344,9 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QComboBox" name="cmbDiffMethod"/>
+        </item>
        </layout>
       </item>
       <item>
@@ -557,7 +560,7 @@
      <x>0</x>
      <y>0</y>
      <width>1404</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -589,6 +592,7 @@
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
     <addaction name="actionSet_Init_to_Current"/>
+    <addaction name="actionSet_Input_Home_Dir"/>
    </widget>
    <widget class="QMenu" name="menuRun">
     <property name="title">
@@ -717,6 +721,11 @@
   <action name="actionSet_Init_to_Current">
    <property name="text">
     <string>Set Init to Current</string>
+   </property>
+  </action>
+  <action name="actionSet_Input_Home_Dir">
+   <property name="text">
+    <string>Set Default Input Dir.</string>
    </property>
   </action>
  </widget>

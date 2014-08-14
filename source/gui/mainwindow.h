@@ -95,8 +95,6 @@ class MainWindow : public QMainWindow
                         DEFAULT_VF_TAIL,
                         MAX_BUF_SIZE,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
-                        TP_SAMPLES_SHOWN,
-                        TP_WINDOW_LENGTH,
                         XY_SAMPLES_SHOWN;
         static const double MIN_MODEL_STEP;
             //If Qwt isn't able to draw the samples quickly enough, you get a recursive draw
@@ -128,7 +126,6 @@ class MainWindow : public QMainWindow
         virtual void closeEvent(QCloseEvent *) override;
 
     signals:
-        void DoUpdateParams();
         void UpdateSimPBar(int n);
 
     private slots:
@@ -152,6 +149,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
         void on_actionSet_Init_to_Current_triggered();
+        void on_actionSet_Input_Home_Dir_triggered();
 
         void on_btnAddCondition_clicked();
         void on_btnPulse_clicked();
@@ -170,6 +168,7 @@ class MainWindow : public QMainWindow
         void on_cboxNullclines_stateChanged(int state);
         void on_cboxPlotZ_stateChanged(int state);
 
+        void on_cmbDiffMethod_currentIndexChanged(const QString& text);
         void on_cmbPlotX_currentIndexChanged(int index);
         void on_cmbPlotY_currentIndexChanged(int index);
         void on_cmbPlotZ_currentIndexChanged(int index);
@@ -192,7 +191,7 @@ class MainWindow : public QMainWindow
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
         void Replot(const ViewRect& pp_data, const ViewRect& tp_data);
-        void UpdateParams();
+        void UpdatePulseParam();
 
     private:
         struct JobRecord
@@ -216,6 +215,7 @@ class MainWindow : public QMainWindow
         const std::vector<QColor> InitTPColors() const;
         void InitViews();
         void LoadModel(const std::string& file_name);
+        ViewRect PhasePlotLimits() const;
         void ResetPhasePlotAxes();
         void ResetResultsList(int cond_row);
         void SaveFigure(QwtPlot* fig, const QString& name, const QSizeF& size) const;

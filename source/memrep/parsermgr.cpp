@@ -123,6 +123,22 @@ void ParserMgr::InitData()
                     data[k] = temp_data[k] = std::stod(value.c_str());
             }
         }
+
+        switch (_modelMgr->DiffMethod())
+        {
+            case ModelMgr::UNKNOWN:
+                throw std::runtime_error("ParserMgr::InitData: Bad Diff Method.");
+            case ModelMgr::EULER:
+                break;
+            case ModelMgr::EULER2:
+            case ModelMgr::RUNGE_KUTTA:
+                for (size_t i=0; i<4; ++i)
+                {
+                    std::string ktemp = "__k" + std::to_string(i+1);
+                    _parser.DefineVar(ktemp, _rkTemps+i);
+                }
+                break;
+        }
     }
     catch (mu::ParserError& e)
     {

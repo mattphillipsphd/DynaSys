@@ -15,7 +15,8 @@ class TimePlot : public DrawBase
         virtual void Initialize() override;
         virtual void MakePlotItems() override;
 
-        virtual int SamplesShown() const override { return 2 * 1024; }
+        virtual int SleepMs() const override { return 100; }
+        virtual int SamplesShown() const override { return 1024 * 1024; }
 
     private:
         std::vector<QColor> _colors;

@@ -24,7 +24,7 @@ void LogGui::showEvent(QShowEvent* event)
 {
     ui->txtLog->clear();
     connect(_log, SIGNAL(SendMesg(const char*, QColor)), this,
-            SLOT(Append(const char*, QColor)), Qt::DirectConnection);
+            SLOT(Append(const char*, QColor)), Qt::QueuedConnection);
     _log->SendBuffer();
     QWidget::showEvent(event);
 }

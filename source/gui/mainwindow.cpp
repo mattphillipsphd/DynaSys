@@ -9,8 +9,6 @@ const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
 const int MainWindow::SLIDER_INT_LIM = 10000;
-const int MainWindow::TP_SAMPLES_SHOWN = 2 * 1024;
-const int MainWindow::TP_WINDOW_LENGTH = 1000;
 const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 
 
@@ -20,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()),
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
-    _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(TP_WINDOW_LENGTH),
+    _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
     _tid(std::this_thread::get_id()), _tpColors(InitTPColors()),
@@ -48,6 +46,13 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
     ui->actionFit->setEnabled(false);
 
+//    ui->qwtPhasePlot->setAutoReplot(true);
+//    ui->qwtTimePlot->setAutoReplot(true);
+
+    QStringList diff_methods;
+    diff_methods << "Euler" << "Euler2" << "Runge-Kutta";
+    ui->cmbDiffMethod->setModel( new QStringListModel(diff_methods) );
+
     QStringList modes;
     modes << "Single" << "Vector field" << "Variable View";
     ui->cmbPlotMode->setModel( new QStringListModel(modes) );
@@ -56,7 +61,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lblPlotZ->hide();
 
     ui->edModelStep->setText( QString("%1").arg(ds::DEFAULT_MODEL_STEP) );
-    ui->edNumTPSamples->setText( std::to_string(TP_WINDOW_LENGTH).c_str() );
+    ui->edNumTPSamples->setText( std::to_string(DrawBase::TP_WINDOW_LENGTH).c_str() );
     ui->tblTimePlot->horizontalHeader()->setStretchLastSection(true);
     ui->sldParameter->setRange(0, SLIDER_INT_LIM);
     ui->spnVFResolution->setValue(DEFAULT_VF_RES);
@@ -77,8 +82,6 @@ MainWindow::MainWindow(QWidget *parent) :
     UpdateTimePlotTable();
 
     ConnectModels();
-
-    connect(this, SIGNAL(DoUpdateParams()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
 
     connect(_fastRunGui, SIGNAL(StartCompiled(int,int)), this, SLOT(StartCompiled(int,int)));
     connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)));
@@ -184,8 +187,11 @@ void MainWindow::NullclineData(int) //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::NullclineData", _tid);
 #endif
-//    emit DoReplot(pp_lims, tp_lims);
-//    Replot(pp_lims, tp_lims);
+    if (_drawMgr->DrawState() != DrawBase::DRAWING)
+    {
+        ViewRect pp_lims = PhasePlotLimits();
+        Replot(pp_lims, ViewRect());
+    }
 }
 void MainWindow::ParamEditorClosed() //slot
 {
@@ -241,25 +247,7 @@ void MainWindow::PhasePlotData(int) //slot
     DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
     if ( pp->Spec_tob("make_plots") )
     {
-        const int xidx = pp->Spec_toi("xidx"),
-                yidx = pp->Spec_toi("yidx");
-        double xmin, xmax, ymin, ymax;
-        if (ui->cboxFitLimits->isChecked())
-        {
-            xmin = _modelMgr->Minimum(ds::INIT, xidx);
-            xmax = _modelMgr->Maximum(ds::INIT, xidx);
-            ymin = _modelMgr->Minimum(ds::INIT, yidx);
-            ymax = _modelMgr->Maximum(ds::INIT, yidx);
-        }
-        else
-        {
-            xmin = pp->Spec_tod("xidx");
-            xmax = pp->Spec_tod("xmax");
-            ymin = pp->Spec_tod("ymin");
-            ymax = pp->Spec_tod("ymax");
-        }
-        ViewRect pp_lims(xmin, xmax, ymin, ymax);
-
+        ViewRect pp_lims = PhasePlotLimits();
         Replot(pp_lims, ViewRect());
     }
     else
@@ -270,7 +258,7 @@ void MainWindow::PhasePlotData(int) //slot
         else
         {
             UpdateSimPBar(-1);
-            connect(pp, SIGNAL(Flag1()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
+            connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
             connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             SaveData(_fastRunGui->FullFileName());
         }
@@ -352,11 +340,11 @@ void MainWindow::UpdateTimePlot() //slot
 #endif
     if (_drawMgr->DrawState()!=DrawBase::DRAWING)
     {
-        DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+        const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
         if (pp)
         {
             DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
-            tp->SetOpaqueSpec("dv_data", pp->ConstData());
+            tp->SetOpaqueSpec("dv_data", pp->DataCopy());
             _drawMgr->Resume(DrawBase::TIME_PLOT, 1);
         }
     }
@@ -366,11 +354,11 @@ void MainWindow::UpdateTPData() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateTPData", _tid);
 #endif
-    DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
     const MapStr& specs = pp->Specs();
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
     tp->SetSpecs(specs);
-    tp->SetOpaqueSpec("dv_data", pp->ConstData());
+    tp->SetOpaqueSpec("dv_data", pp->DataCopy());
 }
 void MainWindow::VariableViewData(int) //slot
 {
@@ -438,14 +426,15 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
 #endif
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
                                                          "Select CUDA kernel file name",
-                                                         DDM::MEXFilesDir().c_str()).toStdString();
+                                                         DDM::CudaFilesDir().c_str()).toStdString();
     if (file_name.empty()) return;
     try
     {
-//        DDM::SetMEXFilesDir(file_name);
+        DDM::SetCudaFilesDir(file_name);
         CudaKernel cuda_kernel(file_name);
         cuda_kernel.Make();
-        _log->AddMesg("CUDA kernel file " + file_name + " created.");
+        cuda_kernel.MakeMFiles();
+        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created.");
     }
     catch (std::exception& e)
     {
@@ -602,8 +591,8 @@ void MainWindow::on_actionSave_Model_As_triggered()
                                                          "Save dynamical system",
                                                          DDM::ModelFilesDir().c_str()).toStdString();
     if (file_name.empty()) return;
-
-    _fileName = file_name.substr(file_name.find_last_of('.'))==".txt"
+    size_t pos = file_name.find_last_of('.');
+    _fileName = (pos!=std::string::npos && file_name.substr(pos)==".txt")
             ? file_name
             : file_name + ".txt";
     DDM::SetModelFilesDir(_fileName);
@@ -648,6 +637,17 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
                                  std::to_string(parser_mgr.ConstData(ds::DIFF)[i]) );
         ui->tblInitConds->update();
     }
+}
+void MainWindow::on_actionSet_Input_Home_Dir_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Input_Home_Dir_triggered", _tid);
+#endif
+    std::string dir_name = QFileDialog::getExistingDirectory(nullptr,
+                                                         "Select Input $HOME directory",
+                                                         DDM::InputFilesDir().c_str()).toStdString();
+    if (dir_name.empty()) return;
+    DDM::SetInputFilesDir(dir_name);
 }
 
 void MainWindow::on_btnAddCondition_clicked()
@@ -864,6 +864,18 @@ void MainWindow::on_cboxVectorField_stateChanged(int state)
         _drawMgr->StopAndRemove(DrawBase::VECTOR_FIELD);
 }
 
+void MainWindow::on_cmbDiffMethod_currentIndexChanged(const QString& text)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_cmbDiffMethod_currentIndexChanged", _tid);
+#endif
+    if (text=="Euler")
+        _modelMgr->SetDiffMethod(ModelMgr::EULER);
+    else if (text=="Euler2")
+        _modelMgr->SetDiffMethod(ModelMgr::EULER2);
+    else
+        _modelMgr->SetDiffMethod(ModelMgr::RUNGE_KUTTA);
+}
 void MainWindow::on_cmbPlotX_currentIndexChanged(int index)
 {
 #ifdef DEBUG_FUNC
@@ -979,6 +991,8 @@ void MainWindow::on_edNumTPSamples_editingFinished()
     ScopeTracker st("MainWindow::on_edNumTPSamples_editingFinished", _tid);
 #endif
     _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
+    if (DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT))
+        pp->SetSpec("num_tp_samples", _numTPSamples);
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
@@ -1098,7 +1112,7 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
                 this, SLOT(NullclineData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::PHASE_PLOT:
-            connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdateParams()), Qt::BlockingQueuedConnection);
+            connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             connect(draw_object, SIGNAL(ComputeComplete(int)),
                     this, SLOT(PhasePlotData(int)), Qt::BlockingQueuedConnection);
@@ -1156,7 +1170,7 @@ void MainWindow::DoFastRun()
 
     pp->SetSpec("make_plots", false);
     pp->SetSpec("is_recording", true);
-    disconnect(pp, SIGNAL(Flag1()), this, SLOT(UpdateParams()));
+    disconnect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()));
     disconnect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()));
 
     const int num_iters = _numSimSteps / _modelMgr->ModelStep() + 0.5;
@@ -1283,7 +1297,12 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
                                                                   "Text file (*.txt) ;; DSIN file (*.dsin)"
                                                                  ).toStdString();
             if (!file_name.empty())
+            {
+                const size_t pos = file_name.find( DDM::InputFilesDir() );
+                if (pos!=std::string::npos)
+                    file_name.replace(pos, DDM::InputFilesDir().length(), "$HOME");
                 text = "\"" + file_name + "\"";
+            }
             else
                 text = "0";
             _modelMgr->SetValue(ds::VAR, (size_t)row, text);
@@ -1357,12 +1376,13 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
         if (_drawMgr->DrawState()==DrawBase::DRAWING) on_btnStart_clicked();
     }
 }
-void MainWindow::UpdateParams() //slot
+void MainWindow::UpdatePulseParam() //slot
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::UpdateParams", _tid);
+    ScopeTracker st("MainWindow::UpdatePulseParam", _tid);
 #endif
     _modelMgr->SetValue(ds::INP, (int)_pulseParIdx, _pulseResetValue);
+    _pulseStepsRemaining = -1;
     ui->tblParameters->update();
 }
 void MainWindow::LoadModel(const std::string& file_name)
@@ -1400,6 +1420,33 @@ void MainWindow::LoadModel(const std::string& file_name)
     {
         _log->AddExcept("MainWindow::LoadModel: " + std::string(e.what()));
     }
+}
+MainWindow::ViewRect MainWindow::PhasePlotLimits() const
+{
+    ViewRect pp_lims;
+    DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    if (pp)
+    {
+        const int xidx = pp->Spec_toi("xidx"),
+                yidx = pp->Spec_toi("yidx");
+        double xmin, xmax, ymin, ymax;
+        if (ui->cboxFitLimits->isChecked() || !pp->IsSpec("xmin"))
+        {
+            xmin = _modelMgr->Minimum(ds::INIT, xidx);
+            xmax = _modelMgr->Maximum(ds::INIT, xidx);
+            ymin = _modelMgr->Minimum(ds::INIT, yidx);
+            ymax = _modelMgr->Maximum(ds::INIT, yidx);
+        }
+        else
+        {
+            xmin = pp->Spec_tod("xmin");
+            xmax = pp->Spec_tod("xmax");
+            ymin = pp->Spec_tod("ymin");
+            ymax = pp->Spec_tod("ymax");
+        }
+        pp_lims = ViewRect(xmin, xmax, ymin, ymax);
+    }
+    return pp_lims;
 }
 void MainWindow::ResetPhasePlotAxes()
 {
@@ -1599,6 +1646,8 @@ void MainWindow::UpdateLists()
     UpdatePulseVList();
     UpdateSliderPList();
     UpdateTimePlotTable();
+    if (_modelMgr->Model(ds::COND)->NumPars()>0)
+        ui->lsConditions->setCurrentIndex( ui->lsConditions->model()->index(0,0) );
 }
 void MainWindow::UpdateNotes()
 {

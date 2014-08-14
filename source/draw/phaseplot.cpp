@@ -17,6 +17,20 @@ PhasePlot::~PhasePlot()
     if (data) delete data;
 }
 
+void* PhasePlot::DataCopy() const
+{
+    auto data_tuple = static_cast<
+            const std::tuple<std::deque<double>,DataVec,DataVec>* >( ConstData() );
+    if (!data_tuple) return nullptr;
+    std::deque<double> inner_product = std::get<0>(*data_tuple);
+    DataVec diff_pts = std::get<1>(*data_tuple),
+             var_pts = std::get<2>(*data_tuple);
+    auto out = new std::tuple<std::deque<double>,DataVec,DataVec>(
+                inner_product,
+                diff_pts,
+                var_pts);
+    return out;
+}
 int PhasePlot::SleepMs() const
 {
     return _makePlots ? 50 : 0;
@@ -102,8 +116,8 @@ void PhasePlot::ComputeData()
                 if (pulse_steps_remaining>0) --pulse_steps_remaining;
                 if (pulse_steps_remaining==0)
                 {
-                    emit Flag1();
                     pulse_steps_remaining = -1;
+                    emit Flag1();
                 }
 
                 //Record updated variables for 2d graph, inner product, and output file
@@ -146,7 +160,7 @@ void PhasePlot::ComputeData()
         SetSpec("pulse_steps_remaining", pulse_steps_remaining);
 
         //A blowup will crash QwtPlot
-        const double DMAX = std::numeric_limits<double>::max()/1e50;
+        const double DMAX = std::numeric_limits<double>::max()/1e100;
         for (int i=0; i<num_diffs; ++i)
             if (abs(diffs[i])>DMAX)
                 throw std::runtime_error("PhasePlot::ComputeData: model exploded");

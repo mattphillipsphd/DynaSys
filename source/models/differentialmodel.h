@@ -15,6 +15,10 @@ class DifferentialModel : public NumericModelBase
         virtual std::string ShortKey(size_t idx) const override;
         virtual int ShortKeyIndex(const std::string& par_name) const override;
         virtual std::string TempExpression(size_t idx) const override;
+
+    private:
+        std::string ExprnInsert(const std::string& in, const std::string& exprn,
+                                const std::string& token) const;
 };
 
 #endif // DIFFERENTIALMODEL_H

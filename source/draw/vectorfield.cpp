@@ -94,6 +94,8 @@ void VectorField::ComputeData()
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
+
+    if (DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void VectorField::Initialize()

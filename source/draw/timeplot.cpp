@@ -29,7 +29,7 @@ void TimePlot::Initialize()
     }
 
     SetSpec("dv_start", 0);
-    SetSpec("dv_end", 1000);
+    SetSpec("dv_end", DrawBase::TP_WINDOW_LENGTH);
     SetSpec("y_tp_min", 0);
     SetSpec("y_tp_max", 0);
     SetOpaqueSpec("dv_data", nullptr);
@@ -49,9 +49,7 @@ void TimePlot::ComputeData()
 
         MakePlotItems();
 
-        SetOpaqueSpec("dv_data", nullptr);
-
-        emit ComputeComplete(-1);
+        emit ComputeComplete(1);
 
         }label:
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
@@ -64,6 +62,7 @@ void TimePlot::MakePlotItems()
     ScopeTracker st("TimePlot::MakePlotItems", std::this_thread::get_id());
 #endif
     const void* dv_data = OpaqueSpec("dv_data");
+    if (!dv_data) return;
     auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
     const auto& inner_product = std::get<0>(*data_tuple);
     const auto& diff_pts = std::get<1>(*data_tuple),
@@ -103,11 +102,10 @@ void TimePlot::MakePlotItems()
             continue;
         }
 
-        const std::string name = tp_model->Name(i);
         const double scale = std::pow(10.0, tp_model->LogScale(i));
             // ### Use MSL for fast multiplication!
 
-        if (name=="IP")
+        if (i==0) //IP
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=ip_start+ip_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
@@ -115,18 +113,18 @@ void TimePlot::MakePlotItems()
             curv->setSamples(points_tp);
             continue;
         }
-        int didx = _modelMgr->Model(ds::DIFF)->ShortKeyIndex(name);
-        if (didx != -1)
+        else if (i<=num_diffs) //A differential
         {
+            int didx = i-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
                 points_tp[ct] = QPointF( (past_dv_samps_ct+k)*_modelMgr->ModelStep(), diff_pts.at(didx).at(k)*scale);
             curv->setSamples(points_tp);
             continue;
         }
-        int vidx = _modelMgr->Model(ds::VAR)->KeyIndex(name);
-        if (vidx != -1)
+        else //A variable
         {
+            int vidx = i-num_diffs-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
                 points_tp[ct] = QPointF( (past_dv_samps_ct+k)*_modelMgr->ModelStep(), var_pts.at(vidx).at(k)*scale);
@@ -136,7 +134,7 @@ void TimePlot::MakePlotItems()
 
     //Get axis limits
     double y_tp_min(std::numeric_limits<double>::max()),
-            y_tp_max(std::numeric_limits<double>::min());
+            y_tp_max(-std::numeric_limits<double>::max());
     for (int i=0; i<num_all_tplots; ++i)
         if (tp_model->IsEnabled(i))
         {
@@ -149,4 +147,7 @@ void TimePlot::MakePlotItems()
     SetSpec("dv_end", dv_end);
     SetSpec("y_tp_min", y_tp_min);
     SetSpec("y_tp_max", y_tp_max);
+
+    SetOpaqueSpec("dv_data", nullptr);
+    delete data_tuple;
 }

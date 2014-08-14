@@ -45,7 +45,8 @@ class DrawBase : public QObject
             PAUSED
         };
 
-        static const int MAX_BUF_SIZE;
+        static const int MAX_BUF_SIZE,
+                        TP_WINDOW_LENGTH;
 
         static DrawBase* Create(DRAW_TYPE draw_type, DSPlot* plot);
 
@@ -53,6 +54,7 @@ class DrawBase : public QObject
 
         void QuickEval(const std::string&);
 
+        void SetDeleteOnFinish(bool b) { _deleteOnFinish = b; }
         void SetNeedRecompute(bool need_update_parser);
         void SetOpaqueSpec(const std::string& key, const void* value);
         void SetSpec(const std::string& key, const std::string& value);
@@ -61,7 +63,10 @@ class DrawBase : public QObject
         void SetSpecs(const MapStr& specs);
 
         const void* ConstData() const { return _data; }
+        virtual void* DataCopy() const;
+        bool DeleteOnFinish() const { return _deleteOnFinish; }
         const ParserMgr& GetParserMgr(size_t i) const { return _parserMgrs.at(i); }
+        bool IsSpec(const std::string& key) const;
         long long int IterCt() const { return _iterCt; }
         long long int IterMax() const { return _iterMax; }
         size_t NumPlotItems() const;
@@ -83,6 +88,7 @@ class DrawBase : public QObject
         void Flag1();
         void Flag2();
         void Flag3();
+        void ReadyToDelete();
 
     protected slots:
         void IterCompleted(int num_iters);
@@ -121,6 +127,7 @@ class DrawBase : public QObject
         void SetIterMax(long long int iter_max) { _iterMax = iter_max; }
 
         void* _data;
+        bool _deleteOnFinish;
         DRAW_STATE _drawState;
         DRAW_TYPE _drawType;
         long long int _iterCt, _iterMax;

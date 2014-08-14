@@ -147,7 +147,7 @@ std::string ModelMgr::Value(ds::PMODEL mi, size_t idx) const
     return _models.at(mi)->Value(idx);
 }
 
-ModelMgr::ModelMgr() : _log(Log::Instance()), _models(MakeModelVec()),
+ModelMgr::ModelMgr() : _diffMethod(UNKNOWN), _log(Log::Instance()), _models(MakeModelVec()),
     _notes(nullptr), _tpvModel(nullptr)
 {
     CreateModels();
