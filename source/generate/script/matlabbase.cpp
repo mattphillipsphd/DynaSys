@@ -2,7 +2,8 @@
 
 const int MatlabBase::NUM_AUTO_ARGS = 2;
 
-MatlabBase::MatlabBase(const std::string& name) : CFileBase(name),
+MatlabBase::MatlabBase(const std::string& name, const std::string& extension)
+    : CFileBase(name, extension),
     _nameMDefs(MakeMDefsName(name))
 {
 }

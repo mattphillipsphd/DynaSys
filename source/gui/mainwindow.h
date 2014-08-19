@@ -39,6 +39,7 @@
 #include "parameditor.h"
 #include "../generate/script/cfileso.h"
 #include "../generate/script/cudakernel.h"
+#include "../generate/script/cudakernelwithmeasure.h"
 #include "../generate/object/executable.h"
 #include "../generate/script/mexfile.h"
 #include "../generate/object/sharedobj.h"
@@ -134,6 +135,7 @@ class MainWindow : public QMainWindow
         void on_actionCreate_CUDA_kernel_triggered();
         void on_actionCreate_MEX_file_triggered();
         void on_actionCreate_SO_triggered();
+        void on_actionCUDA_kernel_with_measure_triggered();
         void on_actionCompile_Run_triggered();
         void on_actionExit_triggered();
         void on_actionLoad_triggered();

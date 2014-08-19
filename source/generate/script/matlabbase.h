@@ -7,7 +7,7 @@
 class MatlabBase : public CFileBase
 {
     public:
-        MatlabBase(const std::string& name);
+        MatlabBase(const std::string& name, const std::string& extension);
 
         void MakeMFiles();
 

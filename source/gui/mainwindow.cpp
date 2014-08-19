@@ -441,6 +441,7 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
         _log->AddExcept("MainWindow::on_actionCreate_CUDA_kernel_triggered: " + std::string(e.what()));
     }
 }
+
 void MainWindow::on_actionCreate_MEX_file_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -482,6 +483,33 @@ void MainWindow::on_actionCreate_SO_triggered()
     catch (std::exception& e)
     {
         _log->AddExcept("MainWindow::on_actionCreate_SO_triggered: " + std::string(e.what()));
+    }
+}
+
+void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionCUDA_kernel_with_measure_triggered", _tid);
+#endif
+    std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
+                                                         "Select objective function",
+                                                         DDM::CudaFilesDir().c_str()).toStdString();
+    if (objective_fun.empty()) return;
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select CUDA kernel file name",
+                                                         DDM::CudaFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetCudaFilesDir(file_name);
+        CudaKernelWithMeasure ckwm(file_name, objective_fun);
+        ckwm.Make();
+        ckwm.MakeMFiles();
+        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCUDA_kernel_with_measure_triggered: " + std::string(e.what()));
     }
 }
 

@@ -603,6 +603,7 @@
     <addaction name="actionCreate_MEX_file"/>
     <addaction name="actionCreate_SO"/>
     <addaction name="actionCreate_CUDA_kernel"/>
+    <addaction name="actionCUDA_kernel_with_measure"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -726,6 +727,11 @@
   <action name="actionSet_Input_Home_Dir">
    <property name="text">
     <string>Set Default Input Dir.</string>
+   </property>
+  </action>
+  <action name="actionCUDA_kernel_with_measure">
+   <property name="text">
+    <string>CUDA kernel with measure</string>
    </property>
   </action>
  </widget>
