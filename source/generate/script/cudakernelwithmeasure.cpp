@@ -38,7 +38,6 @@ void CudaKernelWithMeasure::MakeHFile()
 void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
 {
     out <<
-           "num_iters = round( num_records/model_step );\n"
            "num_intervals = length(target);\n"
            "out_mat = zeros(num_tests,1);\n"
            "data = gather( feval(k, fi.Data, length(fi.Data), fi.Sput, ...\n"
@@ -59,12 +58,30 @@ void CudaKernelWithMeasure::WriteDataOut(std::ofstream& out, ds::PMODEL mi)
     out << "    \n";
 }
 
+void CudaKernelWithMeasure::WriteExtraFuncs(std::ofstream& out)
+{
+    std::ifstream ofun;
+    ofun.open(_objectiveFun);
+
+    out << "//Begin CudaKernelWithMeasure::WriteExtraFuncs\n";
+    std::string line;
+    std::getline(ofun, line);
+    while (!ofun.eof())
+    {
+        if (!line.empty() && line.at(0) != '#')
+            out << line;
+        std::getline(ofun, line);
+    }
+    out << "//End CudaKernelWithMeasure::WriteExtraFuncs\n";
+    out << "\n";
+}
+
 void CudaKernelWithMeasure::WriteIncludes(std::ofstream &out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteIncludes\n";
     out <<
            "#include \"math.h\"\n"
-           "#include \"" + _objectiveFun + "\"\n";
+           "#include \"" + _hFileName + "\"\n";
     out << "//End CudaKernelWithMeasure::WriteIncludes\n";
     out << "\n";
 }
@@ -94,6 +111,15 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
            "    \n"
            "    out_mat[idx] = rmse;\n"
            "}\n";
+}
+
+void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
+{
+    std::string name_defs = ds::StripPath( NameMDefs() );
+    name_defs.erase(name_defs.find_last_of('.'));
+    out <<
+           "[~, inputs] = " + name_defs + ";\n"
+           "\n";
 }
 
 void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)

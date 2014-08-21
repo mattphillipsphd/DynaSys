@@ -12,9 +12,11 @@ class CudaKernelWithMeasure : public CudaKernel
         virtual void MakeHFile() override;
         virtual void WriteCuCall(std::ofstream& out) override;
         virtual void WriteDataOut(std::ofstream& out, ds::PMODEL mi) override;
+        virtual void WriteExtraFuncs(std::ofstream& out) override;
         virtual void WriteIncludes(std::ofstream& out) override;
         virtual void WriteMainBegin(std::ofstream& out) override;
         virtual void WriteMainEnd(std::ofstream& out) override;
+        virtual void WriteMDefsCall(std::ofstream& out) override;
         virtual void WriteMRunHeader(std::ofstream& out) override;
         virtual void WriteModelLoopBegin(std::ofstream& out) override;
         virtual void WriteOutputHeader(std::ofstream& out) override;
