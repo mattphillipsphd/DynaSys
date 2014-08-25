@@ -52,6 +52,7 @@ class DrawBase : public QObject
 
         virtual ~DrawBase();
 
+        virtual void MakePlotItems() = 0;
         void QuickEval(const std::string&);
 
         void SetDeleteOnFinish(bool b) { _deleteOnFinish = b; }
@@ -102,8 +103,7 @@ class DrawBase : public QObject
         void FreezeNonUser();
         virtual void Initialize() = 0;
         void InitParserMgrs(size_t num);
-        virtual void MakePlotItems() = 0;
-        std::mutex& Mutex() { return _mutex; }
+        std::recursive_mutex& Mutex() { return _mutex; }
         void RecomputeIfNeeded();
         void ReservePlotItems(size_t num);
 
@@ -113,6 +113,7 @@ class DrawBase : public QObject
         void* Data() { return _data; }
         DRAW_STATE DrawState() const { return _drawState; }
         ParserMgr& GetParserMgr(size_t i) { return _parserMgrs[i]; }
+        std::recursive_mutex& Mutex() const { return _mutex; }
         bool NeedNewStep();
         bool NeedRecompute() const { return _needRecompute; }
         QwtPlotItem* PlotItem(size_t i) { return _plotItems[i]; }
@@ -132,7 +133,7 @@ class DrawBase : public QObject
         DRAW_TYPE _drawType;
         long long int _iterCt, _iterMax;
         std::chrono::time_point<std::chrono::system_clock> _lastStep;
-        mutable std::mutex _mutex;
+        mutable std::recursive_mutex _mutex;
         bool _needRecompute;
         MapSCV _opaqueSpecs; //Try to use as little as possible obviously!
         std::vector<ParserMgr> _parserMgrs;

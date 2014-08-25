@@ -12,12 +12,12 @@ class PhasePlot : public DrawBase
         virtual ~PhasePlot() override;
 
         virtual void* DataCopy() const override;
+        virtual void MakePlotItems() override;
         virtual int SleepMs() const override;
 
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
-        virtual void MakePlotItems() override;
 
     private:
         QwtPlotCurve* _curve;

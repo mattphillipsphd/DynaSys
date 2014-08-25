@@ -41,6 +41,7 @@ void PhasePlot::ComputeData()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::ComputeData", std::this_thread::get_id());
 #endif
+    std::unique_lock<std::recursive_mutex> lock(Mutex());
     //Get all of the information from the parameter fields, introducing new variables as needed.
     ParserMgr& parser_mgr = GetParserMgr(0);
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
@@ -74,6 +75,7 @@ void PhasePlot::ComputeData()
         if (!NeedNewStep())
             goto label;{
 
+        lock.lock();
         //Get values which may be updated from main thread
         int num_tp_samples = std::stoi(Spec("num_tp_samples")),
                 pulse_steps_remaining = std::stoi(Spec("pulse_steps_remaining"));
@@ -108,7 +110,7 @@ void PhasePlot::ComputeData()
         try
         {
             RecomputeIfNeeded();
-            std::lock_guard<std::mutex> lock( Mutex() );
+            std::lock_guard<std::recursive_mutex> lock( Mutex() );
             for (int k=0; k<num_steps; ++k)
             {
                 parser_mgr.ParserEvalAndConds();
@@ -169,14 +171,12 @@ void PhasePlot::ComputeData()
         SetSpec("past_ip_samps_ct", _pastIPSampsCt);
 
         if (_makePlots)
-        {
             emit Flag2();
-            MakePlotItems();
-        }
 
         emit ComputeComplete(num_steps);
 
         }label:
+        lock.unlock();
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
@@ -185,6 +185,7 @@ void PhasePlot::ComputeData()
 
 void PhasePlot::Initialize()
 {
+    std::lock_guard<std::recursive_mutex> lock(Mutex());
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
             num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
     auto inner_product = std::deque<double>();
@@ -220,6 +221,7 @@ void PhasePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::MakePlotItems", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::recursive_mutex> lock(Mutex());
     auto data = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( Data() );
     auto diff_pts = std::get<1>(*data);
     ParserMgr& parser_mgr = GetParserMgr(0);

@@ -12,10 +12,11 @@ class VectorField : public DrawBase
         VectorField(DSPlot* plot);
         virtual ~VectorField() override;
 
+        virtual void MakePlotItems() override;
+
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
-        virtual void MakePlotItems() override;
 
     private:
         static const int DEFAULT_TAIL_LEN;

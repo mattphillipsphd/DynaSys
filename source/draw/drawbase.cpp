@@ -53,24 +53,24 @@ void DrawBase::QuickEval(const std::string& exprn)
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawBase::QuickEval", std::this_thread::get_id());
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     for (auto& it : _parserMgrs)
         it.QuickEval(exprn);
 }
 
 void DrawBase::SetNeedRecompute(bool need_update_parser)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _needRecompute = need_update_parser;
 }
 void DrawBase::SetOpaqueSpec(const std::string& key, const void* value)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _opaqueSpecs[key] = value;
 }
 void DrawBase::SetSpec(const std::string& key, const std::string& value)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _specs[key] = value;
 }
 void DrawBase::SetSpec(const std::string& key, double value)
@@ -83,7 +83,7 @@ void DrawBase::SetSpec(const std::string& key, int value)
 }
 void DrawBase::SetSpecs(const MapStr& specs)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     for (auto it : specs)
         _specs[it.first] = it.second;
 }
@@ -94,27 +94,27 @@ void* DrawBase::DataCopy() const
 }
 bool DrawBase::IsSpec(const std::string& key) const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _specs.find(key) != _specs.end();
 }
 size_t DrawBase::NumPlotItems() const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _plotItems.size();
 }
 size_t DrawBase::NumParserMgrs() const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _parserMgrs.size();
 }
 const void* DrawBase::OpaqueSpec(const std::string& key) const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _opaqueSpecs.at(key);
 }
 const std::string& DrawBase::Spec(const std::string& key) const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _specs.at(key);
 }
 bool DrawBase::Spec_tob(const std::string& key) const
@@ -149,7 +149,7 @@ int DrawBase::Spec_toi(const std::string& key) const
 }
 const MapStr& DrawBase::Specs() const
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     return _specs;
 }
 
@@ -171,13 +171,13 @@ DrawBase::DrawBase(DSPlot* plot)
 
 void DrawBase::ClearPlotItems()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     DetachItems();
     _plotItems.clear(); //Qwt deletes these for you
 }
 void DrawBase::RecomputeIfNeeded()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     if (_needRecompute)
     {
         for (auto& it : _parserMgrs)
@@ -190,7 +190,7 @@ void DrawBase::RecomputeIfNeeded()
 }
 void DrawBase::ReservePlotItems(size_t num)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     DetachItems();
     _plotItems.clear();
     _plotItems.reserve(num);
@@ -198,7 +198,7 @@ void DrawBase::ReservePlotItems(size_t num)
 
 void DrawBase::AddPlotItem(QwtPlotItem* plot_item)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _plotItems.push_back(plot_item);
 }
 
@@ -211,7 +211,7 @@ void DrawBase::Initialize()
 }
 void DrawBase::InitParserMgrs(size_t num)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _parserMgrs.resize(num);
     for (auto& it : _parserMgrs)
         it.InitializeFull();

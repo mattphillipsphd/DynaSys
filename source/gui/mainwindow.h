@@ -21,6 +21,7 @@
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QStringListModel>
+#include <QTimer>
 
 #include <qwt_scale_div.h>
 #include <qwt_plot.h>
@@ -109,19 +110,14 @@ class MainWindow : public QMainWindow
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
         void LoadTempModel(void* models);
-        void NullclineData(int);
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
-        void PhasePlotData(int);
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
-        void TimePlotData(int);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
         void UpdateTPData();
-        void VariableViewData(int);
-        void VectorFieldData(int);
 
     protected:
         virtual void closeEvent(QCloseEvent *) override;
@@ -192,7 +188,7 @@ class MainWindow : public QMainWindow
         void ExprnChanged(QModelIndex, QModelIndex);
         void ParamChanged(QModelIndex topLeft, QModelIndex bottomRight);
         void ResultsChanged(QModelIndex, QModelIndex);
-        void Replot(const ViewRect& pp_data, const ViewRect& tp_data);
+        void Replot();
         void UpdatePulseParam();
 
     private:
@@ -250,7 +246,6 @@ class MainWindow : public QMainWindow
         std::vector<JobRecord> _jobs;
         Log* const _log;
         ModelMgr* const _modelMgr;
-        std::mutex _mutex;
         int _numSimSteps, _numTPSamples;
         PLOT_MODE _plotMode;
         std::string _pulseResetValue;
@@ -259,6 +254,7 @@ class MainWindow : public QMainWindow
             //Consider making a little pulse struct/class
             _saveModN, _singleStepsSec, _singleTailLen;
         const std::thread::id _tid;
+        QTimer _timer;
         const std::vector<QColor> _tpColors;
         int _vfStepsSec, _vfTailLen;
 };

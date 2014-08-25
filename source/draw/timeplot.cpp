@@ -44,10 +44,9 @@ void TimePlot::ComputeData()
 #endif
     while (DrawState()==DRAWING)
     {
+        std::lock_guard<std::recursive_mutex> lock(Mutex());
         if (!OpaqueSpec("dv_data"))
             goto label;{
-
-        MakePlotItems();
 
         emit ComputeComplete(1);
 
@@ -61,6 +60,7 @@ void TimePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::MakePlotItems", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::recursive_mutex> lock(Mutex());
     const void* dv_data = OpaqueSpec("dv_data");
     if (!dv_data) return;
     auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);

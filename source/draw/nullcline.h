@@ -13,10 +13,11 @@ class Nullcline : public DrawBase
         Nullcline(DSPlot* plot);
         virtual ~Nullcline() override;
 
+        virtual void MakePlotItems() override;
+
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
-        virtual void MakePlotItems() override;
 
         virtual int SleepMs() const { return 250; }
 

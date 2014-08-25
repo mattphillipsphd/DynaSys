@@ -92,6 +92,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
     connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
 
+    connect(&_timer, SIGNAL(timeout()), this, SLOT(Replot()));
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
     connect(ui->qwtPhasePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
     connect(ui->qwtTimePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
@@ -162,6 +163,7 @@ void MainWindow::Error()
     setEnabled(true);
     _paramEditor->setEnabled(true);
     _logGui->show();
+    _timer.stop();
 }
 void MainWindow::LoadTempModel(void* models) //slot
 {
@@ -180,17 +182,6 @@ void MainWindow::LoadTempModel(void* models) //slot
     catch (std::exception& e)
     {
         _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
-    }
-}
-void MainWindow::NullclineData(int) //slot
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::NullclineData", _tid);
-#endif
-    if (_drawMgr->DrawState() != DrawBase::DRAWING)
-    {
-        ViewRect pp_lims = PhasePlotLimits();
-        Replot(pp_lims, ViewRect());
     }
 }
 void MainWindow::ParamEditorClosed() //slot
@@ -221,7 +212,6 @@ void MainWindow::Pause() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::Pause", _tid);
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
     switch (_drawMgr->DrawState())
     {
         case DrawBase::STOPPED:
@@ -238,32 +228,6 @@ void MainWindow::Pause() //slot
             SetSaveActionsEnabled(false);
             break;
     }
-}
-void MainWindow::PhasePlotData(int) //slot
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::PhasePlotData", std::this_thread::get_id());
-#endif
-    DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
-    if ( pp->Spec_tob("make_plots") )
-    {
-        ViewRect pp_lims = PhasePlotLimits();
-        Replot(pp_lims, ViewRect());
-    }
-    else
-    {
-        int num_steps = pp->IterCt()*_modelMgr->ModelStep();
-        if (num_steps<_numSimSteps)
-            UpdateSimPBar(num_steps);
-        else
-        {
-            UpdateSimPBar(-1);
-            connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
-            connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
-            SaveData(_fastRunGui->FullFileName());
-        }
-    }
-
 }
 void MainWindow::StartCompiled(int duration, int save_mod_n) //slot
 {
@@ -307,24 +271,6 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     std::thread t( std::bind(&MainWindow::DoFastRun, this) );
     t.detach();
 }
-void MainWindow::TimePlotData(int)
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::TimePlotData", std::this_thread::get_id());
-#endif
-    const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT),
-            * tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
-    const int dv_start = tp->Spec_toi("dv_start"),
-            dv_end = tp->Spec_toi("dv_end"),
-            y_tp_min = tp->Spec_toi("y_tp_min"),
-            y_tp_max = tp->Spec_toi("y_tp_max"),
-            past_dv_samps_ct = pp->Spec_toi("past_dv_samps_ct");
-    ViewRect tp_lims( (past_dv_samps_ct+dv_start)*_modelMgr->ModelStep(),
-                      (past_dv_samps_ct+dv_end)*_modelMgr->ModelStep(),
-                      y_tp_min, y_tp_max );
-
-    Replot(ViewRect(), tp_lims);
-}
 void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
 //#ifdef DEBUG_FUNC
@@ -359,35 +305,6 @@ void MainWindow::UpdateTPData() //slot
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
     tp->SetSpecs(specs);
     tp->SetOpaqueSpec("dv_data", pp->DataCopy());
-}
-void MainWindow::VariableViewData(int) //slot
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::VariableViewData", _tid);
-#endif
-    DrawBase* vv = _drawMgr->GetObject(DrawBase::VARIABLE_VIEW);
-    const double xmin = vv->Spec_tod("xmin"),
-            xmax = vv->Spec_tod("xmax"),
-            ymin = vv->Spec_tod("ymin"),
-            ymax = vv->Spec_tod("ymax");
-
-    ViewRect vv_lims(xmin, xmax, ymin, ymax);
-    Replot(vv_lims, ViewRect());
-}
-void MainWindow::VectorFieldData(int) //slot
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::VectorFieldData", _tid);
-#endif
-    if (_plotMode!=VECTOR_FIELD) return;
-    DrawBase* vf = _drawMgr->GetObject(DrawBase::VECTOR_FIELD);
-    const double xmin = vf->Spec_tod("xmin"),
-            xmax = vf->Spec_tod("xmax"),
-            ymin = vf->Spec_tod("ymin"),
-            ymax = vf->Spec_tod("ymax");
-
-    ViewRect vf_lims(xmin, xmax, ymin, ymax);
-    Replot(vf_lims, ViewRect());
 }
 
 void MainWindow::closeEvent(QCloseEvent *)
@@ -654,7 +571,6 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_actionSet_Init_to_Current_triggered", _tid);
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
     const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
     if (pp)
     {
@@ -829,12 +745,14 @@ void MainWindow::on_btnStart_clicked()
             ui->btnStart->setText("Start");
             SetButtonsEnabled(true);            
             _paramEditor->setEnabled(true);
+            _timer.stop();
             break;
         case DrawBase::PAUSED:
             _drawMgr->Resume();
             ui->btnStart->setText("Stop");
             SetButtonsEnabled(false);
             _paramEditor->setEnabled(true);
+            _timer.stop();
             break;
         case DrawBase::STOPPED:
         {
@@ -850,6 +768,7 @@ void MainWindow::on_btnStart_clicked()
                 UpdateDOSpecs(obj->Type());
             }
             _drawMgr->Start();
+            _timer.start(100);
             break;
         }
     }
@@ -1049,7 +968,6 @@ void MainWindow::on_spnStepsPerSec_valueChanged(int value)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_spnStepsPerSec_valueChanged", _tid);
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
     _drawMgr->SetGlobalSpec("steps_per_sec", value);
     switch (_plotMode)
     {
@@ -1067,7 +985,6 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_spnTailLength_valueChanged", _tid);
 #endif
-    std::unique_lock<std::mutex> lock(_mutex);
     _drawMgr->SetGlobalSpec("tail_length", value);
     switch (_plotMode)
     {
@@ -1077,7 +994,6 @@ void MainWindow::on_spnTailLength_valueChanged(int value)
             break;
         case VECTOR_FIELD:
             _vfTailLen = value;
-            lock.unlock();
             break;
     }
 }
@@ -1136,26 +1052,16 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     switch (draw_type)
     {
         case DrawBase::NULL_CLINE:
-        connect(draw_object, SIGNAL(ComputeComplete(int)),
-                this, SLOT(NullclineData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::PHASE_PLOT:
             connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
-            connect(draw_object, SIGNAL(ComputeComplete(int)),
-                    this, SLOT(PhasePlotData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::TIME_PLOT:
-        connect(draw_object, SIGNAL(ComputeComplete(int)),
-                this, SLOT(TimePlotData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::VARIABLE_VIEW:
-        connect(draw_object, SIGNAL(ComputeComplete(int)),
-                this, SLOT(VariableViewData(int)), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::VECTOR_FIELD:
-        connect(draw_object, SIGNAL(ComputeComplete(int)),
-                this, SLOT(VectorFieldData(int)), Qt::BlockingQueuedConnection);
             break;
     }
     connect(draw_object, SIGNAL(Error()), this, SLOT(Error()));
@@ -1313,7 +1219,6 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ComboBoxChanged", _tid);
 #endif
-    std::lock_guard<std::mutex> lock(_mutex);
     try
     {
         std::string text = _modelMgr->Value(ds::VAR, row);
@@ -1375,27 +1280,79 @@ void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
 }
-void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
+void MainWindow::Replot()
 {
 #ifdef DEBUG_FUNC
     assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::Replot");
 #endif
-    std::unique_lock<std::mutex> lock(_mutex);
-
     try
     {
-        if (pp_data != ViewRect())
+        DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+        if ( pp->Spec_tob("make_plots") )
         {
-            ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_data.xmin, pp_data.xmax );
-            ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_data.ymin, pp_data.ymax );
-            ui->qwtPhasePlot->replot();
-        }
+            if (pp->IterCt()==0) return;
+            const size_t num_objects = _drawMgr->NumDrawObjects();
+            for (size_t i=0; i<num_objects; ++i)
+            {
+                DrawBase* obj = _drawMgr->GetObject(i);
+                obj->MakePlotItems();
+            }
 
-        if (tp_data != ViewRect())
-        {
-            ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_data.xmin, tp_data.xmax );
-            ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_data.ymin, tp_data.ymax );
+            ViewRect pp_lims;
+            switch (_plotMode)
+            {
+                case SINGLE:
+                    pp_lims = PhasePlotLimits();
+                    break;
+                case VARIABLE_VIEW:
+                {
+                    DrawBase* vv = _drawMgr->GetObject(DrawBase::VARIABLE_VIEW);
+                    pp_lims = ViewRect(vv->Spec_tod("xmin"),
+                                       vv->Spec_tod("xmax"),
+                                       vv->Spec_tod("ymin"),
+                                       vv->Spec_tod("ymax"));
+                    break;
+                }
+                case VECTOR_FIELD:
+                {
+                    DrawBase* vf = _drawMgr->GetObject(DrawBase::VECTOR_FIELD);
+                    pp_lims = ViewRect(vf->Spec_tod("xmin"),
+                                       vf->Spec_tod("xmax"),
+                                       vf->Spec_tod("ymin"),
+                                       vf->Spec_tod("ymax"));
+                    break;
+                }
+            }
+            ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_lims.xmin, pp_lims.xmax );
+            ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_lims.ymin, pp_lims.ymax );
+
+            DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+            const int dv_start = tp->Spec_toi("dv_start"),
+                    dv_end = tp->Spec_toi("dv_end"),
+                    y_tp_min = tp->Spec_toi("y_tp_min"),
+                    y_tp_max = tp->Spec_toi("y_tp_max"),
+                    past_dv_samps_ct = pp->Spec_toi("past_dv_samps_ct");
+            ViewRect tp_lims( (past_dv_samps_ct+dv_start)*_modelMgr->ModelStep(),
+                              (past_dv_samps_ct+dv_end)*_modelMgr->ModelStep(),
+                              y_tp_min, y_tp_max );
+            ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
+            ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
+
+            ui->qwtPhasePlot->replot();
             ui->qwtTimePlot->replot();
+        }
+        else
+        {
+            int num_steps = pp->IterCt()*_modelMgr->ModelStep();
+            if (num_steps<_numSimSteps)
+                UpdateSimPBar(num_steps);
+            else
+            {
+                UpdateSimPBar(-1);
+                connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
+                connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
+                SaveData(_fastRunGui->FullFileName());
+            }
         }
     }
     catch (std::exception& e)
@@ -1404,6 +1361,7 @@ void MainWindow::Replot(const ViewRect& pp_data, const ViewRect& tp_data) //slot
         if (_drawMgr->DrawState()==DrawBase::DRAWING) on_btnStart_clicked();
     }
 }
+
 void MainWindow::UpdatePulseParam() //slot
 {
 #ifdef DEBUG_FUNC

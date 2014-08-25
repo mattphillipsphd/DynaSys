@@ -59,7 +59,7 @@ void VariableView::ComputeData()
 
         try
         {
-            std::lock_guard<std::mutex> lock( Mutex() );
+            std::lock_guard<std::recursive_mutex> lock( Mutex() );
             for (int k=0; k<_numFuncs; ++k)
             {
                 const double zval = zmin+k*zinc;

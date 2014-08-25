@@ -46,7 +46,7 @@ void Nullcline::ComputeData()
 
         try
         {
-            std::lock_guard<std::mutex> lock( Mutex() );
+            std::lock_guard<std::recursive_mutex> lock( Mutex() );
             for (int i=0; i<resolution; ++i)
                 for (int j=0; j<resolution; ++j)
                 {
@@ -125,8 +125,6 @@ void Nullcline::ComputeData()
         delete[] ydiff;
         if (Data()) delete static_cast<Record*>( Data() );
         SetData(record);
-
-        MakePlotItems();
 
         emit ComputeComplete(1);
 
