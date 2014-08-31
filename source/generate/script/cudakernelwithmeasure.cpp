@@ -1,9 +1,9 @@
 #include "cudakernelwithmeasure.h"
 
-const std::string CudaKernelWithMeasure::MAX_OBJ_VEC_LEN = "256";
+const std::string CudaKernelWithMeasure::MAX_OBJ_VEC_LEN = "16";
 
 CudaKernelWithMeasure::CudaKernelWithMeasure(const std::string& name, const std::string& obj_fun)
-    : CudaKernel(name), _hFileName( MakeHName(name) ), _objectiveFun(obj_fun)
+    : CudaKernel( AddSuffix(name) ), _hFileName( MakeHName(name) ), _objectiveFun(obj_fun)
 {
 }
 
@@ -40,12 +40,14 @@ void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
     out <<
            "num_intervals = length(target);\n"
            "out_mat = zeros(num_tests,1);\n"
-           "data = gather( feval(k, fi.Data, length(fi.Data), fi.Sput, ...\n"
+           "data = gather( feval(k, ... \n"
+           "    fi.Data, length(fi.Data), fi.Sput, ...\n"
            "    input_mat, num_inputs, num_tests, ...\n"
            "    target, fi.IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
            "    out_mat) );\n"
            "\n";
 }
+
 
 void CudaKernelWithMeasure::WriteDataOut(std::ofstream& out, ds::PMODEL mi)
 {
@@ -99,18 +101,18 @@ void CudaKernelWithMeasure::WriteMainBegin(std::ofstream& out)
 
 void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
 {
+    out << "//Begin CudaKernelWithMeasure::WriteMainEnd\n";
     out <<
-           "    double sse = 0, rmse;\n"
+           "    double sse = 0;\n"
            "    for (int i=0; i<num_intervals; ++i)\n"
            "    {\n"
            "        const double yhat_i = yhat[i], tg_i = target[i];\n"
            "        sse += (yhat_i - tg_i)*(yhat_i - tg_i);\n"
            "        //sse +=  2*(yhat_i>tg_i ? yhat_i : tg_i) / (yhat_i + tg_i) - 1;\n"
            "    }\n"
-           "    rmse = sqrt(sse/num_intervals);\n"
-           "    \n"
-           "    out_mat[idx] = rmse;\n"
+           "    out_mat[idx] = sqrt(sse/num_intervals); //RMSE\n"
            "}\n";
+    out << "//End CudaKernelWithMeasure::WriteMainEnd\n";
 }
 
 void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
@@ -151,8 +153,11 @@ void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
                 num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
     std::string num_out = std::to_string(num_vars+num_diffs);
     out <<
-           "    const int num_records = num_iters / save_mod_n;\n"
-           "    double out[" + num_out + "];\n";
+           "    double out[" + num_out + "];\n"
+           "    int istate[" + MAX_OBJ_VEC_LEN + "];\n"
+           "    double dstate[" + MAX_OBJ_VEC_LEN + "];\n"
+           "    memset(istate, 0, sizeof(int)*" + MAX_OBJ_VEC_LEN + ");\n"
+           "    memset(dstate, 0, sizeof(double)*" + MAX_OBJ_VEC_LEN + ");\n";
     out << "//End CudaKernel::WriteOutputHeader\n";
     out << "\n";
 }
@@ -164,16 +169,32 @@ void CudaKernelWithMeasure::WriteSaveBlockEnd(std::ofstream& out)
     const size_t pos = obj_fun.find_last_of('.');
     obj_fun.erase(pos);
 
-    out << "            " + obj_fun + "(i, out, yhat, &iters_per_interval, 0);\n";
+    out << "            " + obj_fun
+           + "(i, out, yhat, &iters_per_interval, 0, istate, dstate);\n";
     out << "//End CudaKernelWithMeasure::WriteSaveBlockEnd\n";
 }
 
+std::string CudaKernelWithMeasure::AddSuffix(const std::string& name) const
+{
+    std::string out = name;
+    size_t pos = out.find_last_of('.');
+    out.insert(pos, "_m");
+    return out;
+}
 std::string CudaKernelWithMeasure::MakeHName(const std::string& name) const
 {
     std::string out = name;
     size_t pos = out.find_last_of('.');
     if (pos!=std::string::npos) out.erase(pos);
     out += ".h";
+    return out;
+}
+std::string CudaKernelWithMeasure::NameMRun() const
+{
+    std::string out(Name());
+    size_t pos = out.find_last_of('.');
+    if (pos!=std::string::npos) out.erase(pos);
+    out += "_cmrun.m";
     return out;
 }
 std::string CudaKernelWithMeasure::MakeObjFunName(const std::string& obj_fun) const
