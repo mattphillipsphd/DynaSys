@@ -10,6 +10,7 @@ class CudaKernelWithMeasure : public CudaKernel
 
     protected:
         virtual void MakeHFile() override;
+        virtual std::string NameMRun() const override;
         virtual void WriteCuCall(std::ofstream& out) override;
         virtual void WriteDataOut(std::ofstream& out, ds::PMODEL mi) override;
         virtual void WriteExtraFuncs(std::ofstream& out) override;
@@ -23,6 +24,7 @@ class CudaKernelWithMeasure : public CudaKernel
         virtual void WriteSaveBlockEnd(std::ofstream&) override;
 
     private:
+        std::string AddSuffix(const std::string& name) const;
         std::string MakeHName(const std::string& name) const;
         std::string MakeObjFunName(const std::string& obj_fun) const;
 

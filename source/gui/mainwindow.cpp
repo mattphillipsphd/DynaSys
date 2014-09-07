@@ -422,7 +422,8 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
         CudaKernelWithMeasure ckwm(file_name, objective_fun);
         ckwm.Make();
         ckwm.MakeMFiles();
-        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created.");
+        _log->AddMesg("CUDA kernel file with measure " + file_name + " and associated m-files created."
+                      "  The file has an '_m' suffix appended to it.");
     }
     catch (std::exception& e)
     {
