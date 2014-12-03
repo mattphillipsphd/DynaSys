@@ -21,6 +21,7 @@ class DrawMgr : public QObject
         
         void AddObject(DrawBase* object);
         void ClearObjects();
+        void MakePlotItems();
         void Pause();
         void QuickEval(const std::string& exprn);
         void Resume();
@@ -61,6 +62,7 @@ class DrawMgr : public QObject
         
         volatile DrawBase::DRAW_STATE _drawState;
         Log* const _log;
+        mutable std::mutex _mutex;
         std::vector<DrawBase*> _objects;        
 };
 

@@ -12,6 +12,7 @@ class VectorField : public DrawBase
         VectorField(DSPlot* plot);
         virtual ~VectorField() override;
 
+        virtual void* DataCopy() const override;
         virtual void MakePlotItems() override;
 
     protected:

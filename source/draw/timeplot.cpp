@@ -44,7 +44,7 @@ void TimePlot::ComputeData()
 #endif
     while (DrawState()==DRAWING)
     {
-        std::lock_guard<std::recursive_mutex> lock(Mutex());
+//        std::lock_guard<std::recursive_mutex> lock(Mutex());
         if (!OpaqueSpec("dv_data"))
             goto label;{
 
@@ -60,15 +60,15 @@ void TimePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::MakePlotItems", std::this_thread::get_id());
 #endif
-    std::lock_guard<std::recursive_mutex> lock(Mutex());
+//    std::lock_guard<std::recursive_mutex> lock(Mutex());
     const void* dv_data = OpaqueSpec("dv_data");
     if (!dv_data) return;
     auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
     const auto& inner_product = std::get<0>(*data_tuple);
     const auto& diff_pts = std::get<1>(*data_tuple),
             & var_pts = std::get<2>(*data_tuple);
-    const int past_dv_samps_ct = std::stoi(Spec("past_dv_samps_ct")),
-            past_ip_samps_ct = std::stoi(Spec("past_ip_samps_ct"));
+    const int past_dv_samps_ct = Spec_toi("past_dv_samps_ct"),
+            past_ip_samps_ct = Spec_toi("past_ip_samps_ct");
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),

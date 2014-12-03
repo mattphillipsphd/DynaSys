@@ -68,7 +68,7 @@ class DrawBase : public QObject
         bool DeleteOnFinish() const { return _deleteOnFinish; }
         const ParserMgr& GetParserMgr(size_t i) const { return _parserMgrs.at(i); }
         bool IsSpec(const std::string& key) const;
-        long long int IterCt() const { return _iterCt; }
+        long long int IterCt() const;
         long long int IterMax() const { return _iterMax; }
         size_t NumPlotItems() const;
         size_t NumParserMgrs() const;
@@ -98,6 +98,7 @@ class DrawBase : public QObject
         DrawBase(DSPlot* plot);
 
         void AddPlotItem(QwtPlotItem* plot_item);
+        virtual void ClearData() {}
         void ClearPlotItems();
         virtual void ComputeData() = 0;
         void FreezeNonUser();
@@ -107,7 +108,7 @@ class DrawBase : public QObject
         void RecomputeIfNeeded();
         void ReservePlotItems(size_t num);
 
-        void SetData(void* data) { _data = data; }
+        void SetData(void* data);
         void SetDrawState(DRAW_STATE draw_state) { _drawState = draw_state; }
 
         void* Data() { return _data; }

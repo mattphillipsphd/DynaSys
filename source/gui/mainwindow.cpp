@@ -8,6 +8,7 @@ const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
+const int MainWindow::PLOT_REFRESH = 33;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 
@@ -769,7 +770,7 @@ void MainWindow::on_btnStart_clicked()
                 UpdateDOSpecs(obj->Type());
             }
             _drawMgr->Start();
-            _timer.start(100);
+            _timer.start(PLOT_REFRESH);
             break;
         }
     }
@@ -1292,12 +1293,7 @@ void MainWindow::Replot()
         if ( pp->Spec_tob("make_plots") )
         {
             if (pp->IterCt()==0) return;
-            const size_t num_objects = _drawMgr->NumDrawObjects();
-            for (size_t i=0; i<num_objects; ++i)
-            {
-                DrawBase* obj = _drawMgr->GetObject(i);
-                obj->MakePlotItems();
-            }
+            _drawMgr->MakePlotItems();
 
             ViewRect pp_lims;
             switch (_plotMode)
@@ -1327,27 +1323,31 @@ void MainWindow::Replot()
             ui->qwtPhasePlot->setAxisScale( QwtPlot::xBottom, pp_lims.xmin, pp_lims.xmax );
             ui->qwtPhasePlot->setAxisScale( QwtPlot::yLeft, pp_lims.ymin, pp_lims.ymax );
 
-            DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
-            const int dv_start = tp->Spec_toi("dv_start"),
-                    dv_end = tp->Spec_toi("dv_end"),
-                    y_tp_min = tp->Spec_toi("y_tp_min"),
-                    y_tp_max = tp->Spec_toi("y_tp_max"),
-                    past_dv_samps_ct = pp->Spec_toi("past_dv_samps_ct");
-            ViewRect tp_lims( (past_dv_samps_ct+dv_start)*_modelMgr->ModelStep(),
-                              (past_dv_samps_ct+dv_end)*_modelMgr->ModelStep(),
-                              y_tp_min, y_tp_max );
-            ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
-            ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
+            if (_plotMode==SINGLE)
+            {
+                DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+                const int dv_start = tp->Spec_toi("dv_start"),
+                        dv_end = tp->Spec_toi("dv_end"),
+                        y_tp_min = tp->Spec_toi("y_tp_min"),
+                        y_tp_max = tp->Spec_toi("y_tp_max"),
+                        past_dv_samps_ct = pp->Spec_toi("past_dv_samps_ct");
+                ViewRect tp_lims( (past_dv_samps_ct+dv_start)*_modelMgr->ModelStep(),
+                                  (past_dv_samps_ct+dv_end)*_modelMgr->ModelStep(),
+                                  y_tp_min, y_tp_max );
+                ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
+                ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
+
+                ui->qwtTimePlot->replot();
+            }
 
             ui->qwtPhasePlot->replot();
-            ui->qwtTimePlot->replot();
         }
         else
         {
             int num_steps = pp->IterCt()*_modelMgr->ModelStep();
             if (num_steps<_numSimSteps)
                 UpdateSimPBar(num_steps);
-            else
+            else //Simulation finished
             {
                 UpdateSimPBar(-1);
                 connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);

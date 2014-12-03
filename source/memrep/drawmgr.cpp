@@ -19,6 +19,7 @@ void DrawMgr::AddObject(DrawBase* object)
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::AddObject", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     _objects.push_back(object);
     connect(object, SIGNAL(ReadyToDelete()), this, SLOT(Erase()));
 }
@@ -27,9 +28,28 @@ void DrawMgr::ClearObjects()
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::ClearObjects", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto it : _objects)
         delete it;
     _objects.clear();
+}
+void DrawMgr::MakePlotItems()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("DrawMgr::MakePlotItems", std::this_thread::get_id());
+#endif
+    try
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (auto it : _objects)
+            if (it->DrawState() == DrawBase::DRAWING)
+                it->MakePlotItems();
+    }
+    catch (std::runtime_error& e)
+    {
+        _log->AddExcept("DrawMgr::MakePlotItems: " + std::string(e.what()));
+        throw(e);
+    }
 }
 void DrawMgr::Pause()
 {
@@ -44,6 +64,7 @@ void DrawMgr::QuickEval(const std::string& exprn)
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::QuickEval", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto it : _objects)
         it->QuickEval(exprn);
 }
@@ -73,6 +94,7 @@ void DrawMgr::Start()
     if (_drawState==DrawBase::DRAWING) return;
     try
     {
+        std::lock_guard<std::mutex> lock(_mutex);
         for (auto it : _objects)
         {
             it->ClearPlotItems();
@@ -124,6 +146,7 @@ void DrawMgr::SetGlobalSpec(const std::string& key, const std::string& value)
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::SetGlobalSpec", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto it : _objects)
         it->SetSpec(key, value);
 }
@@ -136,6 +159,7 @@ void DrawMgr::SetNeedRecompute()
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::SetNeedRecompute", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto it : _objects)
         it->SetNeedRecompute(true);
 }
@@ -146,6 +170,7 @@ DrawBase::DRAW_STATE DrawMgr::DrawState() const
 }
 DrawBase* DrawMgr::GetObject(DrawBase::DRAW_TYPE draw_type)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     auto it = std::find_if(_objects.begin(), _objects.end(), [=](DrawBase* obj)
     {
             return obj->Type() == draw_type;
@@ -154,6 +179,7 @@ DrawBase* DrawMgr::GetObject(DrawBase::DRAW_TYPE draw_type)
 }
 DrawBase* DrawMgr::GetObject(size_t idx)
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     return _objects[idx];
 }
 int DrawMgr::NumDrawObjects() const
@@ -161,11 +187,13 @@ int DrawMgr::NumDrawObjects() const
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::NumDrawObjects", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     return _objects.size();
 }
 
 void DrawMgr::Erase() //slot
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     QObject* dobj = sender();
     _objects.erase( std::find(_objects.begin(), _objects.end(), dobj) );
 }
@@ -175,6 +203,7 @@ DrawMgr::DrawMgr() : _drawState(DrawBase::STOPPED), _log(Log::Instance())
 }
 void DrawMgr::BroadcastDrawState()
 {
+    std::lock_guard<std::mutex> lock(_mutex);
     for (auto it : _objects)
         it->SetDrawState(_drawState);
 }
@@ -206,6 +235,7 @@ void DrawMgr::StartThreads()
 #ifdef DEBUG_FUNC
     ScopeTracker st("DrawMgr::StartThreads", std::this_thread::get_id());
 #endif
+    std::lock_guard<std::mutex> lock(_mutex);
     _drawState = DrawBase::DRAWING;
     for (auto it : _objects)
     {

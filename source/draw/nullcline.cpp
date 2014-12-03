@@ -29,7 +29,7 @@ void Nullcline::ComputeData()
                 yidx = Spec_toi("yidx"),
                 resolution = Spec_toi("resolution")*2,
                 resolution2 = resolution*resolution;
-        InitParserMgrs(resolution2);
+//        InitParserMgrs(resolution2);
 
         const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
                 xmax = _modelMgr->Maximum(ds::INIT, xidx),
@@ -142,6 +142,19 @@ void Nullcline::Initialize()
 #endif
     _colors = *static_cast< const std::vector<QColor>* >( OpaqueSpec("colors") );
     SetNeedRecompute(true);
+    const int resolution = Spec_toi("resolution")*2,
+            resolution2 = resolution*resolution;
+    InitParserMgrs(resolution2);
+}
+
+void* Nullcline::DataCopy() const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("Nullcline::DataCopy", std::this_thread::get_id());
+#endif
+    std::lock_guard<std::recursive_mutex> lock( Mutex() );
+    if (!ConstData()) return nullptr;
+    return new Record(*static_cast<const Record*>( ConstData() ));
 }
 
 void Nullcline::MakePlotItems()
@@ -151,12 +164,13 @@ void Nullcline::MakePlotItems()
 #endif
     ClearPlotItems();
 
-    const int xidx = Spec_toi("xidx"),
+    const size_t xidx = Spec_toi("xidx"),
             yidx = Spec_toi("yidx"),
             resolution2 = NumParserMgrs(),
             resolution = (int)sqrt(resolution2);
 
-    const Record* record = static_cast<Record*>( Data() );
+    Record* record = static_cast<Record*>( DataCopy() );
+    if (!record) return;
     const std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
             & xcross_v = record->xcross_v,
             & ycross_h = record->ycross_h,
@@ -227,4 +241,6 @@ void Nullcline::MakePlotItems()
 
     DrawBase::Initialize(); //Have to wait on this, since we don't know how many objects there
         //are until the analysis is complete
+
+    delete record;
 }

@@ -54,6 +54,9 @@
 #include "../models/tpvtablemodel.h"
 
 //#define DEBUG_FUNC
+//#ifdef QT_DEBUG
+//#define DEBUG_FUNC
+//#endif
 
 namespace Ui {
 class MainWindow;
@@ -96,6 +99,7 @@ class MainWindow : public QMainWindow
                         DEFAULT_VF_STEP,
                         DEFAULT_VF_TAIL,
                         MAX_BUF_SIZE,
+                        PLOT_REFRESH,
                         SLIDER_INT_LIM, //Because QSliders have integer increments
                         XY_SAMPLES_SHOWN;
         static const double MIN_MODEL_STEP;

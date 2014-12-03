@@ -17,6 +17,7 @@ class PhasePlot : public DrawBase
 
     protected:
         virtual void ComputeData() override;
+        virtual void ClearData() override;
         virtual void Initialize() override;
 
     private:
