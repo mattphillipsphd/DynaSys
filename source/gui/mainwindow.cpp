@@ -200,7 +200,7 @@ void MainWindow::ParserToLog() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ParserToLog", _tid);
 #endif
-    const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    const DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
     if (pp)
     {
         std::string parser = pp->GetParserMgr(0).ParserContents();
@@ -287,11 +287,11 @@ void MainWindow::UpdateTimePlot() //slot
 #endif
     if (_drawMgr->DrawState()!=DrawBase::DRAWING)
     {
-        const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+        const DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
         if (pp)
         {
             DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
-            tp->SetOpaqueSpec("dv_data", pp->DataCopy());
+            tp->SetNonConstOpaqueSpec("dv_data", pp->DataCopy());
             _drawMgr->Resume(DrawBase::TIME_PLOT, 1);
         }
     }
@@ -301,11 +301,11 @@ void MainWindow::UpdateTPData() //slot
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::UpdateTPData", _tid);
 #endif
-    const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    const DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
     const MapStr& specs = pp->Specs();
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
     tp->SetSpecs(specs);
-    tp->SetOpaqueSpec("dv_data", pp->DataCopy());
+    tp->SetNonConstOpaqueSpec("dv_data", pp->DataCopy());
 }
 
 void MainWindow::closeEvent(QCloseEvent *)
@@ -573,7 +573,7 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_actionSet_Init_to_Current_triggered", _tid);
 #endif
-    const DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    const DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
     if (pp)
     {
         const ParserMgr& parser_mgr = pp->GetParserMgr(0);
@@ -616,7 +616,7 @@ void MainWindow::on_btnPulse_clicked()
     if (_pulseParIdx==-1) _pulseParIdx = 0;
     _pulseResetValue = _modelMgr->Value(ds::INP, _pulseParIdx);
     _pulseStepsRemaining = (int)( ui->edPulseDuration->text().toDouble() / _modelMgr->ModelStep() );
-    _drawMgr->GetObject(DrawBase::PHASE_PLOT)->SetSpec(
+    _drawMgr->GetObject(DrawBase::SINGLE)->SetSpec(
                 "pulse_steps_remaining", _pulseStepsRemaining);
     double pulse = ui->edPulseValue->text().toDouble(),
             val = std::stod(_modelMgr->Value(ds::INP,_pulseParIdx));
@@ -761,8 +761,8 @@ void MainWindow::on_btnStart_clicked()
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
             _paramEditor->setEnabled(false);
-            if (!_drawMgr->GetObject(DrawBase::TIME_PLOT))
-                CreateObject(DrawBase::TIME_PLOT);
+//            if (!_drawMgr->GetObject(DrawBase::TIME_PLOT))
+//                CreateObject(DrawBase::TIME_PLOT);
             size_t num_objects = _drawMgr->NumDrawObjects();
             for (size_t i=0; i<num_objects; ++i)
             {
@@ -831,7 +831,7 @@ void MainWindow::on_cmbPlotX_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotX_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("xidx", index);
-    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
+    _drawMgr->Resume(DrawBase::SINGLE, 1);
 }
 void MainWindow::on_cmbPlotY_currentIndexChanged(int index)
 {
@@ -839,7 +839,7 @@ void MainWindow::on_cmbPlotY_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotY_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("yidx", index);
-    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
+    _drawMgr->Resume(DrawBase::SINGLE, 1);
 }
 void MainWindow::on_cmbPlotZ_currentIndexChanged(int index)
 {
@@ -847,7 +847,7 @@ void MainWindow::on_cmbPlotZ_currentIndexChanged(int index)
     ScopeTracker st("MainWindow::on_cmbPlotZ_currentIndexChanged", _tid);
 #endif
     _drawMgr->SetGlobalSpec("zidx", index);
-    _drawMgr->Resume(DrawBase::PHASE_PLOT, 1);
+    _drawMgr->Resume(DrawBase::SINGLE, 1);
 }
 void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
 {
@@ -876,7 +876,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
             ui->spnTailLength->setValue(_singleTailLen);
             _vfTailLen = 1;
 
-            CreateObject(DrawBase::PHASE_PLOT);
+            CreateObject(DrawBase::SINGLE);
             CreateObject(DrawBase::TIME_PLOT);
             break;
         }
@@ -940,7 +940,7 @@ void MainWindow::on_edNumTPSamples_editingFinished()
     ScopeTracker st("MainWindow::on_edNumTPSamples_editingFinished", _tid);
 #endif
     _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
-    if (DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT))
+    if (DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE))
         pp->SetSpec("num_tp_samples", _numTPSamples);
 }
 
@@ -1040,7 +1040,7 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     switch (draw_type)
     {
         case DrawBase::NULL_CLINE:
-        case DrawBase::PHASE_PLOT:
+        case DrawBase::SINGLE:
         case DrawBase::VARIABLE_VIEW:
         case DrawBase::VECTOR_FIELD:
             plot = ui->qwtPhasePlot;
@@ -1055,8 +1055,8 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     {
         case DrawBase::NULL_CLINE:
             break;
-        case DrawBase::PHASE_PLOT:
-            connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
+        case DrawBase::SINGLE:
+            connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::TIME_PLOT:
@@ -1101,8 +1101,8 @@ void MainWindow::DoFastRun()
 #endif
 
     _drawMgr->ClearObjects();
-    DrawBase* pp = CreateObject(DrawBase::PHASE_PLOT);
-    UpdateDOSpecs(DrawBase::PHASE_PLOT);
+    DrawBase* pp = CreateObject(DrawBase::SINGLE);
+    UpdateDOSpecs(DrawBase::SINGLE);
 
     pp->SetSpec("make_plots", false);
     pp->SetSpec("is_recording", true);
@@ -1110,7 +1110,7 @@ void MainWindow::DoFastRun()
     disconnect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()));
 
     const int num_iters = _numSimSteps / _modelMgr->ModelStep() + 0.5;
-    _drawMgr->Start(DrawBase::PHASE_PLOT, num_iters);
+    _drawMgr->Start(DrawBase::SINGLE, num_iters);
 }
 
 void MainWindow::InitDefaultModel()
@@ -1289,7 +1289,20 @@ void MainWindow::Replot()
 #endif
     try
     {
-        DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+        DrawBase* pp;
+        switch (_plotMode)
+        {
+            case SINGLE:
+                pp = _drawMgr->GetObject(DrawBase::SINGLE);
+                break;
+            case VARIABLE_VIEW:
+                pp = _drawMgr->GetObject(DrawBase::VARIABLE_VIEW);
+                break;
+            case VECTOR_FIELD:
+                pp = _drawMgr->GetObject(DrawBase::VECTOR_FIELD);
+                break;
+        }
+
         if ( pp->Spec_tob("make_plots") )
         {
             if (pp->IterCt()==0) return;
@@ -1302,21 +1315,12 @@ void MainWindow::Replot()
                     pp_lims = PhasePlotLimits();
                     break;
                 case VARIABLE_VIEW:
-                {
-                    DrawBase* vv = _drawMgr->GetObject(DrawBase::VARIABLE_VIEW);
-                    pp_lims = ViewRect(vv->Spec_tod("xmin"),
-                                       vv->Spec_tod("xmax"),
-                                       vv->Spec_tod("ymin"),
-                                       vv->Spec_tod("ymax"));
-                    break;
-                }
                 case VECTOR_FIELD:
                 {
-                    DrawBase* vf = _drawMgr->GetObject(DrawBase::VECTOR_FIELD);
-                    pp_lims = ViewRect(vf->Spec_tod("xmin"),
-                                       vf->Spec_tod("xmax"),
-                                       vf->Spec_tod("ymin"),
-                                       vf->Spec_tod("ymax"));
+                    pp_lims = ViewRect(pp->Spec_tod("xmin"),
+                                       pp->Spec_tod("xmax"),
+                                       pp->Spec_tod("ymin"),
+                                       pp->Spec_tod("ymax"));
                     break;
                 }
             }
@@ -1350,7 +1354,7 @@ void MainWindow::Replot()
             else //Simulation finished
             {
                 UpdateSimPBar(-1);
-                connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::BlockingQueuedConnection);
+                connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
                 connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
                 SaveData(_fastRunGui->FullFileName());
             }
@@ -1387,9 +1391,9 @@ void MainWindow::LoadModel(const std::string& file_name)
         ConnectModels();
 
         ui->cmbPlotMode->setCurrentIndex(0);
-        if (!_drawMgr->GetObject(DrawBase::PHASE_PLOT))
+        if (!_drawMgr->GetObject(DrawBase::SINGLE))
         {
-            CreateObject(DrawBase::PHASE_PLOT);
+            CreateObject(DrawBase::SINGLE);
             CreateObject(DrawBase::TIME_PLOT);
         }
         ui->edModelStep->setText( std::to_string(_modelMgr->ModelStep()).c_str() ); //This does *not* call editingFinished
@@ -1411,7 +1415,7 @@ void MainWindow::LoadModel(const std::string& file_name)
 MainWindow::ViewRect MainWindow::PhasePlotLimits() const
 {
     ViewRect pp_lims;
-    DrawBase* pp = _drawMgr->GetObject(DrawBase::PHASE_PLOT);
+    DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
     if (pp)
     {
         const int xidx = pp->Spec_toi("xidx"),
@@ -1563,6 +1567,7 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     SetSaveActionsEnabled(is_enabled);
 
     ui->cmbPlotMode->setEnabled(is_enabled);
+    ui->spnVFResolution->setEnabled(is_enabled); //Would like to work this in, too hard currently
 }
 void MainWindow::SetParamsEnabled(bool is_enabled)
 {
@@ -1711,7 +1716,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("resolution", ui->spnVFResolution->value());
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
-        case DrawBase::PHASE_PLOT:
+        case DrawBase::SINGLE:
             draw_object->SetSpec("num_tp_samples", _numTPSamples);
             draw_object->SetSpec("is_recording", ui->cboxRecord->isChecked());
             draw_object->SetSpec("pulse_steps_remaining", _pulseStepsRemaining);
@@ -1729,6 +1734,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("zidx", ui->cmbPlotZ->currentIndex());
             draw_object->SetSpec("tail_length", ui->spnTailLength->value());
             draw_object->SetSpec("use_z", ui->cboxPlotZ->checkState()==Qt::Checked);
+            draw_object->SetSpec("make_plots", true);
             break;
         case DrawBase::VECTOR_FIELD:
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
@@ -1736,6 +1742,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("resolution", ui->spnVFResolution->value());
             draw_object->SetSpec("tail_length", ui->spnTailLength->value());
             draw_object->SetSpec("grow_tail", _plotMode==VECTOR_FIELD);
+            draw_object->SetSpec("make_plots", true);
             break;
     }
 }

@@ -18,6 +18,19 @@ VariableView::~VariableView()
     if (Data()) delete[] static_cast<QPolygonF*>( Data() );
 }
 
+void* VariableView::DataCopy() const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("VariableView::DataCopy", std::this_thread::get_id());
+#endif
+    std::lock_guard<std::mutex> lock( Mutex() );
+    QPolygonF* data = new QPolygonF[_numFuncs];
+    auto cdata = static_cast<const QPolygonF*>( ConstData() );
+    for (size_t i=0; i<_numFuncs; ++i)
+        data[i] = cdata[i];
+    return data;
+}
+
 void VariableView::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -29,8 +42,6 @@ void VariableView::ComputeData()
     {
         if (!NeedRecompute() && !NeedNewStep())
             goto label;{
-
-        Initialize();
 
         const size_t xidx_raw = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
@@ -59,7 +70,7 @@ void VariableView::ComputeData()
 
         try
         {
-            std::lock_guard<std::recursive_mutex> lock( Mutex() );
+            std::lock_guard<std::mutex> lock( Mutex() );
             for (int k=0; k<_numFuncs; ++k)
             {
                 const double zval = zmin+k*zinc;
@@ -82,7 +93,7 @@ void VariableView::ComputeData()
         }
         catch (std::exception& e)
         {
-            _log->AddExcept("VectorField::ComputeData: " + std::string(e.what()));
+            _log->AddExcept("VariableView::ComputeData: " + std::string(e.what()));
             throw (e);
         }
         SetData(points);
@@ -127,7 +138,7 @@ void VariableView::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VariableView::MakePlotItems", std::this_thread::get_id());
 #endif
-    QPolygonF* points = static_cast<QPolygonF*>( Data() );
+    QPolygonF* points = static_cast<QPolygonF*>( DataCopy() );
 
     for (int k=0; k<_numFuncs; ++k)
     {

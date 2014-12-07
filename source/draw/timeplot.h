@@ -11,6 +11,7 @@ class TimePlot : public DrawBase
     public:
         TimePlot(DSPlot* plot);
 
+    protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
         virtual void MakePlotItems() override;

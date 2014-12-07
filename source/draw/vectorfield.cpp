@@ -16,6 +16,20 @@ VectorField::~VectorField()
     if (Data()) delete[] static_cast<QPolygonF*>( Data() );
 }
 
+void* VectorField::DataCopy() const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("VectorField::DataCopy", std::this_thread::get_id());
+#endif
+    std::lock_guard<std::mutex> lock( Mutex() );
+    const size_t resolution2 = _resolution*_resolution;
+    QPolygonF* data = new QPolygonF[resolution2];
+    auto cdata = static_cast<const QPolygonF*>( ConstData() );
+    for (size_t i=0; i<resolution2; ++i)
+        data[i] = cdata[i];
+    return data;
+}
+
 void VectorField::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -26,15 +40,13 @@ void VectorField::ComputeData()
         if (!NeedRecompute() && !NeedNewStep())
             goto label;{
 
-//        ResetPPs();
+        InitParserMgrs();
 
         QPolygonF* data = static_cast<QPolygonF*>( Data() );
 
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
                 tail_len = Spec_toi("tail_length"),
-                resolution2 = NumParserMgrs(),
-                resolution = (int)std::sqrt(resolution2),
                 steps_per_sec = Spec_toi("steps_per_sec");
         const bool grow_tail = Spec_toi("grow_tail");
 
@@ -46,21 +58,22 @@ void VectorField::ComputeData()
         SetSpec("xmax", xmax);
         SetSpec("ymin", ymin);
         SetSpec("ymax", ymax);
-        const double xinc = (xmax - xmin) / (double)(resolution-1),
-                yinc = (ymax - ymin) / (double)(resolution-1),
-                xpix_inc = (double)Plot()->width() / (double)(resolution-1),
-                ypix_inc = (double)Plot()->height() / (double)(resolution-1);
+        const double xinc = (xmax - xmin) / (double)(_resolution-1),
+                yinc = (ymax - ymin) / (double)(_resolution-1),
+                xpix_inc = (double)Plot()->width() / (double)(_resolution-1),
+                ypix_inc = (double)Plot()->height() / (double)(_resolution-1);
         SetSpec("xinc", xinc);
         SetSpec("yinc", yinc);
         ArrowHead::SetConversions(xinc, yinc, xpix_inc, ypix_inc);
 
         try
         {
-            std::lock_guard<std::recursive_mutex> lock( Mutex() );
-            for (int i=0; i<resolution; ++i)
-                for (int j=0; j<resolution; ++j)
+            std::lock_guard<std::mutex> lock( Mutex() );
+            RecomputeIfNeeded();
+            for (int i=0; i<_resolution; ++i)
+                for (int j=0; j<_resolution; ++j)
                 {
-                    const int idx = i*resolution+j;
+                    const int idx = i*_resolution+j;
                     ParserMgr& parser_mgr = GetParserMgr(idx);
                     const double* diffs = parser_mgr.ConstData(ds::DIFF);
                     const double x = i*xinc + xmin,
@@ -68,7 +81,7 @@ void VectorField::ComputeData()
 
                     parser_mgr.SetData(ds::DIFF, xidx, x);
                     parser_mgr.SetData(ds::DIFF, yidx, y);
-                    QPolygonF& pts = data[i*resolution+j];
+                    QPolygonF& pts = data[i*_resolution+j];
                     pts = QPolygonF(_tailLength+1);
                     pts[0] = QPointF(x, y);
                     for (int k=1; k<=_tailLength; ++k)
@@ -96,27 +109,14 @@ void VectorField::ComputeData()
     if (DeleteOnFinish()) emit ReadyToDelete();
 }
 
-void* VectorField::DataCopy() const
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("VectorField::DataCopy", std::this_thread::get_id());
-#endif
-    std::lock_guard<std::recursive_mutex> lock( Mutex() );
-    const size_t resolution2 = NumParserMgrs();
-    QPolygonF* data = new QPolygonF[resolution2];
-    auto cdata = static_cast<const QPolygonF*>( ConstData() );
-    for (size_t i=0; i<resolution2; ++i)
-        data[i] = cdata[i];
-    return data;
-}
-
 void VectorField::Initialize()
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::Initialize", std::this_thread::get_id());
 #endif
     _tailLength = DEFAULT_TAIL_LEN;
-    ResetPPs();
+    InitParserMgrs();
+    ResetPlotItems();
 }
 
 void VectorField::MakePlotItems()
@@ -127,22 +127,19 @@ void VectorField::MakePlotItems()
     QPolygonF* data = static_cast<QPolygonF*>( DataCopy() );
     if (!data) return;
 
-    const size_t resolution2 = NumParserMgrs(),
-            resolution = (int)std::sqrt(resolution2);
-//    if (data->size()!=resolution2) return;
-
     if (!IsSpec("xmin")) return;
     const double xmin = Spec_tod("xmin"),
             ymin = Spec_tod("ymin"),
             xinc = Spec_tod("xinc"),
             yinc = Spec_tod("yinc");
 
-    for (size_t i=0; i<resolution; ++i)
-        for (size_t j=0; j<resolution; ++j)
+    const size_t tail_length = data[0].size()-1;
+    for (size_t i=0; i<_resolution; ++i)
+        for (size_t j=0; j<_resolution; ++j)
         {
             const double x = i*xinc + xmin,
                         y = j*yinc + ymin;
-            const int idx = i*resolution+j;
+            const size_t idx = i*_resolution+j;
             QPolygonF pts = data[idx];
 
             QwtPlotMarker* marker = static_cast<QwtPlotMarker*>( PlotItem(3*idx + 0) );
@@ -155,23 +152,29 @@ void VectorField::MakePlotItems()
             curv->setZ(-0.5);
 
             QwtPlotCurve* arrow = static_cast<QwtPlotCurve*>( PlotItem(3*idx + 2) );
-            const ArrowHead arrow_head(pts[_tailLength], pts[_tailLength-1]);
+            const ArrowHead arrow_head(pts[tail_length], pts[tail_length-1]);
             arrow->setSamples(arrow_head.Points());
             arrow->setZ(0);
         }
     delete[] data;
 }
 
-void VectorField::ResetPPs()
+void VectorField::InitParserMgrs()
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("VectorField::ResetPPs", std::this_thread::get_id());
+    ScopeTracker st("VectorField::InitParserMgrs", std::this_thread::get_id());
 #endif
-    const int resolution = Spec_toi("resolution"),
-            resolution2 = resolution*resolution;
-
+    _resolution = Spec_toi("resolution");
     FreezeNonUser();
-    InitParserMgrs(resolution2);
+    DrawBase::InitParserMgrs(_resolution*_resolution);
+}
+
+void VectorField::ResetPlotItems()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("VectorField::ResetPlotItems", std::this_thread::get_id());
+#endif
+    const int resolution2 = _resolution*_resolution;
 
     ReservePlotItems(resolution2*3);
     for (int i=0; i<resolution2; ++i)

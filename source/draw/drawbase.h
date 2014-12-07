@@ -23,6 +23,7 @@
 typedef std::vector< std::deque<double> > DataVec;
 typedef std::map<std::string, std::string> MapStr;
 typedef std::map<std::string, const void*> MapSCV;
+typedef std::map<std::string, void*> MapSV;
 class DrawBase : public QObject
 {
     Q_OBJECT
@@ -33,7 +34,7 @@ class DrawBase : public QObject
         enum DRAW_TYPE
         {
             NULL_CLINE,
-            PHASE_PLOT,
+            SINGLE,
             TIME_PLOT,
             VARIABLE_VIEW,
             VECTOR_FIELD
@@ -58,6 +59,7 @@ class DrawBase : public QObject
         void SetDeleteOnFinish(bool b) { _deleteOnFinish = b; }
         void SetNeedRecompute(bool need_update_parser);
         void SetOpaqueSpec(const std::string& key, const void* value);
+        void SetNonConstOpaqueSpec(const std::string& key, void* value);
         void SetSpec(const std::string& key, const std::string& value);
         void SetSpec(const std::string& key, double value);
         void SetSpec(const std::string& key, int value);
@@ -70,6 +72,7 @@ class DrawBase : public QObject
         bool IsSpec(const std::string& key) const;
         long long int IterCt() const;
         long long int IterMax() const { return _iterMax; }
+        void* NonConstOpaqueSpec(const std::string& key);
         size_t NumPlotItems() const;
         size_t NumParserMgrs() const;
         const void* OpaqueSpec(const std::string& key) const;
@@ -104,7 +107,7 @@ class DrawBase : public QObject
         void FreezeNonUser();
         virtual void Initialize() = 0;
         void InitParserMgrs(size_t num);
-        std::recursive_mutex& Mutex() { return _mutex; }
+        std::mutex& Mutex() { return _mutex; }
         void RecomputeIfNeeded();
         void ReservePlotItems(size_t num);
 
@@ -114,7 +117,7 @@ class DrawBase : public QObject
         void* Data() { return _data; }
         DRAW_STATE DrawState() const { return _drawState; }
         ParserMgr& GetParserMgr(size_t i) { return _parserMgrs[i]; }
-        std::recursive_mutex& Mutex() const { return _mutex; }
+        std::mutex& Mutex() const { return _mutex; }
         bool NeedNewStep();
         bool NeedRecompute() const { return _needRecompute; }
         QwtPlotItem* PlotItem(size_t i) { return _plotItems[i]; }
@@ -132,11 +135,13 @@ class DrawBase : public QObject
         bool _deleteOnFinish;
         DRAW_STATE _drawState;
         DRAW_TYPE _drawType;
+        const std::thread::id _guiTid;
         long long int _iterCt, _iterMax;
         std::chrono::time_point<std::chrono::system_clock> _lastStep;
-        mutable std::recursive_mutex _mutex;
+        mutable std::mutex _mutex;
         bool _needRecompute;
         MapSCV _opaqueSpecs; //Try to use as little as possible obviously!
+        MapSV _nonConstOpaqueSpecs; //Try to use as little as possible obviously!
         std::vector<ParserMgr> _parserMgrs;
         DSPlot* _plot;
         std::vector<QwtPlotItem*> _plotItems;

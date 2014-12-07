@@ -14,6 +14,16 @@ Nullcline::~Nullcline()
     if (Data()) delete static_cast<Record*>( Data() );
 }
 
+void* Nullcline::DataCopy() const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("Nullcline::DataCopy", std::this_thread::get_id());
+#endif
+    std::lock_guard<std::mutex> lock( Mutex() );
+    if (!ConstData()) return nullptr;
+    return new Record(*static_cast<const Record*>( ConstData() ));
+}
+
 void Nullcline::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -46,7 +56,8 @@ void Nullcline::ComputeData()
 
         try
         {
-            std::lock_guard<std::recursive_mutex> lock( Mutex() );
+            std::lock_guard<std::mutex> lock( Mutex() );
+            RecomputeIfNeeded();
             for (int i=0; i<resolution; ++i)
                 for (int j=0; j<resolution; ++j)
                 {
@@ -145,16 +156,6 @@ void Nullcline::Initialize()
     const int resolution = Spec_toi("resolution")*2,
             resolution2 = resolution*resolution;
     InitParserMgrs(resolution2);
-}
-
-void* Nullcline::DataCopy() const
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("Nullcline::DataCopy", std::this_thread::get_id());
-#endif
-    std::lock_guard<std::recursive_mutex> lock( Mutex() );
-    if (!ConstData()) return nullptr;
-    return new Record(*static_cast<const Record*>( ConstData() ));
 }
 
 void Nullcline::MakePlotItems()

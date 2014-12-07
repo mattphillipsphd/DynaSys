@@ -136,8 +136,16 @@ void DrawMgr::StopAndRemove(DrawBase::DRAW_TYPE draw_type)
     DrawBase* obj = GetObject(draw_type);
     if (obj)
     {
-        obj->SetDeleteOnFinish(true);
-        obj->SetDrawState(DrawBase::STOPPED);
+        if (obj->DrawState()==DrawBase::DRAWING)
+        {
+            obj->SetDeleteOnFinish(true);
+            obj->SetDrawState(DrawBase::STOPPED);
+        }
+        else
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            std::remove(_objects.begin(), _objects.end(), obj);
+        }
     }
 }
 

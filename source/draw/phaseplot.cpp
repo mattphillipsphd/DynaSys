@@ -19,7 +19,7 @@ PhasePlot::~PhasePlot()
 
 void* PhasePlot::DataCopy() const
 {
-    std::lock_guard<std::recursive_mutex> lock(Mutex());
+    std::lock_guard<std::mutex> lock(Mutex());
     auto data_tuple = static_cast<
             const std::tuple<std::deque<double>,DataVec,DataVec>* >( ConstData() );
     if (!data_tuple) return nullptr;
@@ -49,7 +49,7 @@ void PhasePlot::ComputeData()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::ComputeData", std::this_thread::get_id());
 #endif
-    std::unique_lock<std::recursive_mutex> lock(Mutex(), std::defer_lock);
+    std::unique_lock<std::mutex> lock(Mutex(), std::defer_lock);
     //Get all of the information from the parameter fields, introducing new variables as needed.
     ParserMgr& parser_mgr = GetParserMgr(0);
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
@@ -58,10 +58,7 @@ void PhasePlot::ComputeData()
             * vars = parser_mgr.ConstData(ds::VAR);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
-//    const void* dv_data = OpaqueSpec("dv_data");
-//    if (!dv_data) return;
-//    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
-//    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( DataCopy() );
+
     auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( Data() );
     std::deque<double>& inner_product = std::get<0>(*data_tuple);
     DataVec& diff_pts = std::get<1>(*data_tuple);
@@ -99,10 +96,8 @@ void PhasePlot::ComputeData()
                 : 100;
         if (num_steps==0) num_steps = 1;
         if (num_steps>MAX_BUF_SIZE) num_steps = MAX_BUF_SIZE;
-//### Adjust data in separate function call, in main thread, use it as
-//### const object in all worker threads
-//### There is no way to avoid race conditions without copying
-            //Shrink the buffers if need be
+
+        //Shrink the buffers if need be
         lock.lock();
         const int xy_buf_over = (int)diff_pts.at(0).size() + num_steps - MAX_BUF_SIZE;
         if (xy_buf_over>0)
@@ -124,7 +119,7 @@ void PhasePlot::ComputeData()
         try
         {
             RecomputeIfNeeded();
-//            std::lock_guard<std::recursive_mutex> lock( Mutex() );
+//            std::lock_guard<std::mutex> lock( Mutex() );
             for (int k=0; k<num_steps; ++k)
             {
                 parser_mgr.ParserEvalAndConds();
@@ -166,11 +161,13 @@ void PhasePlot::ComputeData()
         catch (mu::ParserError& e)
         {
             _log->AddExcept("PhasePlot::ComputeData: " + e.GetMsg());
+            lock.unlock();
             throw std::runtime_error("PhasePlot::ComputeData: Parser error");
         }
         catch (std::exception& e)
         {
             _log->AddExcept("PhasePlot::ComputeData: " + std::string(e.what()));
+            lock.unlock();
             throw(e);
         } 
 //                SetData( new std::tuple<std::deque<double>,DataVec,DataVec>(
@@ -202,7 +199,7 @@ void PhasePlot::ComputeData()
 
 void PhasePlot::Initialize()
 {
-//    std::lock_guard<std::recursive_mutex> lock(Mutex());
+//    std::lock_guard<std::mutex> lock(Mutex());
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
             num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
     auto inner_product = std::deque<double>();
@@ -238,8 +235,8 @@ void PhasePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::MakePlotItems", std::this_thread::get_id());
 #endif
-//    std::lock_guard<std::recursive_mutex> lock(Mutex());
-    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >( DataCopy() );
+// ### Need to only copy *new* data.  Recopying *everything* is making the program impossibly slow.
+    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( DataCopy() );
 //    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >( ConstData() );
 //    const void* dv_data = OpaqueSpec("dv_data");
 //    if (!dv_data) return;
@@ -278,4 +275,6 @@ void PhasePlot::MakePlotItems()
     SetSpec("xmax", xmax);
     SetSpec("ymin", ymin);
     SetSpec("ymax", ymax);
+
+    delete data_tuple;
 }

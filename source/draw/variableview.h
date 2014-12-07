@@ -14,6 +14,8 @@ class VariableView : public DrawBase
         VariableView(DSPlot* plot);
         virtual ~VariableView() override;
 
+        virtual void* DataCopy() const override;
+
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;

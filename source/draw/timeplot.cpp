@@ -44,7 +44,7 @@ void TimePlot::ComputeData()
 #endif
     while (DrawState()==DRAWING)
     {
-//        std::lock_guard<std::recursive_mutex> lock(Mutex());
+//        std::lock_guard<std::mutex> lock(Mutex());
         if (!OpaqueSpec("dv_data"))
             goto label;{
 
@@ -60,10 +60,10 @@ void TimePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::MakePlotItems", std::this_thread::get_id());
 #endif
-//    std::lock_guard<std::recursive_mutex> lock(Mutex());
-    const void* dv_data = OpaqueSpec("dv_data");
+//    std::lock_guard<std::mutex> lock(Mutex());
+    void* dv_data = NonConstOpaqueSpec("dv_data");
     if (!dv_data) return;
-    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
+    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
     const auto& inner_product = std::get<0>(*data_tuple);
     const auto& diff_pts = std::get<1>(*data_tuple),
             & var_pts = std::get<2>(*data_tuple);
@@ -148,6 +148,6 @@ void TimePlot::MakePlotItems()
     SetSpec("y_tp_min", y_tp_min);
     SetSpec("y_tp_max", y_tp_max);
 
-    SetOpaqueSpec("dv_data", nullptr);
+    SetNonConstOpaqueSpec("dv_data", nullptr);
     delete data_tuple;
 }

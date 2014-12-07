@@ -13,18 +13,20 @@ class VectorField : public DrawBase
         virtual ~VectorField() override;
 
         virtual void* DataCopy() const override;
-        virtual void MakePlotItems() override;
 
     protected:
+        virtual void MakePlotItems() override;
         virtual void ComputeData() override;
         virtual void Initialize() override;
 
     private:
         static const int DEFAULT_TAIL_LEN;
 
-        void ResetPPs(); //Reset parser and plot items
+        void InitParserMgrs();
+        void ResetPlotItems(); //Reset parser and plot items
 
-        int _tailLength;
+        int _resolution, //thread-local
+            _tailLength;
 };
 
 #endif // VECTORFIELD_H
