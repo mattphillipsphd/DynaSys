@@ -46,6 +46,7 @@ MainWindow::MainWindow(QWidget *parent) :
 //    ui->actionCreate_SO->setEnabled(false);
 #endif
     ui->actionFit->setEnabled(false);
+    ui->cmbDiffMethod->setEnabled(false);
 
 //    ui->qwtPhasePlot->setAutoReplot(true);
 //    ui->qwtTimePlot->setAutoReplot(true);
@@ -754,15 +755,13 @@ void MainWindow::on_btnStart_clicked()
             ui->btnStart->setText("Stop");
             SetButtonsEnabled(false);
             _paramEditor->setEnabled(true);
-            _timer.stop();
+            _timer.start(PLOT_REFRESH);
             break;
         case DrawBase::STOPPED:
         {
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
             _paramEditor->setEnabled(false);
-//            if (!_drawMgr->GetObject(DrawBase::TIME_PLOT))
-//                CreateObject(DrawBase::TIME_PLOT);
             size_t num_objects = _drawMgr->NumDrawObjects();
             for (size_t i=0; i<num_objects; ++i)
             {
@@ -940,8 +939,8 @@ void MainWindow::on_edNumTPSamples_editingFinished()
     ScopeTracker st("MainWindow::on_edNumTPSamples_editingFinished", _tid);
 #endif
     _numTPSamples = (int)( ui->edNumTPSamples->text().toInt() / _modelMgr->ModelStep() );
-    if (DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE))
-        pp->SetSpec("num_tp_samples", _numTPSamples);
+    if (DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT))
+        tp->SetSpec("num_samples", _numTPSamples);
 }
 
 void MainWindow::on_lsConditions_clicked(const QModelIndex& index)
@@ -1334,9 +1333,9 @@ void MainWindow::Replot()
                         dv_end = tp->Spec_toi("dv_end"),
                         y_tp_min = tp->Spec_toi("y_tp_min"),
                         y_tp_max = tp->Spec_toi("y_tp_max"),
-                        past_dv_samps_ct = pp->Spec_toi("past_dv_samps_ct");
-                ViewRect tp_lims( (past_dv_samps_ct+dv_start)*_modelMgr->ModelStep(),
-                                  (past_dv_samps_ct+dv_end)*_modelMgr->ModelStep(),
+                        past_samps_ct = tp->Spec_toi("past_samps_ct");
+                ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep(),
+                                  (past_samps_ct+dv_end)*_modelMgr->ModelStep(),
                                   y_tp_min, y_tp_max );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
@@ -1717,7 +1716,6 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::SINGLE:
-            draw_object->SetSpec("num_tp_samples", _numTPSamples);
             draw_object->SetSpec("is_recording", ui->cboxRecord->isChecked());
             draw_object->SetSpec("pulse_steps_remaining", _pulseStepsRemaining);
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
@@ -1726,6 +1724,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("make_plots", true);
             break;
         case DrawBase::TIME_PLOT:
+            draw_object->SetSpec("num_samples", _numTPSamples);
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:

@@ -12,6 +12,7 @@ class PhasePlot : public DrawBase
         virtual ~PhasePlot() override;
 
         virtual void* DataCopy() const override;
+//        virtual void* DataCopy2() const;
         virtual void MakePlotItems() override;
         virtual int SleepMs() const override;
 
@@ -21,9 +22,13 @@ class PhasePlot : public DrawBase
         virtual void Initialize() override;
 
     private:
+        int PacketSampCt() const;
+
         QwtPlotCurve* _curve;
+        DataVec _diffPts;
         bool _makePlots;
         QwtPlotMarker* _marker;
+        std::deque<Packet*> _packets;
         int _pastDVSampsCt, _pastIPSampsCt; //Samples outside the buffer
 };
 

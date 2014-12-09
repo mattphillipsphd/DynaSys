@@ -11,6 +11,8 @@ class TimePlot : public DrawBase
     public:
         TimePlot(DSPlot* plot);
 
+        virtual void SetNonConstOpaqueSpec(const std::string &key, void *value) override;
+
     protected:
         virtual void ComputeData() override;
         virtual void Initialize() override;
@@ -21,6 +23,9 @@ class TimePlot : public DrawBase
 
     private:
         std::vector<QColor> _colors;
+        std::deque<double> _ip;
+        DataVec _diffPts, _varPts;
+        std::deque<Packet*> _packets;
 };
 
 #endif // TIMEPLOT_H

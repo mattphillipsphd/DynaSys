@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include <QFile>
+#include <QTime>
 
 #include <qwt_scale_div.h>
 #include <qwt_plot.h>
@@ -49,6 +50,51 @@ class DrawBase : public QObject
         static const int MAX_BUF_SIZE,
                         TP_WINDOW_LENGTH;
 
+        struct Packet
+        {
+            static const uchar PP_READ, TP_READ;
+            Packet(int num_samps, int num_diffs, int num_vars) : num_samples(num_samps),
+                ip(new double[num_samps]),
+                  diffs(MakeDVec(num_diffs, num_samps)),
+                  vars(MakeDVec(num_vars, num_samps)),
+                  read_flag(0)
+            {}
+            Packet(const Packet& pack) : num_samples(pack.num_samples),
+                ip(new double[pack.num_samples]),
+                  diffs(MakeDVec(pack.diffs.size(), pack.num_samples)),
+                  vars(MakeDVec(pack.vars.size(), pack.num_samples)),
+                  read_flag(0)
+            {
+                CopyDVec(diffs, pack.diffs);
+                CopyDVec(vars, pack.vars);
+                memcpy(ip, pack.ip, num_samples*sizeof(double));
+            }
+            ~Packet()
+            {
+                delete[] ip;
+                for (auto it: diffs) delete[] it;
+                for (auto it: vars) delete[] it;
+            }
+            const int num_samples;
+            double* const ip;
+            const std::vector<double*> diffs, vars;
+            uchar read_flag;
+
+        private:
+            void CopyDVec(const std::vector<double*>& dest, const std::vector<double*>& source)
+            {
+                const size_t num_elts = source.size();
+                for (size_t i=0; i<num_elts; ++i)
+                    memcpy(dest[i], source.at(i), num_samples*sizeof(double));
+            }
+            const std::vector<double*> MakeDVec(size_t num_elts, size_t num_samps)
+            {
+                std::vector<double*> vec = std::vector<double*>(num_elts);
+                for (auto& it : vec) it = new double[num_samps];
+                return vec;
+            }
+        };
+
         static DrawBase* Create(DRAW_TYPE draw_type, DSPlot* plot);
 
         virtual ~DrawBase();
@@ -58,8 +104,8 @@ class DrawBase : public QObject
 
         void SetDeleteOnFinish(bool b) { _deleteOnFinish = b; }
         void SetNeedRecompute(bool need_update_parser);
-        void SetOpaqueSpec(const std::string& key, const void* value);
-        void SetNonConstOpaqueSpec(const std::string& key, void* value);
+        virtual void SetOpaqueSpec(const std::string& key, const void* value);
+        virtual void SetNonConstOpaqueSpec(const std::string& key, void* value);
         void SetSpec(const std::string& key, const std::string& value);
         void SetSpec(const std::string& key, double value);
         void SetSpec(const std::string& key, int value);

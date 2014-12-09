@@ -7,6 +7,22 @@ TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot)
 #endif
 }
 
+void TimePlot::SetNonConstOpaqueSpec(const std::string &key, void *value)
+{
+    if (key=="dv_data")
+    {
+        std::lock_guard<std::mutex> lock( Mutex() );
+        std::deque<Packet*>* packets = static_cast< std::deque<Packet*>* >(value);
+        if (packets)
+        {
+            for (size_t i=0; i<packets->size(); ++i)
+                _packets.push_back( packets->at(i) );
+            delete packets;
+        }
+    }
+    DrawBase::SetNonConstOpaqueSpec(key, value);
+}
+
 void TimePlot::Initialize()
 {
 #ifdef DEBUG_FUNC
@@ -28,11 +44,20 @@ void TimePlot::Initialize()
         AddPlotItem(curv);
     }
 
+    while (!_packets.empty())
+    {
+        delete _packets.front();
+        _packets.pop_front();
+    }
+    _ip.clear();
+    _diffPts = DataVec(num_diffs);
+    _varPts = DataVec(num_vars);
+
     SetSpec("dv_start", 0);
     SetSpec("dv_end", DrawBase::TP_WINDOW_LENGTH);
     SetSpec("y_tp_min", 0);
     SetSpec("y_tp_max", 0);
-    SetOpaqueSpec("dv_data", nullptr);
+    SetNonConstOpaqueSpec("dv_data", nullptr);
 
     DrawBase::Initialize();
 }
@@ -44,8 +69,7 @@ void TimePlot::ComputeData()
 #endif
     while (DrawState()==DRAWING)
     {
-//        std::lock_guard<std::mutex> lock(Mutex());
-        if (!OpaqueSpec("dv_data"))
+        if (!NonConstOpaqueSpec("dv_data"))
             goto label;{
 
         emit ComputeComplete(1);
@@ -60,22 +84,50 @@ void TimePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::MakePlotItems", std::this_thread::get_id());
 #endif
-//    std::lock_guard<std::mutex> lock(Mutex());
-    void* dv_data = NonConstOpaqueSpec("dv_data");
-    if (!dv_data) return;
-    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
-    const auto& inner_product = std::get<0>(*data_tuple);
-    const auto& diff_pts = std::get<1>(*data_tuple),
-            & var_pts = std::get<2>(*data_tuple);
-    const int past_dv_samps_ct = Spec_toi("past_dv_samps_ct"),
-            past_ip_samps_ct = Spec_toi("past_ip_samps_ct");
+//    QTime timer;
+//    timer.start();
+
+    //Get the available packets
+    std::unique_lock<std::mutex> lock( Mutex() );
+    if (_packets.empty()) return;
+    while (!_packets.empty())
+    {
+        const Packet* packet = _packets.front();
+        const size_t num_diffs = packet->diffs.size(),
+                num_vars = packet->vars.size(),
+                num_samples = packet->num_samples;
+        for (size_t k=0; k<num_samples; ++k)
+        {
+            for (size_t i=0; i<num_diffs; ++i)
+                _diffPts[i].push_back( packet->diffs.at(i)[k]);
+            for (size_t i=0; i<num_vars; ++i)
+                _varPts[i].push_back( packet->vars.at(i)[k]);
+            _ip.push_back( packet->ip[k] );
+        }
+        _packets.pop_front();
+    }
+    lock.unlock();
+
+    //Shrink the buffers if need be, and record overshoot
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+    static int past_samps_ct = 0;
+    const int max_size = std::min(MAX_BUF_SIZE, Spec_toi("num_samples"));
+    const int overflow = (int)_diffPts.at(0).size() - max_size;
+    if (overflow>0)
+    {
+        for (int i=0; i<num_diffs; ++i)
+            _diffPts[i].erase(_diffPts[i].begin(), _diffPts[i].begin()+overflow);
+        for (int i=0; i<num_vars; ++i)
+            _varPts[i].erase(_varPts[i].begin(), _varPts[i].begin()+overflow);
+        _ip.erase(_ip.begin(), _ip.begin()+overflow);
+        past_samps_ct += overflow;
+    }
+    SetSpec("past_samps_ct", past_samps_ct);
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars(),
-            num_tp_points = std::min( (int)inner_product.size(), MAX_BUF_SIZE ),
-            ip_start  = std::max(0, (int)inner_product.size()-num_tp_points),
-            dv_start = std::max(0, (int)diff_pts.at(0).size()-num_tp_points),
+    const int num_tp_points = (int)_ip.size(),
+            dv_start = std::max(0, (int)_diffPts.at(0).size()-num_tp_points),
             dv_end = dv_start + num_tp_points;
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
@@ -90,8 +142,8 @@ void TimePlot::MakePlotItems()
     static int last_step = 1;
     if (last_step!=step)
         last_step = step;
-    const int ip_step_off = step - (ip_start % step),
-            dv_step_off = step - (dv_start % step);
+    const int dv_step_off = step - (dv_start % step);
+    const double model_step = _modelMgr->ModelStep();
 
     for (int i=0; i<num_all_tplots; ++i)
     {
@@ -108,26 +160,24 @@ void TimePlot::MakePlotItems()
         if (i==0) //IP
         {
             QPolygonF points_tp(num_plotted_pts);
-            for (int k=ip_start+ip_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF((past_ip_samps_ct+k)*_modelMgr->ModelStep(), inner_product[k]*scale);
+            for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
+                points_tp[ct] = QPointF((past_samps_ct+k)*model_step, _ip.at(k)*scale);
             curv->setSamples(points_tp);
-            continue;
         }
         else if (i<=num_diffs) //A differential
         {
             int didx = i-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_dv_samps_ct+k)*_modelMgr->ModelStep(), diff_pts.at(didx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _diffPts.at(didx).at(k)*scale);
             curv->setSamples(points_tp);
-            continue;
         }
         else //A variable
         {
             int vidx = i-num_diffs-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_dv_samps_ct+k)*_modelMgr->ModelStep(), var_pts.at(vidx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _varPts.at(vidx).at(k)*scale);
             curv->setSamples(points_tp);
         }
     }
@@ -149,5 +199,5 @@ void TimePlot::MakePlotItems()
     SetSpec("y_tp_max", y_tp_max);
 
     SetNonConstOpaqueSpec("dv_data", nullptr);
-    delete data_tuple;
+//    std::cerr << "Timeplot::MakeItems: " << std::to_string( timer.elapsed() );
 }

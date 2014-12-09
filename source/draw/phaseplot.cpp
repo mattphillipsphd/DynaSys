@@ -17,7 +17,7 @@ PhasePlot::~PhasePlot()
     if (data) delete data;
 }
 
-void* PhasePlot::DataCopy() const
+/*void* PhasePlot::DataCopy() const
 {
     std::lock_guard<std::mutex> lock(Mutex());
     auto data_tuple = static_cast<
@@ -31,7 +31,21 @@ void* PhasePlot::DataCopy() const
                 diff_pts,
                 var_pts);
     return out;
+}*/
+
+void* PhasePlot::DataCopy() const
+{
+    std::lock_guard<std::mutex> lock(Mutex());
+    std::deque<Packet*>* packets = new std::deque<Packet*>();
+    for (auto it : _packets)
+    {
+        if (!( it->read_flag & Packet::TP_READ))
+                packets->push_back( new Packet(*it) );
+        it->read_flag |= Packet::TP_READ;
+    }
+    return packets;
 }
+
 int PhasePlot::SleepMs() const
 {
     return _makePlots ? 50 : 0;
@@ -49,7 +63,6 @@ void PhasePlot::ComputeData()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::ComputeData", std::this_thread::get_id());
 #endif
-    std::unique_lock<std::mutex> lock(Mutex(), std::defer_lock);
     //Get all of the information from the parameter fields, introducing new variables as needed.
     ParserMgr& parser_mgr = GetParserMgr(0);
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
@@ -59,10 +72,6 @@ void PhasePlot::ComputeData()
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
 
-    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( Data() );
-    std::deque<double>& inner_product = std::get<0>(*data_tuple);
-    DataVec& diff_pts = std::get<1>(*data_tuple);
-    DataVec& var_pts = std::get<2>(*data_tuple);
     const bool is_recording = Spec_tob("is_recording");
 
     QFile temp(ds::TEMP_FILE.c_str());
@@ -73,7 +82,7 @@ void PhasePlot::ComputeData()
         for (size_t i=0; i<(size_t)num_diffs; ++i)
             output += _modelMgr->Model(ds::DIFF)->ShortKey(i) + "\t";
         for (size_t i=0; i<(size_t)num_vars; ++i)
-            output += _modelMgr->Model(ds::VAR)->ShortKey(i)+ "\t";
+            output += _modelMgr->Model(ds::VAR)->ShortKey(i) + "\t";
         output += "\n";
         temp.write(output.c_str());
         temp.flush();
@@ -85,8 +94,7 @@ void PhasePlot::ComputeData()
             goto label;{
 
         //Get values which may be updated from main thread
-        int num_tp_samples = Spec_toi("num_tp_samples"),
-                pulse_steps_remaining = Spec_toi("pulse_steps_remaining");
+        int pulse_steps_remaining = Spec_toi("pulse_steps_remaining");
 
         //Update the state vector with the value of the differentials.
             //Number of iterations to calculate in this refresh
@@ -96,30 +104,15 @@ void PhasePlot::ComputeData()
                 : 100;
         if (num_steps==0) num_steps = 1;
         if (num_steps>MAX_BUF_SIZE) num_steps = MAX_BUF_SIZE;
-
-        //Shrink the buffers if need be
-        lock.lock();
-        const int xy_buf_over = (int)diff_pts.at(0).size() + num_steps - MAX_BUF_SIZE;
-        if (xy_buf_over>0)
-        {
-            for (int i=0; i<num_diffs; ++i)
-                diff_pts[i].erase(diff_pts[i].begin(), diff_pts[i].begin()+xy_buf_over);
-            for (int i=0; i<num_vars; ++i)
-                var_pts[i].erase(var_pts[i].begin(), var_pts[i].begin()+xy_buf_over);
-            _pastDVSampsCt += xy_buf_over;
-        }
-        const int ip_buf_over = (int)inner_product.size() + num_steps - num_tp_samples;
-        if (ip_buf_over>0)
-        {
-            inner_product.erase(inner_product.begin(), inner_product.begin()+ip_buf_over);
-            _pastIPSampsCt += ip_buf_over;
-        }
+        Packet* packet = new Packet(num_steps, num_diffs, num_vars);
+        double* pack_ip = packet->ip;
+        const std::vector<double*>& pack_diffs = packet->diffs,
+                pack_vars = packet->vars;
 
         //Go through each expression and evaluate them
         try
         {
             RecomputeIfNeeded();
-//            std::lock_guard<std::mutex> lock( Mutex() );
             for (int k=0; k<num_steps; ++k)
             {
                 parser_mgr.ParserEvalAndConds();
@@ -136,12 +129,12 @@ void PhasePlot::ComputeData()
                 for (int i=0; i<num_diffs; ++i)
                 {
                     double diffs_i = diffs[i];
-                    diff_pts[i].push_back(diffs_i);
+                    pack_diffs[i][k] = diffs_i;
                     ip_k += diffs_i * diffs_i;
                 }
-                inner_product.push_back(ip_k);
+                pack_ip[k] = ip_k;
                 for (int i=0; i<num_vars; ++i)
-                    var_pts[i].push_back( vars[i] );
+                    pack_vars[i][k] = vars[i];
 
                 if (is_recording)
                 {
@@ -157,23 +150,19 @@ void PhasePlot::ComputeData()
                     //Saving *every* sample is incredibly unwieldy--need a parameter to control
                     //when to save values
             }
+            std::lock_guard<std::mutex> lock( Mutex() );
+            _packets.push_back(packet);
         }
         catch (mu::ParserError& e)
         {
             _log->AddExcept("PhasePlot::ComputeData: " + e.GetMsg());
-            lock.unlock();
             throw std::runtime_error("PhasePlot::ComputeData: Parser error");
         }
         catch (std::exception& e)
         {
             _log->AddExcept("PhasePlot::ComputeData: " + std::string(e.what()));
-            lock.unlock();
             throw(e);
         } 
-//                SetData( new std::tuple<std::deque<double>,DataVec,DataVec>(
-//                            inner_product, diff_pts, var_pts)
-//                         );
-        lock.unlock();
         SetSpec("pulse_steps_remaining", pulse_steps_remaining);
 
         //A blowup will crash QwtPlot
@@ -181,9 +170,6 @@ void PhasePlot::ComputeData()
         for (int i=0; i<num_diffs; ++i)
             if (abs(diffs[i])>DMAX)
                 throw std::runtime_error("PhasePlot::ComputeData: model exploded");
-
-        SetSpec("past_dv_samps_ct", _pastDVSampsCt);
-        SetSpec("past_ip_samps_ct", _pastIPSampsCt);
 
         if (_makePlots)
             emit Flag2();
@@ -199,19 +185,18 @@ void PhasePlot::ComputeData()
 
 void PhasePlot::Initialize()
 {
-//    std::lock_guard<std::mutex> lock(Mutex());
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    auto inner_product = std::deque<double>();
-    auto diff_pts = DataVec(num_diffs);
-    auto var_pts = DataVec(num_vars);
-    SetData( new std::tuple<std::deque<double>,DataVec,DataVec>(
-                inner_product, diff_pts, var_pts)
-             );
+    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars();
+    while (!_packets.empty())
+    {
+        delete _packets.front();
+        _packets.pop_front();
+    }
 
     _makePlots = Spec_tob("make_plots");
     if (_makePlots)
     {
+        _diffPts = DataVec(num_diffs);
+
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
             QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
         _marker = new QwtPlotMarker();
@@ -235,23 +220,52 @@ void PhasePlot::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("PhasePlot::MakePlotItems", std::this_thread::get_id());
 #endif
-// ### Need to only copy *new* data.  Recopying *everything* is making the program impossibly slow.
-    auto data_tuple = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( DataCopy() );
-//    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >( ConstData() );
-//    const void* dv_data = OpaqueSpec("dv_data");
-//    if (!dv_data) return;
-//    auto data_tuple = static_cast< const std::tuple<std::deque<double>,DataVec,DataVec>* >(dv_data);
-    auto diff_pts = std::get<1>(*data_tuple);
-    if (diff_pts.at(0).empty()) return;
-    ParserMgr& parser_mgr = GetParserMgr(0);
-    const double* diffs = parser_mgr.ConstData(ds::DIFF);
+//    QTime timer;
+//    timer.start();
+
+    //**********************Copy packet data into local variables
+    std::unique_lock<std::mutex> lock( Mutex() );
+    if (_packets.empty()) return;
+    for (auto it : _packets)
+    {
+        if (!(it->read_flag & Packet::PP_READ))
+        {
+            const size_t num_diffs = it->diffs.size(),
+                    num_samples = it->num_samples;
+            for (size_t i=0; i<num_diffs; ++i)
+                for (size_t k=0; k<num_samples; ++k)
+                    _diffPts[i].push_back( it->diffs.at(i)[k]);
+            it->read_flag |= Packet::PP_READ;
+        }
+    }
+
+        //Delete used packets
+    Packet* packet = _packets.front();
+    while (packet->read_flag & Packet::TP_READ && packet->read_flag & Packet::PP_READ)
+    {
+        _packets.pop_front();
+        if (_packets.empty()) break;
+        packet = _packets.front();
+    }
+    lock.unlock();
+    //**********************
+
+    //Shrink the buffer if need be
+    const int num_diffs = _diffPts.size(),
+            xy_buf_over = (int)_diffPts.at(0).size() - MAX_BUF_SIZE;
+    if (xy_buf_over>0)
+        for (int i=0; i<num_diffs; ++i)
+            _diffPts[i].erase(_diffPts[i].begin(), _diffPts[i].begin()+xy_buf_over);
 
     //Plot the current state vector
     const int xidx = Spec_toi("xidx"),
             yidx = Spec_toi("yidx");
-    _marker->setValue(diffs[xidx], diffs[yidx]);
+    const std::deque<double> diff_x = _diffPts.at(xidx),
+            diff_y = _diffPts.at(yidx);
+    _marker->setValue(diff_x.back(), _diffPts.at(yidx).back());
 
-    const int num_saved_pts = (int)diff_pts[0].size();
+    //Plot the history (the curve)
+    const int num_saved_pts = (int)diff_x.size();
     int tail_len = std::min( num_saved_pts, Spec_toi("tail_length") );
     if (tail_len==-1) tail_len = num_saved_pts;
     const int inc = tail_len < SamplesShown()/2
@@ -262,11 +276,11 @@ void PhasePlot::MakePlotItems()
 
     int ct_begin = std::max(0,num_saved_pts-tail_len);
     for (int k=0, ct=ct_begin; k<num_drawn_pts; ++k, ct+=inc)
-        points[k] = QPointF(diff_pts.at(xidx).at(ct), diff_pts.at(yidx).at(ct));
+        points[k] = QPointF(diff_x[ct], diff_y[ct]);
     _curve->setSamples(points);
 
-    auto xlims = std::minmax_element(diff_pts.at(xidx).cbegin(), diff_pts.at(xidx).cend()),
-            ylims = std::minmax_element(diff_pts.at(yidx).cbegin(), diff_pts.at(yidx).cend());
+    auto xlims = std::minmax_element(diff_x.cbegin(), diff_x.cend()),
+            ylims = std::minmax_element(diff_y.cbegin(), diff_y.cend());
     const double xmin = *xlims.first,
             xmax = *xlims.second,
             ymin = *ylims.first,
@@ -276,5 +290,12 @@ void PhasePlot::MakePlotItems()
     SetSpec("ymin", ymin);
     SetSpec("ymax", ymax);
 
-    delete data_tuple;
+//    std::cerr << "PhasePlot::MakeItems: " << std::to_string( timer.elapsed() );
+}
+
+int PhasePlot::PacketSampCt() const
+{
+    int sum = 0;
+    for (const auto& it : _packets) sum += it->num_samples;
+    return sum;
 }

@@ -5,6 +5,9 @@
 #include "variableview.h"
 #include "vectorfield.h"
 
+const uchar DrawBase::Packet::PP_READ = (uchar)1 << 0;
+const uchar DrawBase::Packet::TP_READ = (uchar)1 << 1;
+
 const int DrawBase::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const int DrawBase::TP_WINDOW_LENGTH = 1000;
 
