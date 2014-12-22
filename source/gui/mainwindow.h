@@ -166,9 +166,10 @@ class MainWindow : public QMainWindow
         void on_btnRemoveVariable_clicked();
         void on_btnStart_clicked();
 
-        void on_cboxVectorField_stateChanged(int state);
+        void on_cboxFitView_stateChanged(int state);
         void on_cboxNullclines_stateChanged(int state);
         void on_cboxPlotZ_stateChanged(int state);
+        void on_cboxVectorField_stateChanged(int state);
 
         void on_cmbDiffMethod_currentIndexChanged(const QString& text);
         void on_cmbPlotX_currentIndexChanged(int index);

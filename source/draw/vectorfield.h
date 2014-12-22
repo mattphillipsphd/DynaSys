@@ -12,8 +12,6 @@ class VectorField : public DrawBase
         VectorField(DSPlot* plot);
         virtual ~VectorField() override;
 
-        virtual void* DataCopy() const override;
-
     protected:
         virtual void MakePlotItems() override;
         virtual void ComputeData() override;
@@ -27,6 +25,7 @@ class VectorField : public DrawBase
 
         int _resolution, //thread-local
             _tailLength;
+        std::deque<QPolygonF*> _packets;
 };
 
 #endif // VECTORFIELD_H

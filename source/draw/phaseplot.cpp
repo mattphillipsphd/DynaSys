@@ -113,6 +113,7 @@ void PhasePlot::ComputeData()
         try
         {
             RecomputeIfNeeded();
+            if (is_recording) output.clear();
             for (int k=0; k<num_steps; ++k)
             {
                 parser_mgr.ParserEvalAndConds();
@@ -138,18 +139,22 @@ void PhasePlot::ComputeData()
 
                 if (is_recording)
                 {
-                    output.clear();
                     for (int i=0; i<num_diffs; ++i)
                         output += std::to_string(diffs[i]) + "\t";
                     for (int i=0; i<num_vars; ++i)
                         output += std::to_string(vars[i]) + "\t";
                     output += "\n";
-                    temp.write(output.c_str());
-                    temp.flush();
-                }
                     //Saving *every* sample is incredibly unwieldy--need a parameter to control
                     //when to save values
+                }
             }
+
+            if (is_recording)
+            {
+                temp.write(output.c_str());
+                temp.flush();
+            }
+
             std::lock_guard<std::mutex> lock( Mutex() );
             _packets.push_back(packet);
         }

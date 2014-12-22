@@ -35,9 +35,9 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="btnFitView">
+       <widget class="QCheckBox" name="cboxFitView">
         <property name="text">
-         <string>Fit to view</string>
+         <string>Fit View</string>
         </property>
        </widget>
       </item>

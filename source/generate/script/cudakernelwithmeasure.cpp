@@ -40,10 +40,16 @@ void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
     out <<
            "num_intervals = length(target);\n"
            "out_mat = zeros(num_tests,1);\n"
-           "data = gather( feval(k, ... \n"
-           "    fi.Data, length(fi.Data), fi.Sput, ...\n"
+           "input_data = zeros(length(fis(1).Data), num_fis);\n"
+           "sput = zeros(num_fis,1);\n"
+           "for i=1:num_fis\n"
+           "    input_data(:,i) = fis(i).Data;\n"
+           "    sput(i) = fis(i).Sput;\n"
+           "end\n"
+           "data = gather( feval(k, ...\n"
+           "    input_data, length(fis(1).Data), sput, ...\n"
            "    input_mat, num_inputs, num_tests, ...\n"
-           "    target, fi.IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
+           "    target, fis(1).IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
            "    out_mat) );\n"
            "\n";
 }
@@ -71,7 +77,7 @@ void CudaKernelWithMeasure::WriteExtraFuncs(std::ofstream& out)
     while (!ofun.eof())
     {
         if (!line.empty() && line.at(0) != '#')
-            out << line;
+            out << line << "\n";
         std::getline(ofun, line);
     }
     out << "//End CudaKernelWithMeasure::WriteExtraFuncs\n";
@@ -92,7 +98,7 @@ void CudaKernelWithMeasure::WriteMainBegin(std::ofstream& out)
 {
     out <<
            "__global__ void Entry(\n"
-           "        const double* input, const int input_len, const int sput, \n"
+           "        const double* input, const int input_len, const int* sput, \n"
            "        const double* par_mat, const int num_pars, const int num_tests,\n"
            "        const double* target, const int* int_lens, const int num_intervals,\n"
            "        double* out_mat)\n"
@@ -106,7 +112,8 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
            "    double sse = 0;\n"
            "    for (int i=0; i<num_intervals; ++i)\n"
            "    {\n"
-           "        const double yhat_i = yhat[i], tg_i = target[i];\n"
+           "        const double yhat_i = yhat[i],\n"
+           "                    tg_i = target[i];\n"
            "        sse += (yhat_i - tg_i)*(yhat_i - tg_i);\n"
            "        //sse +=  2*(yhat_i>tg_i ? yhat_i : tg_i) / (yhat_i + tg_i) - 1;\n"
            "    }\n"
@@ -120,7 +127,7 @@ void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
     std::string name_defs = ds::StripPath( NameMDefs() );
     name_defs.erase(name_defs.find_last_of('.'));
     out <<
-           "[~, inputs] = " + name_defs + ";\n"
+           "[~, inputs, ~, is_par] = " + name_defs + ";\n"
            "\n";
 }
 
@@ -143,7 +150,7 @@ void CudaKernelWithMeasure::WriteMRunHeader(std::ofstream& out)
     std::string name_run = ds::StripPath( NameMRun() );
     name_run.erase(name_run.find_last_of('.'));
     out << "function [data, k] = " + name_run
-           + "(num_records, save_mod_n, par_mat, is_test, fi, target, k)\n";
+           + "(num_records, save_mod_n, par_mat, is_test, fis, target, k)\n";
 }
 
 void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
@@ -178,7 +185,8 @@ std::string CudaKernelWithMeasure::AddSuffix(const std::string& name) const
 {
     std::string out = name;
     size_t pos = out.find_last_of('.');
-    out.insert(pos, "_m");
+    if (pos==std::string::npos) out += "_m";
+    else out.insert(pos, "_m");
     return out;
 }
 std::string CudaKernelWithMeasure::MakeHName(const std::string& name) const

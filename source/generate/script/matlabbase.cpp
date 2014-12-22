@@ -3,8 +3,7 @@
 const int MatlabBase::NUM_AUTO_ARGS = 2;
 
 MatlabBase::MatlabBase(const std::string& name, const std::string& extension)
-    : CFileBase(name, extension),
-    _nameMDefs(MakeMDefsName(name))
+    : CFileBase(name, extension)
 {
 }
 
@@ -23,7 +22,7 @@ void MatlabBase::MakeMDefsFile()
     ScopeTracker st("MatlabBase::MakeMDefsFile", std::this_thread::get_id());
 #endif
     std::ofstream mout;
-    mout.open(_nameMDefs);
+    mout.open( NameMDefs() );
 
     const NumericModelBase
             * inputs = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::INP)),
@@ -38,7 +37,7 @@ void MatlabBase::MakeMDefsFile()
             num_input_files = static_cast<const VariableModel*>(variables)
                                 ->TypeCount(Input::INPUT_FILE);
 
-    std::string name_m = ds::StripPath(_nameMDefs);
+    std::string name_m = ds::StripPath( NameMDefs() );
     name_m.erase(name_m.find_last_of('.'));
 
     mout <<
@@ -120,15 +119,6 @@ void MatlabBase::MakeMDefsFile()
     mout << "end\n";
 
     mout.close();
-}
-
-std::string MatlabBase::MakeMDefsName(const std::string& name) const
-{
-    std::string out(name);
-    size_t pos = out.find_last_of('.');
-    if (pos!=std::string::npos) out.erase(pos);
-    out += "_defs.m";
-    return out;
 }
 
 

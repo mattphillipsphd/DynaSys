@@ -16,20 +16,6 @@ VectorField::~VectorField()
     if (Data()) delete[] static_cast<QPolygonF*>( Data() );
 }
 
-void* VectorField::DataCopy() const
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("VectorField::DataCopy", std::this_thread::get_id());
-#endif
-    std::lock_guard<std::mutex> lock( Mutex() );
-    const size_t resolution2 = _resolution*_resolution;
-    QPolygonF* data = new QPolygonF[resolution2];
-    auto cdata = static_cast<const QPolygonF*>( ConstData() );
-    for (size_t i=0; i<resolution2; ++i)
-        data[i] = cdata[i];
-    return data;
-}
-
 void VectorField::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -41,8 +27,6 @@ void VectorField::ComputeData()
             goto label;{
 
         InitParserMgrs();
-
-        QPolygonF* data = static_cast<QPolygonF*>( Data() );
 
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
@@ -70,6 +54,7 @@ void VectorField::ComputeData()
         {
             std::lock_guard<std::mutex> lock( Mutex() );
             RecomputeIfNeeded();
+            QPolygonF* data = new QPolygonF[_resolution*_resolution];
             for (int i=0; i<_resolution; ++i)
                 for (int j=0; j<_resolution; ++j)
                 {
@@ -90,6 +75,8 @@ void VectorField::ComputeData()
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
                 }
+
+            _packets.push_back(data);
         }
         catch (std::exception& e)
         {
@@ -124,8 +111,17 @@ void VectorField::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::MakePlotItems", std::this_thread::get_id());
 #endif
-    QPolygonF* data = static_cast<QPolygonF*>( DataCopy() );
-    if (!data) return;
+
+    std::unique_lock<std::mutex> lock( Mutex() );
+    if (_packets.empty()) return;
+    while (_packets.size()>1)
+    {
+        delete[] _packets.front();
+        _packets.pop_front();
+    }
+    QPolygonF* data = _packets.front();
+    _packets.pop_front();
+    lock.unlock();
 
     if (!IsSpec("xmin")) return;
     const double xmin = Spec_tod("xmin"),
@@ -156,6 +152,7 @@ void VectorField::MakePlotItems()
             arrow->setSamples(arrow_head.Points());
             arrow->setZ(0);
         }
+
     delete[] data;
 }
 
@@ -196,8 +193,11 @@ void VectorField::ResetPlotItems()
         AddPlotItem(curv);
         AddPlotItem(arrow);
     }
-    if (Data()) delete[] static_cast<QPolygonF*>( Data() );
-    SetData( new QPolygonF[resolution2] );
+    while (!_packets.empty())
+    {
+        delete[] _packets.front();
+        _packets.pop_front();
+    }
 
     DrawBase::Initialize();
 }

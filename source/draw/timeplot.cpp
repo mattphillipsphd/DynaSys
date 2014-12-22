@@ -53,6 +53,7 @@ void TimePlot::Initialize()
     _diffPts = DataVec(num_diffs);
     _varPts = DataVec(num_vars);
 
+    SetSpec("past_samps_ct", 0);
     SetSpec("dv_start", 0);
     SetSpec("dv_end", DrawBase::TP_WINDOW_LENGTH);
     SetSpec("y_tp_min", 0);
@@ -111,7 +112,7 @@ void TimePlot::MakePlotItems()
     //Shrink the buffers if need be, and record overshoot
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
             num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    static int past_samps_ct = 0;
+    int past_samps_ct = Spec_toi("past_samps_ct");
     const int max_size = std::min(MAX_BUF_SIZE, Spec_toi("num_samples"));
     const int overflow = (int)_diffPts.at(0).size() - max_size;
     if (overflow>0)

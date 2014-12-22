@@ -39,7 +39,7 @@ void Nullcline::ComputeData()
                 yidx = Spec_toi("yidx"),
                 resolution = Spec_toi("resolution")*2,
                 resolution2 = resolution*resolution;
-//        InitParserMgrs(resolution2);
+        InitParserMgrs(resolution2);
 
         const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
                 xmax = _modelMgr->Maximum(ds::INIT, xidx),
@@ -77,6 +77,56 @@ void Nullcline::ComputeData()
                     x[idx] = xij;
                     y[idx] = yij;
                 }
+
+            double lastx, lasty;
+            std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
+                    & xcross_v = record->xcross_v,
+                    & ycross_h = record->ycross_h,
+                    & ycross_v = record->ycross_v;
+            std::unordered_set<int> xidx_set, yidx_set; //To avoid duplicates;
+            //The grid is being searched *column-wise*
+            for (int j=0; j<resolution; ++j)
+            {
+                lastx = xdiff[j];
+                lasty = ydiff[j];
+                for (int i=0; i<resolution; ++i)
+                {
+                    const int idx = i*resolution+j;
+                    if (ds::sgn(lastx) != ds::sgn(xdiff[idx]))
+                    {
+                        xcross_v.push_back( std::make_pair(i,j) );
+                        xidx_set.insert(idx);
+                    }
+                    lastx = xdiff[idx];
+
+                    if (ds::sgn(lasty) != ds::sgn(ydiff[idx]))
+                    {
+                        ycross_v.push_back( std::make_pair(i,j) );
+                        yidx_set.insert(idx);
+                    }
+                    lasty = ydiff[idx];
+                }
+            }
+
+            //Switch indices so as to search row-wise
+            for (int i=0; i<resolution; ++i)
+            {
+                lastx = xdiff[i*resolution];
+                lasty = ydiff[i*resolution];
+                for (int j=0; j<resolution; ++j)
+                {
+                    const int idx = i*resolution+j;
+                    if (ds::sgn(lastx) != ds::sgn(xdiff[idx]) && xidx_set.count(idx)==0)
+                        xcross_h.push_back( std::make_pair(i,j) );
+                    lastx = xdiff[idx];
+
+                    if (ds::sgn(lasty) != ds::sgn(ydiff[idx]) && yidx_set.count(idx)==0)
+                        ycross_h.push_back( std::make_pair(i,j) );
+                    lasty = ydiff[idx];
+                }
+            }
+
+            _packets.push_back(record);
         }
         catch (std::exception& e)
         {
@@ -84,58 +134,8 @@ void Nullcline::ComputeData()
             throw (e);
         }
 
-        double lastx, lasty;
-        std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
-                & xcross_v = record->xcross_v,
-                & ycross_h = record->ycross_h,
-                & ycross_v = record->ycross_v;
-        std::unordered_set<int> xidx_set, yidx_set; //To avoid duplicates;
-        //The grid is being searched *column-wise*
-        for (int j=0; j<resolution; ++j)
-        {
-            lastx = xdiff[j];
-            lasty = ydiff[j];
-            for (int i=0; i<resolution; ++i)
-            {
-                const int idx = i*resolution+j;
-                if (ds::sgn(lastx) != ds::sgn(xdiff[idx]))
-                {
-                    xcross_v.push_back( std::make_pair(i,j) );
-                    xidx_set.insert(idx);
-                }
-                lastx = xdiff[idx];
-
-                if (ds::sgn(lasty) != ds::sgn(ydiff[idx]))
-                {
-                    ycross_v.push_back( std::make_pair(i,j) );
-                    yidx_set.insert(idx);
-                }
-                lasty = ydiff[idx];
-            }
-        }
-
-        //Switch indices so as to search row-wise
-        for (int i=0; i<resolution; ++i)
-        {
-            lastx = xdiff[i*resolution];
-            lasty = ydiff[i*resolution];
-            for (int j=0; j<resolution; ++j)
-            {
-                const int idx = i*resolution+j;
-                if (ds::sgn(lastx) != ds::sgn(xdiff[idx]) && xidx_set.count(idx)==0)
-                    xcross_h.push_back( std::make_pair(i,j) );
-                lastx = xdiff[idx];
-
-                if (ds::sgn(lasty) != ds::sgn(ydiff[idx]) && yidx_set.count(idx)==0)
-                    ycross_h.push_back( std::make_pair(i,j) );
-                lasty = ydiff[idx];
-            }
-        }
-
         delete[] xdiff;
         delete[] ydiff;
-        if (Data()) delete static_cast<Record*>( Data() );
-        SetData(record);
 
         emit ComputeComplete(1);
 
@@ -163,6 +163,19 @@ void Nullcline::MakePlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("Nullcline::MakePlotItems", std::this_thread::get_id());
 #endif
+
+    std::unique_lock<std::mutex> lock( Mutex() );
+    if (_packets.empty()) return;
+    while (_packets.size()>1)
+    {
+        delete[] _packets.front();
+        _packets.pop_front();
+    }
+    Record* record = _packets.front();
+    _packets.pop_front();
+    if (!record) return;
+    lock.unlock();
+
     ClearPlotItems();
 
     const size_t xidx = Spec_toi("xidx"),
@@ -170,8 +183,6 @@ void Nullcline::MakePlotItems()
             resolution2 = NumParserMgrs(),
             resolution = (int)sqrt(resolution2);
 
-    Record* record = static_cast<Record*>( DataCopy() );
-    if (!record) return;
     const std::vector< std::pair<int,int> >& xcross_h = record->xcross_h,
             & xcross_v = record->xcross_v,
             & ycross_h = record->ycross_h,

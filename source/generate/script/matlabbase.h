@@ -11,7 +11,7 @@ class MatlabBase : public CFileBase
 
         void MakeMFiles();
 
-        const std::string& NameMDefs() const { return _nameMDefs; }
+        virtual std::string NameMDefs() const = 0;
         virtual std::string NameMRun() const = 0;
 
     protected:
@@ -21,9 +21,6 @@ class MatlabBase : public CFileBase
         static const int NUM_AUTO_ARGS;
 
     private:
-        std::string MakeMDefsName(const std::string& name) const;
-
-        const std::string _nameMDefs;
 };
 
 #endif // MATLABBASE_H

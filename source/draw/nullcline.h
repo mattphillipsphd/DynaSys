@@ -20,7 +20,7 @@ class Nullcline : public DrawBase
         virtual void ComputeData() override;
         virtual void Initialize() override;
 
-        virtual int SleepMs() const { return 250; }
+        virtual int SleepMs() const { return 50; }
 
     private:
         struct Record
@@ -42,6 +42,7 @@ class Nullcline : public DrawBase
         };
 
         std::vector<QColor> _colors;
+        std::deque<Record*> _packets;
 };
 
 #endif // NULLCLINE_H

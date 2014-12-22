@@ -8,7 +8,7 @@ const int MainWindow::DEFAULT_VF_STEP = 1;
 const int MainWindow::DEFAULT_VF_TAIL = 1;
 const int MainWindow::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const double MainWindow::MIN_MODEL_STEP = 1e-7;
-const int MainWindow::PLOT_REFRESH = 33;
+const int MainWindow::PLOT_REFRESH = 50;
 const int MainWindow::SLIDER_INT_LIM = 10000;
 const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 
@@ -86,7 +86,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ConnectModels();
 
     connect(_fastRunGui, SIGNAL(StartCompiled(int,int)), this, SLOT(StartCompiled(int,int)));
-    connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)));
+    connect(_fastRunGui, SIGNAL(StartFastRun(int,int)), this, SLOT(StartFastRun(int,int)), Qt::DirectConnection);
     connect(_fastRunGui, SIGNAL(Finished()), this, SLOT(FastRunFinished()));
     connect(this, SIGNAL(UpdateSimPBar(int)), _fastRunGui, SLOT(UpdatePBar(int)));
     connect(_logGui, SIGNAL(ShowParser()), this, SLOT(ParserToLog()));
@@ -105,6 +105,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     _aboutGui->setWindowModality(Qt::ApplicationModal);
     _fastRunGui->setWindowModality(Qt::ApplicationModal);
+
+//    _timer.start(PLOT_REFRESH);
 }
 MainWindow::~MainWindow()
 {
@@ -270,8 +272,11 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
 #endif
     _numSimSteps = duration;
     _saveModN = save_mod_n;
+    _drawMgr->ClearObjects();
+
     std::thread t( std::bind(&MainWindow::DoFastRun, this) );
     t.detach();
+    _timer.start(PLOT_REFRESH);
 }
 void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
@@ -774,6 +779,33 @@ void MainWindow::on_btnStart_clicked()
         }
     }
 }
+void MainWindow::on_cboxFitView_stateChanged(int state)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_cboxFitView_clicked", _tid);
+#endif
+    DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
+    if (pp)
+    {
+        static int xmin, xmax, ymin, ymax, xidx, yidx;
+        if (state==Qt::Checked)
+        {
+            xidx = pp->Spec_toi("xidx");
+            yidx = pp->Spec_toi("yidx");
+            xmin = _modelMgr->Minimum(ds::INIT, xidx);
+            xmax = _modelMgr->Maximum(ds::INIT, xidx);
+            ymin = _modelMgr->Minimum(ds::INIT, yidx);
+            ymax = _modelMgr->Maximum(ds::INIT, yidx);
+        }
+        else
+        {
+            _modelMgr->SetMinimum(ds::INIT, xidx, xmin);
+            _modelMgr->SetMaximum(ds::INIT, xidx, xmax);
+            _modelMgr->SetMinimum(ds::INIT, yidx, ymin);
+            _modelMgr->SetMaximum(ds::INIT, yidx, ymax);
+        }
+    }
+}
 void MainWindow::on_cboxNullclines_stateChanged(int state)
 {
 #ifdef DEBUG_FUNC
@@ -783,7 +815,10 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
     {
         CreateObject(DrawBase::NULL_CLINE);
         UpdateDOSpecs(DrawBase::NULL_CLINE);
-        _drawMgr->Start(DrawBase::NULL_CLINE);
+        if (_drawMgr->DrawState()==DrawBase::DRAWING)
+            _drawMgr->Start(DrawBase::NULL_CLINE);
+        else
+            _drawMgr->Start(DrawBase::NULL_CLINE, 1);
     }
     else
         _drawMgr->StopAndRemove(DrawBase::NULL_CLINE);
@@ -881,7 +916,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         }
         case VARIABLE_VIEW:
         {
-            SetTPShown(true);
+            SetTPShown(false);
             SetActionBtnsEnabled(false);
             SetZPlotShown(true);
             ui->lblTailLength->setText("# model evals:");
@@ -897,6 +932,7 @@ void MainWindow::on_cmbPlotMode_currentIndexChanged(const QString& text)
         {
             SetTPShown(false);
             SetActionBtnsEnabled(false);
+            ui->cboxNullclines->setEnabled(true);
             SetZPlotShown(false);
             ui->lblTailLength->setText("tail length:");
             ui->spnStepsPerSec->setValue(_vfStepsSec);
@@ -1099,7 +1135,6 @@ void MainWindow::DoFastRun()
     ScopeTracker st("MainWindow::DoFastRun", std::this_thread::get_id());
 #endif
 
-    _drawMgr->ClearObjects();
     DrawBase* pp = CreateObject(DrawBase::SINGLE);
     UpdateDOSpecs(DrawBase::SINGLE);
 
@@ -1301,6 +1336,7 @@ void MainWindow::Replot()
                 pp = _drawMgr->GetObject(DrawBase::VECTOR_FIELD);
                 break;
         }
+        if (!pp) return;
 
         if ( pp->Spec_tob("make_plots") )
         {
@@ -1353,6 +1389,7 @@ void MainWindow::Replot()
             else //Simulation finished
             {
                 UpdateSimPBar(-1);
+                _timer.stop();
                 connect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
                 connect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
                 SaveData(_fastRunGui->FullFileName());
@@ -1420,6 +1457,13 @@ MainWindow::ViewRect MainWindow::PhasePlotLimits() const
         const int xidx = pp->Spec_toi("xidx"),
                 yidx = pp->Spec_toi("yidx");
         double xmin, xmax, ymin, ymax;
+        if (ui->cboxFitView->isChecked())
+        {
+            _modelMgr->SetMinimum(ds::INIT, xidx, pp->Spec_tod("xmin"));
+            _modelMgr->SetMaximum(ds::INIT, xidx, pp->Spec_tod("xmax"));
+            _modelMgr->SetMinimum(ds::INIT, yidx, pp->Spec_tod("ymin"));
+            _modelMgr->SetMaximum(ds::INIT, yidx, pp->Spec_tod("ymax"));
+        }
         if (ui->cboxFitLimits->isChecked() || !pp->IsSpec("xmin"))
         {
             xmin = _modelMgr->Minimum(ds::INIT, xidx);
