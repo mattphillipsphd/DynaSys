@@ -38,6 +38,7 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "paramselector.h"
 #include "../generate/script/cfileso.h"
 #include "../generate/script/cudakernel.h"
 #include "../generate/script/cudakernelwithmeasure.h"
@@ -150,6 +151,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Phase_Plot_triggered();
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
+        void on_actionSelector_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
 
@@ -245,6 +247,7 @@ class MainWindow : public QMainWindow
         LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
+        ParamSelector* _paramSelector;
 
         DrawMgr* const _drawMgr;
         std::string _fileName;

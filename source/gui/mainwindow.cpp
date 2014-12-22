@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()),
-    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()), _paramSelector(new ParamSelector()),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -573,6 +573,13 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
     ScopeTracker st("MainWindow::on_actionSave_Vector_Field_triggered", _tid);
 #endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
+}
+void MainWindow::on_actionSelector_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSelector_triggered", _tid);
+#endif
+    _paramSelector->show();
 }
 void MainWindow::on_actionSet_Init_to_Current_triggered()
 {

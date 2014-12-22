@@ -76,7 +76,8 @@ SOURCES += main.cpp\
     memrep/drawmgr.cpp \
     memrep/inputmgr.cpp \
     generate/script/matlabbase.cpp \
-    generate/script/cudakernelwithmeasure.cpp
+    generate/script/cudakernelwithmeasure.cpp \
+    gui/paramselector.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -130,7 +131,8 @@ HEADERS  += gui/mainwindow.h \
     memrep/drawmgr.h \
     memrep/inputmgr.h \
     generate/script/matlabbase.h \
-    generate/script/cudakernelwithmeasure.h
+    generate/script/cudakernelwithmeasure.h \
+    gui/paramselector.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -138,7 +140,8 @@ FORMS    += forms/mainwindow.ui \
     forms/parameditor.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
-    forms/fastrungui.ui
+    forms/fastrungui.ui \
+    forms/paramselector.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0
