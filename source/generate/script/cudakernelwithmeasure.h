@@ -8,6 +8,8 @@ class CudaKernelWithMeasure : public CudaKernel
     public:
         CudaKernelWithMeasure(const std::string& name, const std::string& obj_fun);
 
+        std::string ObjFunName() const;
+
     protected:
         virtual void MakeHFile() override;
         virtual std::string NameMRun() const override;
@@ -18,6 +20,7 @@ class CudaKernelWithMeasure : public CudaKernel
         virtual void WriteMainBegin(std::ofstream& out) override;
         virtual void WriteMainEnd(std::ofstream& out) override;
         virtual void WriteMDefsCall(std::ofstream& out) override;
+        virtual void WriteMRunArgCheck(std::ofstream& out) override;
         virtual void WriteMRunHeader(std::ofstream& out) override;
         virtual void WriteModelLoopBegin(std::ofstream& out) override;
         virtual void WriteOutputHeader(std::ofstream& out) override;

@@ -7,6 +7,14 @@ CudaKernelWithMeasure::CudaKernelWithMeasure(const std::string& name, const std:
 {
 }
 
+std::string CudaKernelWithMeasure::ObjFunName() const
+{
+    std::string obj_fun = ds::StripPath(_objectiveFun);
+    const size_t pos = obj_fun.find_last_of('.');
+    obj_fun.erase(pos);
+    return obj_fun;
+}
+
 void CudaKernelWithMeasure::MakeHFile()
 {
     std::ofstream hout;
@@ -34,11 +42,28 @@ void CudaKernelWithMeasure::MakeHFile()
         hout << "#define " + idx + " " + std::to_string(i+num_vars) + "\n";
     }
 }
+std::string CudaKernelWithMeasure::NameMDefs() const
+{
+    std::string out(Name());
+    size_t pos = out.find_last_of('.');
+    if (pos!=std::string::npos) out.erase(pos);
+    out.erase( out.find_last_of('_') ); //Get rid of _m here
+    out += "_defs.m";
+    return out;
+}
+std::string CudaKernelWithMeasure::NameMRun() const
+{
+    std::string out(Name());
+    size_t pos = out.find_last_of('.');
+    if (pos!=std::string::npos) out.erase(pos);
+    out += "_cmrun.m";
+    return out;
+}
 
 void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
 {
     out <<
-           "num_intervals = length(target);\n"
+           "num_intervals = fis(1).NumIntervals;\n"
            "out_mat = zeros(num_tests,1);\n"
            "input_data = zeros(length(fis(1).Data), num_fis);\n"
            "sput = zeros(num_fis,1);\n"
@@ -46,11 +71,23 @@ void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
            "    input_data(:,i) = fis(i).Data;\n"
            "    sput(i) = fis(i).Sput;\n"
            "end\n"
+           "num_iters = num_records / tau;\n"
+           "mipars = int32( zeros(6+length(user_mipars), 1) );\n"
+           "mipars(1) = num_iters;\n"
+           "mipars(2) = num_intervals;\n"
+           "mipars(3) = num_iters / num_intervals;\n"
+           "mipars(4) = 1.0 / tau;\n"
+           "mipars(5) = tau * num_iters / num_intervals;\n"
+           "mipars(6) = length(target);\n"
+           "for i=1:length(user_mipars), mipars(6+i) = user_mipars(i); end\n"
+           "mdpars = user_mdpars;\n"
+           "input_len = length(fis(1).Data);\n"
+           "%keyboard;\n"
            "data = gather( feval(k, ...\n"
-           "    input_data, length(fis(1).Data), sput, ...\n"
+           "    input_data, input_len, sput, ...\n"
            "    input_mat, num_inputs, num_tests, ...\n"
            "    target, fis(1).IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
-           "    out_mat) );\n"
+           "    mipars, mdpars, out_mat) );\n"
            "\n";
 }
 
@@ -76,7 +113,7 @@ void CudaKernelWithMeasure::WriteExtraFuncs(std::ofstream& out)
     std::getline(ofun, line);
     while (!ofun.eof())
     {
-        if (!line.empty() && line.at(0) != '#')
+        if (!line.empty())
             out << line << "\n";
         std::getline(ofun, line);
     }
@@ -101,7 +138,7 @@ void CudaKernelWithMeasure::WriteMainBegin(std::ofstream& out)
            "        const double* input, const int input_len, const int* sput, \n"
            "        const double* par_mat, const int num_pars, const int num_tests,\n"
            "        const double* target, const int* int_lens, const int num_intervals,\n"
-           "        double* out_mat)\n"
+           "        const int* mipars,  const double* mdpars, double* out_mat)\n"
            "{\n";
 }
 
@@ -109,15 +146,8 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteMainEnd\n";
     out <<
-           "    double sse = 0;\n"
-           "    for (int i=0; i<num_intervals; ++i)\n"
-           "    {\n"
-           "        const double yhat_i = yhat[i],\n"
-           "                    tg_i = target[i];\n"
-           "        sse += (yhat_i - tg_i)*(yhat_i - tg_i);\n"
-           "        //sse +=  2*(yhat_i>tg_i ? yhat_i : tg_i) / (yhat_i + tg_i) - 1;\n"
-           "    }\n"
-           "    out_mat[idx] = sqrt(sse/num_intervals); //RMSE\n"
+           "    out_mat[idx] =  MeasureRMSE(target, mipars, mdpars, &mstate); //RMSE\n"
+           "    Delete" + ObjFunName() + "(&mstate);\n"
            "}\n";
     out << "//End CudaKernelWithMeasure::WriteMainEnd\n";
 }
@@ -127,7 +157,7 @@ void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
     std::string name_defs = ds::StripPath( NameMDefs() );
     name_defs.erase(name_defs.find_last_of('.'));
     out <<
-           "[~, inputs, ~, is_par] = " + name_defs + ";\n"
+           "[~, inputs, ~, is_par, ~, tau] = " + name_defs + ";\n"
            "\n";
 }
 
@@ -136,13 +166,21 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     out << "//Begin CudaKernelWithMeasure::WriteModelLoopBegin\n";
 
     out <<
-           "    const int iters_per_interval = num_iters / num_intervals;\n"
-           "    double yhat[" + MAX_OBJ_VEC_LEN + "];\n"
-           "    memset(yhat, 0, sizeof(double)*" + MAX_OBJ_VEC_LEN + ");\n";
+           "    MState mstate;\n"
+           "    Init" + ObjFunName() + "(&mstate, mipars, mdpars);\n";
 
     out << "//End CudaKernelWithMeasure::WriteModelLoopBegin\n";
     out << "\n";
     CFileBase::WriteModelLoopBegin(out);
+}
+
+void CudaKernelWithMeasure::WriteMRunArgCheck(std::ofstream& out)
+{
+    CudaKernel::WriteMRunArgCheck(out);
+    out <<
+            "if ~exist('user_mipars', 'var'), user_mipars = []; end\n"
+            "if ~exist('user_mdpars', 'var'), user_mdpars = []; end\n"
+            "\n";
 }
 
 void CudaKernelWithMeasure::WriteMRunHeader(std::ofstream& out)
@@ -150,7 +188,8 @@ void CudaKernelWithMeasure::WriteMRunHeader(std::ofstream& out)
     std::string name_run = ds::StripPath( NameMRun() );
     name_run.erase(name_run.find_last_of('.'));
     out << "function [data, k] = " + name_run
-           + "(num_records, save_mod_n, par_mat, is_test, fis, target, k)\n";
+           + "(num_records, save_mod_n, par_mat, ...\n"
+           "            is_test, fis, target, user_mipars, user_mdpars, k)\n";
 }
 
 void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
@@ -159,12 +198,7 @@ void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
     const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
                 num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
     std::string num_out = std::to_string(num_vars+num_diffs);
-    out <<
-           "    double out[" + num_out + "];\n"
-           "    int istate[" + MAX_OBJ_VEC_LEN + "];\n"
-           "    double dstate[" + MAX_OBJ_VEC_LEN + "];\n"
-           "    memset(istate, 0, sizeof(int)*" + MAX_OBJ_VEC_LEN + ");\n"
-           "    memset(dstate, 0, sizeof(double)*" + MAX_OBJ_VEC_LEN + ");\n";
+    out << "    double out[" + num_out + "];\n";
     out << "//End CudaKernel::WriteOutputHeader\n";
     out << "\n";
 }
@@ -172,12 +206,9 @@ void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
 void CudaKernelWithMeasure::WriteSaveBlockEnd(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteSaveBlockEnd\n";
-    std::string obj_fun = ds::StripPath(_objectiveFun);
-    const size_t pos = obj_fun.find_last_of('.');
-    obj_fun.erase(pos);
 
-    out << "            " + obj_fun
-           + "(i, out, yhat, &iters_per_interval, 0, istate, dstate);\n";
+    out << "            " + ObjFunName()
+           + "(i, out, mipars, mdpars, &mstate);\n";
     out << "//End CudaKernelWithMeasure::WriteSaveBlockEnd\n";
 }
 
@@ -195,14 +226,6 @@ std::string CudaKernelWithMeasure::MakeHName(const std::string& name) const
     size_t pos = out.find_last_of('.');
     if (pos!=std::string::npos) out.erase(pos);
     out += ".h";
-    return out;
-}
-std::string CudaKernelWithMeasure::NameMRun() const
-{
-    std::string out(Name());
-    size_t pos = out.find_last_of('.');
-    if (pos!=std::string::npos) out.erase(pos);
-    out += "_cmrun.m";
     return out;
 }
 std::string CudaKernelWithMeasure::MakeObjFunName(const std::string& obj_fun) const

@@ -358,7 +358,8 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
         CudaKernel cuda_kernel(file_name);
         cuda_kernel.Make();
         cuda_kernel.MakeMFiles();
-        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created.");
+        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created."
+                      "  The kernel needs to be compiled with nvcc using the -ptx option.");
     }
     catch (std::exception& e)
     {
@@ -429,8 +430,13 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
         CudaKernelWithMeasure ckwm(file_name, objective_fun);
         ckwm.Make();
         ckwm.MakeMFiles();
-        _log->AddMesg("CUDA kernel file with measure " + file_name + " and associated m-files created."
-                      "  The file has an '_m' suffix appended to it.");
+        CudaKernel ck(file_name);
+        ck.Make();
+        ck.MakeMFiles();
+        _log->AddMesg("CUDA kernel file with measure " + ds::StripPath(objective_fun)
+                      + ", standard CUDA kernel, and associated m-files created."
+                      "  The kernel file has an '_m' suffix appended to it.  Both"
+                      " need to be compiled with nvcc and the -ptx option.");
     }
     catch (std::exception& e)
     {
