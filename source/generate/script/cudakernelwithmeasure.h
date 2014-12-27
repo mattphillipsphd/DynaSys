@@ -12,6 +12,7 @@ class CudaKernelWithMeasure : public CudaKernel
 
     protected:
         virtual void MakeHFile() override;
+        virtual std::string NameMDefs() const override;
         virtual std::string NameMRun() const override;
         virtual void WriteCuCall(std::ofstream& out) override;
         virtual void WriteDataOut(std::ofstream& out, ds::PMODEL mi) override;

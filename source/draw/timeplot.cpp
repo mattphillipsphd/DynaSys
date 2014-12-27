@@ -145,7 +145,8 @@ void TimePlot::MakePlotItems()
         last_step = step;
     const int dv_step_off = step - (dv_start % step);
     const double model_step = _modelMgr->ModelStep();
-
+//    std::cerr << step << ", " << num_plotted_pts << ", " << past_samps_ct << ", " << dv_start
+//              << ", " << dv_step_off << ", " << dv_end << std::endl;
     for (int i=0; i<num_all_tplots; ++i)
     {
         QwtPlotCurve* curv = static_cast<QwtPlotCurve*>( PlotItem(i) );
