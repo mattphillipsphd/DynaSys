@@ -417,7 +417,7 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
     ScopeTracker st("MainWindow::on_actionCUDA_kernel_with_measure_triggered", _tid);
 #endif
     std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
-                                                         "Select objective function",
+                                                         "Select objective function (measure)",
                                                          DDM::CudaFilesDir().c_str()).toStdString();
     if (objective_fun.empty()) return;
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
@@ -1269,7 +1269,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
             std::string file_name = QFileDialog::getOpenFileName(nullptr,
                                                                   "Select input file",
                                                                   DDM::InputFilesDir().c_str(),
-                                                                  "Text file (*.txt) ;; DSIN file (*.dsin)"
+                                                                  "Input files (*.txt *.dsin)"
                                                                  ).toStdString();
             if (!file_name.empty())
             {

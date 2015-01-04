@@ -20,6 +20,7 @@ class CudaKernelWithMeasure : public CudaKernel
         virtual void WriteIncludes(std::ofstream& out) override;
         virtual void WriteMainBegin(std::ofstream& out) override;
         virtual void WriteMainEnd(std::ofstream& out) override;
+        virtual void WriteMChunkSize(std::ofstream& out) override;
         virtual void WriteMDefsCall(std::ofstream& out) override;
         virtual void WriteMRunArgCheck(std::ofstream& out) override;
         virtual void WriteMRunHeader(std::ofstream& out) override;

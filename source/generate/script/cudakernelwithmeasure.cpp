@@ -83,11 +83,18 @@ void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
            "mdpars = user_mdpars;\n"
            "input_len = length(fis(1).Data);\n"
            "%keyboard;\n"
-           "data = gather( feval(k, ...\n"
-           "    input_data, input_len, sput, ...\n"
-           "    input_mat, num_inputs, num_tests, ...\n"
-           "    target, fis(1).IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
-           "    mipars, mdpars, out_mat) );\n"
+           "data = NaN(num_tests,1);\n"
+           "num_chunks = ceil( num_tests / MAX_CHUNK_SIZE );\n"
+           "for i=1:num_chunks\n"
+           "    if num_chunks>1, disp(['   Starting chunk ' num2str(i) ' of ' num2str(num_chunks) '...']); end\n"
+           "    idxs = (i-1)*MAX_CHUNK_SIZE+1 : min( [i*MAX_CHUNK_SIZE num_tests] );\n"
+           "    data(idxs) = gather( feval(k, ...\n"
+           "        input_data, input_len, sput, ...\n"
+           "        input_mat(:,idxs), num_inputs, numel(idxs), ...\n"
+           "        target, fis(1).IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
+           "        mipars, mdpars, out_mat(idxs)) );\n"
+           "    if num_chunks>1, disp(['    ...Finished chunk ' num2str(i) ' of ' num2str(num_chunks)]); end\n"
+           "end\n"
            "\n";
 }
 
@@ -123,10 +130,9 @@ void CudaKernelWithMeasure::WriteExtraFuncs(std::ofstream& out)
 
 void CudaKernelWithMeasure::WriteIncludes(std::ofstream &out)
 {
+    CudaKernel::WriteIncludes(out);
     out << "//Begin CudaKernelWithMeasure::WriteIncludes\n";
-    out <<
-           "#include \"math.h\"\n"
-           "#include \"" + _hFileName + "\"\n";
+    out <<"#include \"" + _hFileName + "\"\n";
     out << "//End CudaKernelWithMeasure::WriteIncludes\n";
     out << "\n";
 }
@@ -152,12 +158,19 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
     out << "//End CudaKernelWithMeasure::WriteMainEnd\n";
 }
 
+void CudaKernelWithMeasure::WriteMChunkSize(std::ofstream& out)
+{
+    out <<
+           "MAX_CHUNK_SIZE = 1024 * 1024 * 4;\n"
+           "chunk_size = min([MAX_CHUNK_SIZE num_tests]);\n";
+}
+
 void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
 {
     std::string name_defs = ds::StripPath( NameMDefs() );
     name_defs.erase(name_defs.find_last_of('.'));
     out <<
-           "[~, inputs, ~, is_par, ~, tau] = " + name_defs + ";\n"
+           "[~, inputs, ~, ~, ~, tau] = " + name_defs + ";\n"
            "\n";
 }
 
@@ -189,7 +202,7 @@ void CudaKernelWithMeasure::WriteMRunHeader(std::ofstream& out)
     name_run.erase(name_run.find_last_of('.'));
     out << "function [data, k] = " + name_run
            + "(num_records, save_mod_n, par_mat, ...\n"
-           "            is_test, fis, target, user_mipars, user_mdpars, k)\n";
+           "            fis, target, user_mipars, user_mdpars, k)\n";
 }
 
 void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
