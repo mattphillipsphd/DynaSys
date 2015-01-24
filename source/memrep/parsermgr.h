@@ -62,6 +62,7 @@ class ParserMgr
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
         ModelMgr* const _modelMgr;
+        std::mutex _mutex;
         mu::Parser _parser, _parserResult;
             //_parserResult is for when conditions get satisfied
         std::vector<mu::Parser> _parserConds;

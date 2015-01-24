@@ -194,6 +194,7 @@ void ParserMgr::ParserEval(bool eval_input)
 {
     try
     {
+        std::lock_guard<std::mutex> lock(_mutex);
         _parser.Eval();
         TempEval();
         if (eval_input) _inputMgr->InputEval();
@@ -241,6 +242,7 @@ void ParserMgr::QuickEval(const std::string& exprn)
 #else
     try
     {
+        std::lock_guard<std::mutex> lock(_mutex);
         std::string temp = _parser.GetExpr();
         _parser.SetExpr(exprn);
         _parser.Eval();

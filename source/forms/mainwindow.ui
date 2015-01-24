@@ -600,10 +600,12 @@
     </property>
     <addaction name="actionRun_Offline"/>
     <addaction name="actionCompile_Run"/>
-    <addaction name="actionCreate_MEX_file"/>
     <addaction name="actionCreate_SO"/>
+    <addaction name="actionCreate_MEX_file"/>
+    <addaction name="actionMEX_file_with_measure"/>
     <addaction name="actionCreate_CUDA_kernel"/>
     <addaction name="actionCUDA_kernel_with_measure"/>
+    <addaction name="actionAll_MEX_and_CUDA"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
@@ -711,7 +713,7 @@
   </action>
   <action name="actionCreate_SO">
    <property name="text">
-    <string>Create SO</string>
+    <string>Create C Shared Object (.so)</string>
    </property>
   </action>
   <action name="actionCreate_CUDA_kernel">
@@ -732,6 +734,16 @@
   <action name="actionCUDA_kernel_with_measure">
    <property name="text">
     <string>CUDA kernel with measure</string>
+   </property>
+  </action>
+  <action name="actionMEX_file_with_measure">
+   <property name="text">
+    <string>MEX file with measure</string>
+   </property>
+  </action>
+  <action name="actionAll_MEX_and_CUDA">
+   <property name="text">
+    <string>All MEX and CUDA</string>
    </property>
   </action>
  </widget>

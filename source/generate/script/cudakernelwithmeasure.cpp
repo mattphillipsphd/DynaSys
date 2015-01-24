@@ -3,7 +3,7 @@
 const std::string CudaKernelWithMeasure::MAX_OBJ_VEC_LEN = "16";
 
 CudaKernelWithMeasure::CudaKernelWithMeasure(const std::string& name, const std::string& obj_fun)
-    : CudaKernel( AddSuffix(name) ), _hFileName( MakeHName(name) ), _objectiveFun(obj_fun)
+    : CudaKernel(name, MatlabBase::CUDA_WM ), _hFileName( MakeHName(name) ), _objectiveFun(obj_fun)
 {
 }
 
@@ -42,62 +42,11 @@ void CudaKernelWithMeasure::MakeHFile()
         hout << "#define " + idx + " " + std::to_string(i+num_vars) + "\n";
     }
 }
-std::string CudaKernelWithMeasure::NameMDefs() const
-{
-    std::string out(Name());
-    size_t pos = out.find_last_of('.');
-    if (pos!=std::string::npos) out.erase(pos);
-    out.erase( out.find_last_of('_') ); //Get rid of _m here
-    out += "_defs.m";
-    return out;
-}
-std::string CudaKernelWithMeasure::NameMRun() const
-{
-    std::string out(Name());
-    size_t pos = out.find_last_of('.');
-    if (pos!=std::string::npos) out.erase(pos);
-    out += "_cmrun.m";
-    return out;
-}
 
-void CudaKernelWithMeasure::WriteCuCall(std::ofstream& out)
+std::string CudaKernelWithMeasure::Suffix() const
 {
-    out <<
-           "num_intervals = fis(1).NumIntervals;\n"
-           "out_mat = zeros(num_tests,1);\n"
-           "input_data = zeros(length(fis(1).Data), num_fis);\n"
-           "sput = zeros(num_fis,1);\n"
-           "for i=1:num_fis\n"
-           "    input_data(:,i) = fis(i).Data;\n"
-           "    sput(i) = fis(i).Sput;\n"
-           "end\n"
-           "num_iters = num_records / tau;\n"
-           "mipars = int32( zeros(6+length(user_mipars), 1) );\n"
-           "mipars(1) = num_iters;\n"
-           "mipars(2) = num_intervals;\n"
-           "mipars(3) = num_iters / num_intervals;\n"
-           "mipars(4) = 1.0 / tau;\n"
-           "mipars(5) = tau * num_iters / num_intervals;\n"
-           "mipars(6) = length(target);\n"
-           "for i=1:length(user_mipars), mipars(6+i) = user_mipars(i); end\n"
-           "mdpars = user_mdpars;\n"
-           "input_len = length(fis(1).Data);\n"
-           "%keyboard;\n"
-           "data = NaN(num_tests,1);\n"
-           "num_chunks = ceil( num_tests / MAX_CHUNK_SIZE );\n"
-           "for i=1:num_chunks\n"
-           "    if num_chunks>1, disp(['   Starting chunk ' num2str(i) ' of ' num2str(num_chunks) '...']); end\n"
-           "    idxs = (i-1)*MAX_CHUNK_SIZE+1 : min( [i*MAX_CHUNK_SIZE num_tests] );\n"
-           "    data(idxs) = gather( feval(k, ...\n"
-           "        input_data, input_len, sput, ...\n"
-           "        input_mat(:,idxs), num_inputs, numel(idxs), ...\n"
-           "        target, fis(1).IntervalLen*ones(num_intervals,1), num_intervals, ...\n"
-           "        mipars, mdpars, out_mat(idxs)) );\n"
-           "    if num_chunks>1, disp(['    ...Finished chunk ' num2str(i) ' of ' num2str(num_chunks)]); end\n"
-           "end\n"
-           "\n";
+    return "_cm";
 }
-
 
 void CudaKernelWithMeasure::WriteDataOut(std::ofstream& out, ds::PMODEL mi)
 {
@@ -120,8 +69,7 @@ void CudaKernelWithMeasure::WriteExtraFuncs(std::ofstream& out)
     std::getline(ofun, line);
     while (!ofun.eof())
     {
-        if (!line.empty())
-            out << line << "\n";
+        out << line << "\n";
         std::getline(ofun, line);
     }
     out << "//End CudaKernelWithMeasure::WriteExtraFuncs\n";
@@ -152,26 +100,11 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteMainEnd\n";
     out <<
-           "    out_mat[idx] =  MeasureRMSE(target, mipars, mdpars, &mstate); //RMSE\n"
+           "    double yhat[MAX_YHAT_LEN];\n"
+           "    out_mat[idx] =  MeasureRMSE(target, mipars, mdpars, &mstate, yhat); //RMSE\n"
            "    Delete" + ObjFunName() + "(&mstate);\n"
            "}\n";
     out << "//End CudaKernelWithMeasure::WriteMainEnd\n";
-}
-
-void CudaKernelWithMeasure::WriteMChunkSize(std::ofstream& out)
-{
-    out <<
-           "MAX_CHUNK_SIZE = 1024 * 1024 * 4;\n"
-           "chunk_size = min([MAX_CHUNK_SIZE num_tests]);\n";
-}
-
-void CudaKernelWithMeasure::WriteMDefsCall(std::ofstream& out)
-{
-    std::string name_defs = ds::StripPath( NameMDefs() );
-    name_defs.erase(name_defs.find_last_of('.'));
-    out <<
-           "[~, inputs, ~, ~, ~, tau] = " + name_defs + ";\n"
-           "\n";
 }
 
 void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
@@ -180,6 +113,7 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
 
     out <<
            "    MState mstate;\n"
+           "    mstate.idx = idx;\n"
            "    Init" + ObjFunName() + "(&mstate, mipars, mdpars);\n";
 
     out << "//End CudaKernelWithMeasure::WriteModelLoopBegin\n";
@@ -187,32 +121,14 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     CFileBase::WriteModelLoopBegin(out);
 }
 
-void CudaKernelWithMeasure::WriteMRunArgCheck(std::ofstream& out)
-{
-    CudaKernel::WriteMRunArgCheck(out);
-    out <<
-            "if ~exist('user_mipars', 'var'), user_mipars = []; end\n"
-            "if ~exist('user_mdpars', 'var'), user_mdpars = []; end\n"
-            "\n";
-}
-
-void CudaKernelWithMeasure::WriteMRunHeader(std::ofstream& out)
-{
-    std::string name_run = ds::StripPath( NameMRun() );
-    name_run.erase(name_run.find_last_of('.'));
-    out << "function [data, k] = " + name_run
-           + "(num_records, save_mod_n, par_mat, ...\n"
-           "            fis, target, user_mipars, user_mdpars, k)\n";
-}
-
 void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteOutputHeader\n";
     const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
                 num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
-    std::string num_out = std::to_string(num_vars+num_diffs);
+    const std::string num_out = std::to_string(num_vars+num_diffs);
     out << "    double out[" + num_out + "];\n";
-    out << "//End CudaKernel::WriteOutputHeader\n";
+    out << "//End CudaKernelWithMeasure::WriteOutputHeader\n";
     out << "\n";
 }
 
@@ -225,14 +141,6 @@ void CudaKernelWithMeasure::WriteSaveBlockEnd(std::ofstream& out)
     out << "//End CudaKernelWithMeasure::WriteSaveBlockEnd\n";
 }
 
-std::string CudaKernelWithMeasure::AddSuffix(const std::string& name) const
-{
-    std::string out = name;
-    size_t pos = out.find_last_of('.');
-    if (pos==std::string::npos) out += "_m";
-    else out.insert(pos, "_m");
-    return out;
-}
 std::string CudaKernelWithMeasure::MakeHName(const std::string& name) const
 {
     std::string out = name;

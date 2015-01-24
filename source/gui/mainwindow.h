@@ -43,6 +43,7 @@
 #include "../generate/script/cudakernelwithmeasure.h"
 #include "../generate/object/executable.h"
 #include "../generate/script/mexfile.h"
+#include "../generate/script/mexfilewm.h"
 #include "../generate/object/sharedobj.h"
 #include "../file/datfileout.h"
 #include "../file/defaultdirmgr.h"
@@ -130,6 +131,7 @@ class MainWindow : public QMainWindow
         void UpdateSimPBar(int n);
 
     private slots:
+        void on_actionAll_MEX_and_CUDA_triggered();
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionCreate_CUDA_kernel_triggered();
@@ -140,6 +142,7 @@ class MainWindow : public QMainWindow
         void on_actionExit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
+        void on_actionMEX_file_with_measure_triggered();
         void on_actionNotes_triggered();
         void on_actionParameters_triggered();
         void on_actionReload_Current_triggered();

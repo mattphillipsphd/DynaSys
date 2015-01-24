@@ -76,7 +76,15 @@ SOURCES += main.cpp\
     memrep/drawmgr.cpp \
     memrep/inputmgr.cpp \
     generate/script/matlabbase.cpp \
-    generate/script/cudakernelwithmeasure.cpp
+    generate/script/cudakernelwithmeasure.cpp \
+    generate/script/matlab_interface/mrunbase.cpp \
+    generate/script/matlab_interface/mrunmex.cpp \
+    generate/script/matlab_interface/mfilebase.cpp \
+    generate/script/matlab_interface/mdefsfile.cpp \
+    generate/script/matlab_interface/mruncudakernel.cpp \
+    generate/script/matlab_interface/mrunckwm.cpp \
+    generate/script/matlab_interface/mrunmexwm.cpp \
+    generate/script/mexfilewm.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -130,7 +138,15 @@ HEADERS  += gui/mainwindow.h \
     memrep/drawmgr.h \
     memrep/inputmgr.h \
     generate/script/matlabbase.h \
-    generate/script/cudakernelwithmeasure.h
+    generate/script/cudakernelwithmeasure.h \
+    generate/script/matlab_interface/mrunbase.h \
+    generate/script/matlab_interface/mrunmex.h \
+    generate/script/matlab_interface/mfilebase.h \
+    generate/script/matlab_interface/mdefsfile.h \
+    generate/script/matlab_interface/mruncudakernel.h \
+    generate/script/matlab_interface/mrunckwm.h \
+    generate/script/matlab_interface/mrunmexwm.h \
+    generate/script/mexfilewm.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

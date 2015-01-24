@@ -325,6 +325,49 @@ void MainWindow::closeEvent(QCloseEvent *)
     _paramEditor->close();
 }
 
+void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionAll_MEX_and_CUDA_triggered", _tid);
+#endif
+    std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
+                                                         "Select objective function (measure)",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (objective_fun.empty()) return;
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select model file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetMEXFilesDir(file_name);
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
+        MEXFile mf(file_name);
+        mf.Make();
+        mf.MakeMFiles();
+        DDM::SetCudaFilesDir(file_name);
+        CudaKernelWithMeasure ckwm(file_name, objective_fun);
+        ckwm.Make();
+        ckwm.MakeMFiles();
+        CudaKernel ck(file_name);
+        ck.Make();
+        ck.MakeMFiles();
+        _log->AddMesg("MEX file with measure " + ds::StripPath(objective_fun)
+                      + ", standard MEX file, and associated m-files created."
+                      "  The MEX file with measure file has an '_mm' suffix appended to it.  Both"
+                      " need to be compiled with mex.");
+        _log->AddMesg("CUDA kernel file with measure " + ds::StripPath(objective_fun)
+                      + ", standard CUDA kernel, and associated m-files created."
+                      "  The kernel file has an '_cm' suffix appended to it.  Both"
+                      " need to be compiled with nvcc and the -ptx option.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCUDA_kernel_with_measure_triggered: " + std::string(e.what()));
+    }
+}
 void MainWindow::on_actionAbout_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -358,7 +401,7 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
         CudaKernel cuda_kernel(file_name);
         cuda_kernel.Make();
         cuda_kernel.MakeMFiles();
-        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created."
+        _log->AddMesg("CUDA kernel file " + cuda_kernel.Name() + " and associated m-files created."
                       "  The kernel needs to be compiled with nvcc using the -ptx option.");
     }
     catch (std::exception& e)
@@ -382,7 +425,7 @@ void MainWindow::on_actionCreate_MEX_file_triggered()
         MEXFile mex_file(file_name);
         mex_file.Make();
         mex_file.MakeMFiles();
-        _log->AddMesg("MEX file " + file_name + " and associated m-files created.");
+        _log->AddMesg("MEX file " + mex_file.Name() + " and associated m-files created.");
     }
     catch (std::exception& e)
     {
@@ -433,9 +476,9 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
         CudaKernel ck(file_name);
         ck.Make();
         ck.MakeMFiles();
-        _log->AddMesg("CUDA kernel file with measure " + ds::StripPath(objective_fun)
+        _log->AddMesg("CUDA kernel file " + ckwm.Name() + " with measure " + ds::StripPath(objective_fun)
                       + ", standard CUDA kernel, and associated m-files created."
-                      "  The kernel file has an '_m' suffix appended to it.  Both"
+                      "  The kernel file has an '_cm' suffix appended to it.  Both"
                       " need to be compiled with nvcc and the -ptx option.");
     }
     catch (std::exception& e)
@@ -475,6 +518,7 @@ void MainWindow::on_actionLoad_triggered()
     DDM::SetModelFilesDir(_fileName);
     LoadModel(_fileName);
 }
+
 void MainWindow::on_actionLog_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -483,6 +527,37 @@ void MainWindow::on_actionLog_triggered()
     _logGui->SetFileName(_fileName);
     _logGui->show();
 }
+
+void MainWindow::on_actionMEX_file_with_measure_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionMEX_file_with_measure_triggered", _tid);
+#endif
+    std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
+                                                         "Select objective function (measure)",
+                                                         DDM::CudaFilesDir().c_str()).toStdString();
+    if (objective_fun.empty()) return;
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select MEX file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetMEXFilesDir(file_name);
+        MEXFile mex_file(file_name);
+        mex_file.Make();
+        mex_file.MakeMFiles();
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
+        _log->AddMesg("MEX file " + mfwm.Name() + " and associated m-files created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCreate_MEX_file_triggered: " + std::string(e.what()));
+    }
+}
+
 void MainWindow::on_actionNotes_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -490,6 +565,7 @@ void MainWindow::on_actionNotes_triggered()
 #endif
     _notesGui->show();
 }
+
 void MainWindow::on_actionParameters_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -533,6 +609,7 @@ void MainWindow::on_actionSave_Data_triggered()
     if (file_name.empty()) return;
     SaveData(file_name);
 }
+
 void MainWindow::on_actionSave_Model_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -541,6 +618,7 @@ void MainWindow::on_actionSave_Model_triggered()
     if (_fileName.empty()) return;
     SaveModel(_fileName);
 }
+
 void MainWindow::on_actionSave_Model_As_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -559,6 +637,7 @@ void MainWindow::on_actionSave_Model_As_triggered()
     SaveModel(file_name);
     setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
 }
+
 void MainWindow::on_actionSave_Phase_Plot_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -566,6 +645,7 @@ void MainWindow::on_actionSave_Phase_Plot_triggered()
 #endif
     SaveFigure(ui->qwtPhasePlot, "phase plot", QSizeF(100, 100));
 }
+
 void MainWindow::on_actionSave_Time_Plot_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -573,6 +653,7 @@ void MainWindow::on_actionSave_Time_Plot_triggered()
 #endif
     SaveFigure(ui->qwtTimePlot, "time plot", QSizeF(200, 75));
 }
+
 void MainWindow::on_actionSave_Vector_Field_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -580,6 +661,7 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
 #endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
 }
+
 void MainWindow::on_actionSet_Init_to_Current_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -596,6 +678,7 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
         ui->tblInitConds->update();
     }
 }
+
 void MainWindow::on_actionSet_Input_Home_Dir_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -1298,10 +1381,11 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::ParamChanged", _tid);
+    assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::ParamChanged");
 #endif
     int idx = topLeft.row();
     std::string exprn = _modelMgr->Model(ds::INP)->Expression(idx);
+//std::cerr << exprn << std::endl;
     if (_modelMgr->AreModelsInitialized())
         try
         {

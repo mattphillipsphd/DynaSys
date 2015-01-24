@@ -1,12 +1,14 @@
-#ifndef CUDAKERNELWITHMEASURE_H
-#define CUDAKERNELWITHMEASURE_H
+#ifndef MEXFILEWITHMEASURE_H
+#define MEXFILEWITHMEASURE_H
 
-#include "cudakernel.h"
+#include "mexfile.h"
 
-class CudaKernelWithMeasure : public CudaKernel
+class MEXFileWithMeasure : public MEXFile
 {
     public:
-        CudaKernelWithMeasure(const std::string& name, const std::string& obj_fun);
+        static const int NUM_MEASURE_ARGS; //ipars, dpars, target
+
+        MEXFileWithMeasure(const std::string& name, const std::string& obj_fun);
 
         std::string ObjFunName() const;
 
@@ -16,6 +18,7 @@ class CudaKernelWithMeasure : public CudaKernel
         virtual void WriteDataOut(std::ofstream& out, ds::PMODEL mi) override;
         virtual void WriteExtraFuncs(std::ofstream& out) override;
         virtual void WriteIncludes(std::ofstream& out) override;
+        virtual void WriteInitArgs(std::ofstream& out) override;
         virtual void WriteMainBegin(std::ofstream& out) override;
         virtual void WriteMainEnd(std::ofstream& out) override;
         virtual void WriteModelLoopBegin(std::ofstream& out) override;
@@ -32,4 +35,4 @@ class CudaKernelWithMeasure : public CudaKernel
                 _objectiveFun;
 };
 
-#endif // CUDAKERNELWITHMEASURE_H
+#endif // MEXFILEWITHMEASURE_H
