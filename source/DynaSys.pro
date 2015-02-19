@@ -160,7 +160,7 @@ win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0
     MUPARSER_DIR    = C:/Users/matt/Libraries/muparser_v2_2_3
 } else {
-    QWT_DIR         = /home/matt/Libraries/qwt-6.1.0
+    QWT_DIR         = /home/matt/Libraries/qwt-6.1.2
     MUPARSER_DIR    = /home/matt/Libraries/muparser
 }
 
