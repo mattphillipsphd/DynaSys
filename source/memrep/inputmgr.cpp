@@ -68,6 +68,15 @@ void InputMgr::InputEval()
             input.NextInput();
     }
 }
+void InputMgr::JumpToSample(int n)
+{
+    const size_t num_inputs = _inputs.size();
+    for (size_t i=0; i<num_inputs; ++i)
+    {
+        const int ct = (int)( (double)n / (_modelMgr->ModelStep()) + 0.5 );
+        _inputs[i].SeekTo(ct);
+    }
+}
 
 
 InputMgr::InputMgr() : _modelMgr(ModelMgr::Instance())

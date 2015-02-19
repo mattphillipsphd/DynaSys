@@ -23,6 +23,7 @@ class TimePlot : public DrawBase
 
     private:
         std::vector<QColor> _colors;
+        double _lastPt;
         std::deque<double> _ip;
         DataVec _diffPts, _varPts;
         std::deque<Packet*> _packets;

@@ -84,7 +84,8 @@ SOURCES += main.cpp\
     generate/script/matlab_interface/mruncudakernel.cpp \
     generate/script/matlab_interface/mrunckwm.cpp \
     generate/script/matlab_interface/mrunmexwm.cpp \
-    generate/script/mexfilewm.cpp
+    generate/script/mexfilewm.cpp \
+    gui/eventviewer.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -146,7 +147,8 @@ HEADERS  += gui/mainwindow.h \
     generate/script/matlab_interface/mruncudakernel.h \
     generate/script/matlab_interface/mrunckwm.h \
     generate/script/matlab_interface/mrunmexwm.h \
-    generate/script/mexfilewm.h
+    generate/script/mexfilewm.h \
+    gui/eventviewer.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -154,13 +156,14 @@ FORMS    += forms/mainwindow.ui \
     forms/parameditor.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
-    forms/fastrungui.ui
+    forms/fastrungui.ui \
+    forms/eventviewer.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0
     MUPARSER_DIR    = C:/Users/matt/Libraries/muparser_v2_2_3
 } else {
-    QWT_DIR         = /home/matt/Libraries/qwt-6.1.0
+    QWT_DIR         = /home/matt/Libraries/qwt-6.1.2
     MUPARSER_DIR    = /home/matt/Libraries/muparser
 }
 

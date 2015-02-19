@@ -1,6 +1,6 @@
 #include "timeplot.h"
 
-TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot)
+TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot), _lastPt(0)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::TimePlot", std::this_thread::get_id());
@@ -52,12 +52,15 @@ void TimePlot::Initialize()
     _ip.clear();
     _diffPts = DataVec(num_diffs);
     _varPts = DataVec(num_vars);
+    _lastPt = 0;
 
     SetSpec("past_samps_ct", 0);
     SetSpec("dv_start", 0);
     SetSpec("dv_end", DrawBase::TP_WINDOW_LENGTH);
     SetSpec("y_tp_min", 0);
     SetSpec("y_tp_max", 0);
+    SetSpec("event_index", -1);
+    SetSpec("num_samples", 0);
     SetNonConstOpaqueSpec("dv_data", nullptr);
 
     DrawBase::Initialize();
@@ -132,6 +135,10 @@ void TimePlot::MakePlotItems()
             dv_end = dv_start + num_tp_points;
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
+    const int time_offset = Spec_toi("time_offset");//,
+//            event_index = Spec_toi("event_index");
+//    const double event_threshold = Spec_tod("event_thresh");
+//    const bool thresh_above = Spec_tob("thresh_above");
 
     TPVTableModel* tp_model = _modelMgr->TPVModel();
     const int num_all_tplots = 1 + num_diffs + num_vars,
@@ -149,6 +156,21 @@ void TimePlot::MakePlotItems()
 //              << ", " << dv_step_off << ", " << dv_end << std::endl;
     for (int i=0; i<num_all_tplots; ++i)
     {
+/*        if (i==event_index)
+        {
+            for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
+            {
+                double val;
+                if (i==0) val = _ip.at(k);
+                else if (i<=num_diffs) val = _diffPts.at(i-1).at(k);
+                else val = _varPts.at(i-num_diffs-1).at(k);
+                if (((thresh_above && val>=event_threshold) || (!thresh_above && val<event_threshold))
+                        && ((thresh_above && _lastPt<event_threshold) || (!thresh_above && _lastPt>=event_threshold)))
+                    emit Flag_i(k);
+                _lastPt = val;
+            }
+        }
+*/
         QwtPlotCurve* curv = static_cast<QwtPlotCurve*>( PlotItem(i) );
         if (!tp_model->IsEnabled(i))
         {
@@ -163,23 +185,23 @@ void TimePlot::MakePlotItems()
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF((past_samps_ct+k)*model_step, _ip.at(k)*scale);
+                points_tp[ct] = QPointF((past_samps_ct+k)*model_step+time_offset, _ip.at(k)*scale);
             curv->setSamples(points_tp);
         }
         else if (i<=num_diffs) //A differential
         {
-            int didx = i-1;
+            const int didx = i-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _diffPts.at(didx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step+time_offset, _diffPts.at(didx).at(k)*scale);
             curv->setSamples(points_tp);
         }
         else //A variable
         {
-            int vidx = i-num_diffs-1;
+            const int vidx = i-num_diffs-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _varPts.at(vidx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step+time_offset, _varPts.at(vidx).at(k)*scale);
             curv->setSamples(points_tp);
         }
     }

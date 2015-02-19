@@ -44,6 +44,7 @@ class Input
         void NextInput(int n = 1);
         double NextInputHalf() const;
         double SeeNextInput() const;
+        void SeekTo(int ct);
 
         int SamplesPerUnitTime() const { return _samplesPerUnitTime; }
         TYPE Type() const { return _type; }

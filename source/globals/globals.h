@@ -2,6 +2,7 @@
 #define GLOBALS_H
 
 #include <cctype>
+#include <exception>
 #include <map>
 #include <string>
 #include <thread>

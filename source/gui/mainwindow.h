@@ -34,6 +34,7 @@
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
 #include "dspinboxdelegate.h"
+#include "eventviewer.h"
 #include "fastrungui.h"
 #include "loggui.h"
 #include "notesgui.h"
@@ -112,6 +113,9 @@ class MainWindow : public QMainWindow
 
     public slots:
         void Error();
+        void EventViewerSelection(int i);
+        void EventViewerThreshold(double d);
+        void EventViewerIsAbove(bool b);
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
         void LoadTempModel(void* models);
@@ -139,6 +143,7 @@ class MainWindow : public QMainWindow
         void on_actionCreate_SO_triggered();
         void on_actionCUDA_kernel_with_measure_triggered();
         void on_actionCompile_Run_triggered();
+        void on_actionEvent_Viewer_triggered();
         void on_actionExit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
@@ -162,6 +167,7 @@ class MainWindow : public QMainWindow
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
+        void on_btnJumpToN_clicked();
         void on_btnRemoveCondition_clicked();
         void on_btnRemoveExpression_clicked();
         void on_btnRemoveDiff_clicked();
@@ -181,6 +187,7 @@ class MainWindow : public QMainWindow
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
 
+        void on_edJumpToN_returnPressed();
         void on_edModelStep_editingFinished();
         void on_edNumTPSamples_editingFinished();
 
@@ -243,11 +250,12 @@ class MainWindow : public QMainWindow
         void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
 
-        AboutGui* _aboutGui;
-        FastRunGui* _fastRunGui;
-        LogGui* _logGui;
-        NotesGui* _notesGui;
-        ParamEditor* _paramEditor;
+        AboutGui* const _aboutGui;
+        EventViewer* const _eventViewer;
+        FastRunGui* const _fastRunGui;
+        LogGui* const _logGui;
+        NotesGui* const _notesGui;
+        ParamEditor* const _paramEditor;
 
         DrawMgr* const _drawMgr;
         std::string _fileName;

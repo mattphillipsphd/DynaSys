@@ -138,6 +138,8 @@ class DrawBase : public QObject
         void Flag1();
         void Flag2();
         void Flag3();
+        void Flag_i(int);
+        void Flag_d(double);
         void ReadyToDelete();
 
     protected slots:

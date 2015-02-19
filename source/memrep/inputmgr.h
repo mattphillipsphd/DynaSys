@@ -17,6 +17,8 @@ class InputMgr
             //Assign the source of the data for the variables
         void ClearInputs();
         void InputEval();
+            //To be called on every iteration of the model
+        void JumpToSample(int n);
 
     private:
         InputMgr();

@@ -131,6 +131,13 @@ double Input::SeeNextInput() const
 {
     return _input[_ct+1];
 }
+void Input::SeekTo(int ct)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("Input::SeekTo", std::this_thread::get_id());
+#endif
+    _ct = ct;
+}
 
 void Input::DeepCopy(const Input& other)
 {

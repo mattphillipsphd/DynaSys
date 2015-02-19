@@ -16,7 +16,7 @@ const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()),
+    _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
@@ -106,6 +106,10 @@ MainWindow::MainWindow(QWidget *parent) :
     _aboutGui->setWindowModality(Qt::ApplicationModal);
     _fastRunGui->setWindowModality(Qt::ApplicationModal);
 
+//    connect(_eventViewer, SIGNAL(ListSelection(int)), this, SLOT(EventViewerSelection(int)));
+//    connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
+//    connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
+
 //    _timer.start(PLOT_REFRESH);
 }
 MainWindow::~MainWindow()
@@ -168,6 +172,30 @@ void MainWindow::Error()
     _paramEditor->setEnabled(true);
     _logGui->show();
     _timer.stop();
+}
+void MainWindow::EventViewerSelection(int i)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerSelection", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("event_index", i);
+}
+void MainWindow::EventViewerThreshold(double d)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerThreshold", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("event_thresh", d);
+}
+void MainWindow::EventViewerIsAbove(bool b)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerIsAbove", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("thresh_above", b);
 }
 void MainWindow::LoadTempModel(void* models) //slot
 {
@@ -320,6 +348,7 @@ void MainWindow::closeEvent(QCloseEvent *)
     ScopeTracker st("MainWindow::closeEvent", _tid);
 #endif
     _aboutGui->close();
+    _eventViewer->close();
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
@@ -495,6 +524,14 @@ void MainWindow::on_actionCompile_Run_triggered()
     _fastRunGui->SetMethod(FastRunGui::COMPILED);
     _fastRunGui->show();
     setEnabled(false);
+}
+
+void MainWindow::on_actionEvent_Viewer_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionEvent_Viewer_triggered", _tid);
+#endif
+    _eventViewer->show();
 }
 
 void MainWindow::on_actionExit_triggered()
@@ -775,6 +812,22 @@ void MainWindow::on_btnAddVariable_clicked()
         UpdateTimePlotTable();
     }
 }
+void MainWindow::on_btnJumpToN_clicked()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnJumpToN_clicked", _tid);
+#endif
+    bool ok;
+    const int n = ui->edJumpToN->text().toInt(&ok);
+    if (ok && n>=0)
+    {
+        InputMgr::Instance()->JumpToSample(n);
+        DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+        const int time_now = (tp->Spec_toi("past_samps_ct")+tp->Spec_toi("dv_end"))
+                * _modelMgr->ModelStep() + 0.5;
+        tp->SetSpec("time_offset", n - time_now);
+    }
+}
 void MainWindow::on_btnRemoveCondition_clicked()
 {
 #ifdef DEBUG_FUNC
@@ -864,6 +917,8 @@ void MainWindow::on_btnStart_clicked()
             }
             _drawMgr->Start();
             _timer.start(PLOT_REFRESH);
+//            _eventViewer->Start(0);
+//            connect(_drawMgr->GetObject(DrawBase::TIME_PLOT), SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
             break;
         }
     }
@@ -1044,6 +1099,13 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
     UpdateSlider(index);
 }
 
+void MainWindow::on_edJumpToN_returnPressed()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_edJumpToN_editingFinished", _tid);
+#endif
+    on_btnJumpToN_clicked();
+}
 void MainWindow::on_edModelStep_editingFinished()
 {
 #ifdef DEBUG_FUNC
@@ -1413,7 +1475,7 @@ void MainWindow::Replot()
 #endif
     try
     {
-        DrawBase* pp;
+        DrawBase* pp(nullptr);
         switch (_plotMode)
         {
             case SINGLE:
@@ -1459,10 +1521,12 @@ void MainWindow::Replot()
                         dv_end = tp->Spec_toi("dv_end"),
                         y_tp_min = tp->Spec_toi("y_tp_min"),
                         y_tp_max = tp->Spec_toi("y_tp_max"),
-                        past_samps_ct = tp->Spec_toi("past_samps_ct");
-                ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep(),
-                                  (past_samps_ct+dv_end)*_modelMgr->ModelStep(),
-                                  y_tp_min, y_tp_max );
+                        past_samps_ct = tp->Spec_toi("past_samps_ct"),
+                        time_offset = tp->Spec_toi("time_offset");
+                ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep()+time_offset,
+                                  (past_samps_ct+dv_end)*_modelMgr->ModelStep()+time_offset,
+                                  y_tp_min,
+                                  y_tp_max );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
 
@@ -1771,6 +1835,7 @@ void MainWindow::UpdateLists()
     UpdatePulseVList();
     UpdateSliderPList();
     UpdateTimePlotTable();
+    _eventViewer->SetList( _modelMgr->DiffVarList() );
     if (_modelMgr->Model(ds::COND)->NumPars()>0)
         ui->lsConditions->setCurrentIndex( ui->lsConditions->model()->index(0,0) );
 }
@@ -1858,7 +1923,10 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("make_plots", true);
             break;
         case DrawBase::TIME_PLOT:
-            draw_object->SetSpec("num_samples", _numTPSamples);
+            draw_object->SetSpec("event_index", -1);
+            draw_object->SetSpec("event_thresh", 1);
+            draw_object->SetSpec("thresh_above", true);
+            draw_object->SetSpec("time_offset", 0);
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:
@@ -1885,12 +1953,7 @@ void MainWindow::UpdateTimePlotTable()
     ScopeTracker st("MainWindow::UpdateTimePlotTable", _tid);
 #endif
     delete ui->tblTimePlot->model();
-    VecStr vs,
-            dkeys = _modelMgr->Model(ds::DIFF)->ShortKeys(),
-            vkeys = _modelMgr->Model(ds::VAR)->Keys();
-    vs.push_back("IP");
-    vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
-    vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());
+    VecStr vs = _modelMgr->DiffVarList();
 
     TPVTableModel* model = new TPVTableModel(vs, this);
     _modelMgr->SetTPVModel(model);

@@ -126,6 +126,16 @@ VecStr ModelMgr::CondResults(size_t row) const
 {
     return CondModel()->Results(row);
 }
+VecStr ModelMgr::DiffVarList() const
+{
+    VecStr vs,
+            dkeys = Model(ds::DIFF)->ShortKeys(),
+            vkeys = Model(ds::VAR)->Keys();
+    vs.push_back("IP");
+    vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
+    vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());
+    return vs;
+}
 bool ModelMgr::IsFreeze(ds::PMODEL mi, size_t idx) const
 {
     return _models[mi]->IsFreeze(idx);
