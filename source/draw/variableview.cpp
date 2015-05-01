@@ -26,7 +26,7 @@ void* VariableView::DataCopy() const
     std::lock_guard<std::mutex> lock( Mutex() );
     QPolygonF* data = new QPolygonF[_numFuncs];
     auto cdata = static_cast<const QPolygonF*>( ConstData() );
-    for (size_t i=0; i<_numFuncs; ++i)
+    for (int i=0; i<_numFuncs; ++i)
         data[i] = cdata[i];
     return data;
 }

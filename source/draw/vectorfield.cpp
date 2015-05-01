@@ -55,8 +55,8 @@ void VectorField::ComputeData()
             std::lock_guard<std::mutex> lock( Mutex() );
             RecomputeIfNeeded();
             QPolygonF* data = new QPolygonF[_resolution*_resolution];
-            for (int i=0; i<_resolution; ++i)
-                for (int j=0; j<_resolution; ++j)
+            for (size_t i=0; i<_resolution; ++i)
+                for (size_t j=0; j<_resolution; ++j)
                 {
                     const int idx = i*_resolution+j;
                     ParserMgr& parser_mgr = GetParserMgr(idx);
@@ -161,7 +161,7 @@ void VectorField::InitParserMgrs()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::InitParserMgrs", std::this_thread::get_id());
 #endif
-    _resolution = Spec_toi("resolution");
+    _resolution = (size_t)Spec_toi("resolution");
     FreezeNonUser();
     DrawBase::InitParserMgrs(_resolution*_resolution);
 }
@@ -171,10 +171,10 @@ void VectorField::ResetPlotItems()
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::ResetPlotItems", std::this_thread::get_id());
 #endif
-    const int resolution2 = _resolution*_resolution;
+    const size_t resolution2 = _resolution*_resolution;
 
     ReservePlotItems(resolution2*3);
-    for (int i=0; i<resolution2; ++i)
+    for (size_t i=0; i<resolution2; ++i)
     {
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
             QBrush(Qt::gray), QPen(Qt::gray, 2), QSize(2, 2) );

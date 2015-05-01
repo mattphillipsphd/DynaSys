@@ -7,6 +7,13 @@
 #include "../globals/globals.h"
 #include "../globals/log.h"
 
+#include <qwt_scale_div.h>
+#include <qwt_plot.h>
+#include <qwt_plot_curve.h>
+#include <qwt_plot_marker.h>
+#include <qwt_plot_renderer.h>
+#include <qwt_symbol.h>
+
 namespace Ui {
 class EventViewer;
 }
@@ -20,10 +27,16 @@ class EventViewer : public QWidget
         ~EventViewer();
 
         void SetList(const VecStr& vs);
-        void Start(int start_time);
+        void Start(int);
+        void Stop();
+
+        bool IsThreshAbove() const;
+        double Threshold() const;
+        int VarIndex() const;
 
     public slots:
         void Event(int ev_time);
+        void TimePoints(double point_ct);
 
     protected:
         virtual void closeEvent(QCloseEvent*) override;
@@ -41,8 +54,11 @@ class EventViewer : public QWidget
 
         void on_cmbDiffVars_currentIndexChanged(int index);
 
+        void on_edBinWidth_editingFinished();
+        void on_edRowLen_editingFinished();
         void on_edThresh_editingFinished();
 
+        void RevertLabel();
         void UpdateCount();
 
     private:
@@ -54,9 +70,19 @@ class EventViewer : public QWidget
             BELOW
         };
 
-        int _ct;
-        int _currentTime, _startTime;
-        QTimer _timer;
+        static const int MAX_BINS = 1024 * 1024;
+
+        void ResetAll();
+        void ResetData();
+
+        int _binWidth, _ct;
+        QwtPlotCurve* _sdfCurve;
+        const std::vector<QColor> _colors;
+        double _currentTime, _startTime;
+        int _eventCounts[MAX_BINS];
+        QTimer _evTimer, _updateTimer;
+        std::mutex _mutex;
+        int _numRows, _rowLength;
 };
 
 #endif // EVENTVIEWER_H

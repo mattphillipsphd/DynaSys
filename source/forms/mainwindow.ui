@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1404</width>
+    <width>1494</width>
     <height>972</height>
    </rect>
   </property>
@@ -586,8 +586,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1404</width>
-     <height>20</height>
+     <width>1494</width>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -614,8 +614,9 @@
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>Edit</string>
+     <string>Edit/View</string>
     </property>
+    <addaction name="actionEvent_Viewer"/>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
     <addaction name="actionSet_Init_to_Current"/>
@@ -634,16 +635,9 @@
     <addaction name="actionCUDA_kernel_with_measure"/>
     <addaction name="actionAll_MEX_and_CUDA"/>
    </widget>
-   <widget class="QMenu" name="menuView">
-    <property name="title">
-     <string>View</string>
-    </property>
-    <addaction name="actionEvent_Viewer"/>
-   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuRun"/>
    <addaction name="menuEdit"/>
-   <addaction name="menuView"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">

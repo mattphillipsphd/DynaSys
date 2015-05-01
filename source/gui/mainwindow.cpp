@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
-    _tid(std::this_thread::get_id()), _tpColors(InitTPColors()),
+    _tid(std::this_thread::get_id()), _tpColors(ds::TraceColors()),
     _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
 #ifdef Q_OS_WIN
@@ -101,14 +101,13 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->qwtTimePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
 
     connect(_drawMgr, SIGNAL(Error()), this, SLOT(Error()));
-    connect(_log, SIGNAL(OpenGui()), this, SLOT(Error()));
 
     _aboutGui->setWindowModality(Qt::ApplicationModal);
     _fastRunGui->setWindowModality(Qt::ApplicationModal);
 
-//    connect(_eventViewer, SIGNAL(ListSelection(int)), this, SLOT(EventViewerSelection(int)));
-//    connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
-//    connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
+    connect(_eventViewer, SIGNAL(ListSelection(int)), this, SLOT(EventViewerSelection(int)));
+    connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
+    connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
 
 //    _timer.start(PLOT_REFRESH);
 }
@@ -156,6 +155,7 @@ void MainWindow::FastRunFinished()
     setEnabled(true);
     _drawMgr->Stop();
     ui->btnStart->setText("Start");
+    StopEventViewer();
 }
 void MainWindow::Error()
 {
@@ -891,12 +891,15 @@ void MainWindow::on_btnStart_clicked()
     switch (_drawMgr->DrawState())
     {
         case DrawBase::DRAWING:
+        {
             _drawMgr->Stop();
             ui->btnStart->setText("Start");
             SetButtonsEnabled(true);            
             _paramEditor->setEnabled(true);
             _timer.stop();
+            StopEventViewer();
             break;
+        }
         case DrawBase::PAUSED:
             _drawMgr->Resume();
             ui->btnStart->setText("Stop");
@@ -917,8 +920,7 @@ void MainWindow::on_btnStart_clicked()
             }
             _drawMgr->Start();
             _timer.start(PLOT_REFRESH);
-//            _eventViewer->Start(0);
-//            connect(_drawMgr->GetObject(DrawBase::TIME_PLOT), SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
+            StartEventViewer();
             break;
         }
     }
@@ -1294,6 +1296,8 @@ void MainWindow::DoFastRun()
     disconnect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()));
     disconnect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()));
 
+    StartEventViewer();
+
     const int num_iters = _numSimSteps / _modelMgr->ModelStep() + 0.5;
     _drawMgr->Start(DrawBase::SINGLE, num_iters);
 }
@@ -1336,29 +1340,6 @@ void MainWindow::InitDefaultModel()
     SaveModel(ds::TEMP_MODEL_FILE);
 }
 
-const std::vector<QColor> MainWindow::InitTPColors() const
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::InitTPColors", _tid);
-#endif
-    std::vector<QColor> vc;
-    vc.push_back(Qt::black);
-    vc.push_back(Qt::blue);
-    vc.push_back(Qt::red);
-    vc.push_back(Qt::green);
-    vc.push_back(Qt::gray);
-    vc.push_back(Qt::cyan);
-    vc.push_back(Qt::magenta);
-    vc.push_back(Qt::yellow);
-    vc.push_back(Qt::darkBlue);
-    vc.push_back(Qt::darkRed);
-    vc.push_back(Qt::darkGreen);
-    vc.push_back(Qt::darkGray);
-    vc.push_back(Qt::darkCyan);
-    vc.push_back(Qt::darkMagenta);
-    vc.push_back(Qt::darkYellow);
-    return vc;
-}
 void MainWindow::InitViews()
 {
 #ifdef DEBUG_MW_FUNC
@@ -1827,6 +1808,29 @@ void MainWindow::SetZPlotShown(bool is_shown)
         ui->lblPlotZ->hide();
     }
 }
+void MainWindow::StartEventViewer()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StartEventViewer", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
+    tp->SetSpec("event_index", _eventViewer->VarIndex());
+    connect(tp, SIGNAL(Flag_d(double)), _eventViewer, SLOT(TimePoints(double)));
+    connect(tp, SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
+    _eventViewer->Start(0);
+}
+void MainWindow::StopEventViewer()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StopEventViewer", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
+    disconnect(tp, SIGNAL(Flag_d(double)), _eventViewer, SLOT(TimePoints(double)));
+    disconnect(tp, SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
+    _eventViewer->Stop();
+}
 void MainWindow::UpdateLists()
 {
 #ifdef DEBUG_FUNC
@@ -1924,8 +1928,9 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             break;
         case DrawBase::TIME_PLOT:
             draw_object->SetSpec("event_index", -1);
-            draw_object->SetSpec("event_thresh", 1);
-            draw_object->SetSpec("thresh_above", true);
+            draw_object->SetSpec("event_thresh", _eventViewer->Threshold());
+            draw_object->SetSpec("thresh_above", _eventViewer->IsThreshAbove());
+            draw_object->SetSpec("num_samples", _numTPSamples);
             draw_object->SetSpec("time_offset", 0);
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;

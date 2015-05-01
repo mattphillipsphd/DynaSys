@@ -177,7 +177,7 @@ void Input::LoadBinInput(const std::string& file_name)
     ScopeTracker st("Input::LoadBinInput", std::this_thread::get_id());
 #endif
     FILE* fp = fopen(file_name.c_str(), "rb");
-    if (!fp) throw std::runtime_error("Input::LoadTextInput: File "
+    if (!fp) throw std::runtime_error("Input::LoadBinInput: File "
                                                   + file_name + " failed to open.");
 
     int vnum;

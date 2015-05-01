@@ -23,8 +23,8 @@ class VectorField : public DrawBase
         void InitParserMgrs();
         void ResetPlotItems(); //Reset parser and plot items
 
-        int _resolution, //thread-local
-            _tailLength;
+        size_t _resolution; //thread-local
+        int _tailLength;
         std::deque<QPolygonF*> _packets;
 };
 

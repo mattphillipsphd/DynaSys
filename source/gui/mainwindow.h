@@ -225,7 +225,6 @@ class MainWindow : public QMainWindow
         void ConnectModels();
         void DoFastRun();
         void InitDefaultModel();
-        const std::vector<QColor> InitTPColors() const;
         void InitViews();
         void LoadModel(const std::string& file_name);
         ViewRect PhasePlotLimits() const;
@@ -240,6 +239,8 @@ class MainWindow : public QMainWindow
         void SetSaveActionsEnabled(bool is_enabled);
         void SetTPShown(bool is_shown);
         void SetZPlotShown(bool is_shown);
+        void StartEventViewer();
+        void StopEventViewer();
         void UpdateLists();
         void UpdateNotes();
         void UpdateParamEditor();
