@@ -1,7 +1,9 @@
 #include "eventviewer.h"
 #include "ui_eventviewer.h"
 
+#ifndef Q_OS_WIN
 const int EventViewer::MAX_BINS;
+#endif
 
 EventViewer::EventViewer(QWidget *parent) :
     QWidget(parent),
@@ -16,6 +18,9 @@ EventViewer::EventViewer(QWidget *parent) :
     connect(&_updateTimer, SIGNAL(timeout()), this, SLOT(UpdateCount()), Qt::QueuedConnection);
     ui->buttonGroup->setId(ui->rbtnAbove, ABOVE);
     ui->buttonGroup->setId(ui->rbtnBelow, BELOW);
+
+    ui->qwtEventRate->setAxisTitle( QwtPlot::xBottom, "Time" );
+    ui->qwtEventRate->setAxisTitle( QwtPlot::yLeft, "Thresh. crossings per unit time x1000" );
 
     _sdfCurve = new QwtPlotCurve;
     _sdfCurve->setPen( QPen(_colors.at(0)) );
