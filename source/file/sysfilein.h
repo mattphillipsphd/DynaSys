@@ -1,0 +1,32 @@
+#ifndef SYSFILEIN_H
+#define SYSFILEIN_H
+
+#include <string>
+#include <fstream>
+
+#include "../globals/scopetracker.h"
+#include "../memrep/modelmgr.h"
+#include "../memrep/notes.h"
+#include "../models/parammodelbase.h"
+
+class SysFileIn
+{
+    public:
+        SysFileIn(const std::string& name);
+
+        void Load();
+        void Load(VecStr& vmodels);
+
+    private:
+        std::vector<ParamModelBase*> ReadModels();
+        double ReadModelStep();
+        Notes* ReadNotes();
+        int ReadNumModels();
+        int ReadVersion();
+
+        const std::string _name;
+        std::ifstream _in;
+};
+
+
+#endif // SYSFILEIN_H
