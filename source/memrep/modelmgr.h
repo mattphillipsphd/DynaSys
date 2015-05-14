@@ -53,6 +53,7 @@ class ModelMgr
         bool AreModelsInitialized() const;
         VecStr CondResults(size_t row) const;
         DIFF_METHOD DiffMethod() const { return _diffMethod; }
+        VecStr DiffVarList() const;
         const Notes* GetNotes() const { return _notes; }
         bool IsFreeze(ds::PMODEL mi, size_t idx) const;
         double Maximum(ds::PMODEL mi, size_t idx) const;

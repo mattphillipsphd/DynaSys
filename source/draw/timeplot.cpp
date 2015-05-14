@@ -1,6 +1,6 @@
 #include "timeplot.h"
 
-TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot)
+TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot), _lastPt(0)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("TimePlot::TimePlot", std::this_thread::get_id());
@@ -52,6 +52,7 @@ void TimePlot::Initialize()
     _ip.clear();
     _diffPts = DataVec(num_diffs);
     _varPts = DataVec(num_vars);
+    _eventPointCt = _lastPt = 0;
 
     SetSpec("past_samps_ct", 0);
     SetSpec("dv_start", 0);
@@ -123,6 +124,7 @@ void TimePlot::MakePlotItems()
             _varPts[i].erase(_varPts[i].begin(), _varPts[i].begin()+overflow);
         _ip.erase(_ip.begin(), _ip.begin()+overflow);
         past_samps_ct += overflow;
+        _lastPt -= overflow;
     }
     SetSpec("past_samps_ct", past_samps_ct);
 
@@ -132,6 +134,10 @@ void TimePlot::MakePlotItems()
             dv_end = dv_start + num_tp_points;
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
+    const int time_offset = Spec_toi("time_offset"),
+            event_index = Spec_toi("event_index");
+    const double event_threshold = Spec_tod("event_thresh");
+    const bool thresh_above = Spec_tob("thresh_above");
 
     TPVTableModel* tp_model = _modelMgr->TPVModel();
     const int num_all_tplots = 1 + num_diffs + num_vars,
@@ -145,9 +151,28 @@ void TimePlot::MakePlotItems()
         last_step = step;
     const int dv_step_off = step - (dv_start % step);
     const double model_step = _modelMgr->ModelStep();
-
+//    std::cerr << step << ", " << num_plotted_pts << ", " << past_samps_ct << ", " << dv_start
+//              << ", " << dv_step_off << ", " << dv_end << std::endl;
+    static double last_val = event_threshold;
     for (int i=0; i<num_all_tplots; ++i)
     {
+        if (i==event_index)
+        {
+            for (int k=_lastPt; k<num_tp_points; ++k, ++_eventPointCt)
+            {
+                double val;
+                if (i==0) val = _ip.at(k);
+                else if (i<=num_diffs) val = _diffPts.at(i-1).at(k);
+                else val = _varPts.at(i-num_diffs-1).at(k);
+
+                if ((!thresh_above && val>=event_threshold && last_val<event_threshold)
+                        || (thresh_above && val<=event_threshold && last_val>=event_threshold))
+                    emit Flag_i( (double)_eventPointCt * model_step + 0.5 );
+
+                last_val = val;
+            }
+        }
+
         QwtPlotCurve* curv = static_cast<QwtPlotCurve*>( PlotItem(i) );
         if (!tp_model->IsEnabled(i))
         {
@@ -162,26 +187,28 @@ void TimePlot::MakePlotItems()
         {
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF((past_samps_ct+k)*model_step, _ip.at(k)*scale);
+                points_tp[ct] = QPointF((past_samps_ct+k)*model_step+time_offset, _ip.at(k)*scale);
             curv->setSamples(points_tp);
         }
         else if (i<=num_diffs) //A differential
         {
-            int didx = i-1;
+            const int didx = i-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _diffPts.at(didx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step+time_offset, _diffPts.at(didx).at(k)*scale);
             curv->setSamples(points_tp);
         }
         else //A variable
         {
-            int vidx = i-num_diffs-1;
+            const int vidx = i-num_diffs-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
-                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step, _varPts.at(vidx).at(k)*scale);
+                points_tp[ct] = QPointF( (past_samps_ct+k)*model_step+time_offset, _varPts.at(vidx).at(k)*scale);
             curv->setSamples(points_tp);
         }
     }
+    _lastPt = num_tp_points;
+    emit Flag_d( (double)_eventPointCt * model_step );
 
     //Get axis limits
     double y_tp_min(std::numeric_limits<double>::max()),

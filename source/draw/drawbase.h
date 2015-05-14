@@ -49,6 +49,7 @@ class DrawBase : public QObject
 
         static const int MAX_BUF_SIZE,
                         TP_WINDOW_LENGTH;
+        static const std::string EMPTY_STRING;
 
         struct Packet
         {
@@ -134,10 +135,13 @@ class DrawBase : public QObject
 
     signals:
         void ComputeComplete(int num_iters);
+        void DFlag(); //Only to be used in derived classes
         void Error() const;
         void Flag1();
         void Flag2();
         void Flag3();
+        void Flag_i(int);
+        void Flag_d(double);
         void ReadyToDelete();
 
     protected slots:

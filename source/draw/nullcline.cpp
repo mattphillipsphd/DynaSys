@@ -34,7 +34,6 @@ void Nullcline::ComputeData()
         if (!NeedNewStep() && !NeedRecompute())
             goto label;{
 
-        FreezeNonUser();
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
                 resolution = Spec_toi("resolution")*2,
@@ -153,6 +152,7 @@ void Nullcline::Initialize()
 #endif
     _colors = *static_cast< const std::vector<QColor>* >( OpaqueSpec("colors") );
     SetNeedRecompute(true);
+    FreezeNonUser();
     const int resolution = Spec_toi("resolution")*2,
             resolution2 = resolution*resolution;
     InitParserMgrs(resolution2);

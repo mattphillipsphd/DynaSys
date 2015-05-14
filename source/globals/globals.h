@@ -2,6 +2,7 @@
 #define GLOBALS_H
 
 #include <cctype>
+#include <exception>
 #include <map>
 #include <string>
 #include <thread>
@@ -65,6 +66,7 @@ namespace ds
     std::string StripPath(const std::string& file_name);
     std::string StripQuotes(const std::string& str);
 
+    const std::vector<QColor> TraceColors();
     QColor ThreadColor(std::thread::id tid);
 
     template<typename T>

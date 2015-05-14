@@ -77,7 +77,15 @@ SOURCES += main.cpp\
     memrep/inputmgr.cpp \
     generate/script/matlabbase.cpp \
     generate/script/cudakernelwithmeasure.cpp \
-    gui/paramselector.cpp
+    generate/script/matlab_interface/mrunbase.cpp \
+    generate/script/matlab_interface/mrunmex.cpp \
+    generate/script/matlab_interface/mfilebase.cpp \
+    generate/script/matlab_interface/mdefsfile.cpp \
+    generate/script/matlab_interface/mruncudakernel.cpp \
+    generate/script/matlab_interface/mrunckwm.cpp \
+    generate/script/matlab_interface/mrunmexwm.cpp \
+    generate/script/mexfilewm.cpp \
+    gui/eventviewer.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -132,7 +140,15 @@ HEADERS  += gui/mainwindow.h \
     memrep/inputmgr.h \
     generate/script/matlabbase.h \
     generate/script/cudakernelwithmeasure.h \
-    gui/paramselector.h
+    generate/script/matlab_interface/mrunbase.h \
+    generate/script/matlab_interface/mrunmex.h \
+    generate/script/matlab_interface/mfilebase.h \
+    generate/script/matlab_interface/mdefsfile.h \
+    generate/script/matlab_interface/mruncudakernel.h \
+    generate/script/matlab_interface/mrunckwm.h \
+    generate/script/matlab_interface/mrunmexwm.h \
+    generate/script/mexfilewm.h \
+    gui/eventviewer.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -141,13 +157,13 @@ FORMS    += forms/mainwindow.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
     forms/fastrungui.ui \
-    forms/paramselector.ui
+    forms/eventviewer.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0
     MUPARSER_DIR    = C:/Users/matt/Libraries/muparser_v2_2_3
 } else {
-    QWT_DIR         = /home/matt/Libraries/qwt-6.1.0
+    QWT_DIR         = /home/matt/Libraries/qwt-6.1.2
     MUPARSER_DIR    = /home/matt/Libraries/muparser
 }
 
@@ -180,4 +196,3 @@ win32 {
 #For Ubuntu on the home desktop
 #INCLUDEPATH += /home/matt/openblas/openblas-0.2.6-nothread/lapack-3.4.2/lapacke/include
 #LIBS += /home/matt/openblas/openblas-0.2.6-nothread/libopenblas.a -lgfortran
-

@@ -2,25 +2,31 @@
 #define MATLABBASE_H
 
 #include "cfilebase.h"
+#include "matlab_interface/mdefsfile.h"
+#include "matlab_interface/mrunbase.h"
 
 //This abstract class is for all file types that will be run through Matlab
 class MatlabBase : public CFileBase
 {
     public:
-        MatlabBase(const std::string& name, const std::string& extension);
+        enum FILE_TYPE
+        {
+            MEX = 0,
+            MEX_WM,
+            CUDA,
+            CUDA_WM
+        };
 
-        void MakeMFiles();
+        MatlabBase(const std::string& name, const std::string& extension, FILE_TYPE type);
 
-        virtual std::string NameMDefs() const = 0;
-        virtual std::string NameMRun() const = 0;
+        void MakeMFiles() const;
 
     protected:
-        virtual void MakeMDefsFile();
-        virtual void MakeMRunFile() = 0;
-
-        static const int NUM_AUTO_ARGS;
+        MDefsFile* const _mDefsFile;
+        MRunBase* const _mRunFile;
 
     private:
+        MRunBase* MRunFactory(FILE_TYPE type, const std::string& name) const;
 };
 
 #endif // MATLABBASE_H

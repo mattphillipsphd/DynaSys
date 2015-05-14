@@ -11,6 +11,8 @@ const uchar DrawBase::Packet::TP_READ = (uchar)1 << 1;
 const int DrawBase::MAX_BUF_SIZE = 8 * 1024 * 1024;
 const int DrawBase::TP_WINDOW_LENGTH = 1000;
 
+const std::string DrawBase::EMPTY_STRING = "";
+
 DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
 {
     DrawBase* draw_object(nullptr);
@@ -112,7 +114,7 @@ bool DrawBase::IsSpec(const std::string& key) const
     ScopeTracker st("DrawBase::IsSpec", std::this_thread::get_id());
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
-    return _specs.find(key) != _specs.end();
+    return !_specs.empty() && _specs.find(key) != _specs.end();
 }
 long long int DrawBase::IterCt() const
 {
@@ -181,7 +183,7 @@ const std::string& DrawBase::Spec(const std::string& key) const
         _log->AddExcept("DrawBase::Spec: Bad key, " + key
                         + ", for draw type " + std::to_string(_drawType));
         emit Error();
-        return "";
+        return EMPTY_STRING;
     }
 }
 bool DrawBase::Spec_tob(const std::string& key) const

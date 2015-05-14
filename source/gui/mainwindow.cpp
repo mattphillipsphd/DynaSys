@@ -16,13 +16,18 @@ const int MainWindow::XY_SAMPLES_SHOWN = 128 * 1024;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
+<<<<<<< HEAD
     _aboutGui(new AboutGui()), _fastRunGui(new FastRunGui()),
     _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()), _paramSelector(new ParamSelector()),
+=======
+    _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
+    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+>>>>>>> master
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
     _singleStepsSec(DEFAULT_SINGLE_STEP), _singleTailLen(DEFAULT_SINGLE_TAIL),
-    _tid(std::this_thread::get_id()), _tpColors(InitTPColors()),
+    _tid(std::this_thread::get_id()), _tpColors(ds::TraceColors()),
     _vfStepsSec(DEFAULT_VF_STEP), _vfTailLen(DEFAULT_VF_TAIL)
 {
 #ifdef Q_OS_WIN
@@ -101,10 +106,13 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->qwtTimePlot, SIGNAL(MouseClick()), this, SLOT(Pause()));
 
     connect(_drawMgr, SIGNAL(Error()), this, SLOT(Error()));
-    connect(_log, SIGNAL(OpenGui()), this, SLOT(Error()));
 
     _aboutGui->setWindowModality(Qt::ApplicationModal);
     _fastRunGui->setWindowModality(Qt::ApplicationModal);
+
+    connect(_eventViewer, SIGNAL(ListSelection(int)), this, SLOT(EventViewerSelection(int)));
+    connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
+    connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
 
 //    _timer.start(PLOT_REFRESH);
 }
@@ -152,6 +160,7 @@ void MainWindow::FastRunFinished()
     setEnabled(true);
     _drawMgr->Stop();
     ui->btnStart->setText("Start");
+    StopEventViewer();
 }
 void MainWindow::Error()
 {
@@ -168,6 +177,30 @@ void MainWindow::Error()
     _paramEditor->setEnabled(true);
     _logGui->show();
     _timer.stop();
+}
+void MainWindow::EventViewerSelection(int i)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerSelection", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("event_index", i);
+}
+void MainWindow::EventViewerThreshold(double d)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerThreshold", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("event_thresh", d);
+}
+void MainWindow::EventViewerIsAbove(bool b)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::EventViewerIsAbove", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    tp->SetSpec("thresh_above", b);
 }
 void MainWindow::LoadTempModel(void* models) //slot
 {
@@ -320,11 +353,55 @@ void MainWindow::closeEvent(QCloseEvent *)
     ScopeTracker st("MainWindow::closeEvent", _tid);
 #endif
     _aboutGui->close();
+    _eventViewer->close();
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
 }
 
+void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionAll_MEX_and_CUDA_triggered", _tid);
+#endif
+    std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
+                                                         "Select objective function (measure)",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (objective_fun.empty()) return;
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select model file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetMEXFilesDir(file_name);
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
+        MEXFile mf(file_name);
+        mf.Make();
+        mf.MakeMFiles();
+        DDM::SetCudaFilesDir(file_name);
+        CudaKernelWithMeasure ckwm(file_name, objective_fun);
+        ckwm.Make();
+        ckwm.MakeMFiles();
+        CudaKernel ck(file_name);
+        ck.Make();
+        ck.MakeMFiles();
+        _log->AddMesg("MEX file with measure " + ds::StripPath(objective_fun)
+                      + ", standard MEX file, and associated m-files created."
+                      "  The MEX file with measure file has an '_mm' suffix appended to it.  Both"
+                      " need to be compiled with mex.");
+        _log->AddMesg("CUDA kernel file with measure " + ds::StripPath(objective_fun)
+                      + ", standard CUDA kernel, and associated m-files created."
+                      "  The kernel file has an '_cm' suffix appended to it.  Both"
+                      " need to be compiled with nvcc and the -ptx option.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCUDA_kernel_with_measure_triggered: " + std::string(e.what()));
+    }
+}
 void MainWindow::on_actionAbout_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -358,7 +435,8 @@ void MainWindow::on_actionCreate_CUDA_kernel_triggered()
         CudaKernel cuda_kernel(file_name);
         cuda_kernel.Make();
         cuda_kernel.MakeMFiles();
-        _log->AddMesg("CUDA kernel file " + file_name + " and associated m-files created.");
+        _log->AddMesg("CUDA kernel file " + cuda_kernel.Name() + " and associated m-files created."
+                      "  The kernel needs to be compiled with nvcc using the -ptx option.");
     }
     catch (std::exception& e)
     {
@@ -381,7 +459,7 @@ void MainWindow::on_actionCreate_MEX_file_triggered()
         MEXFile mex_file(file_name);
         mex_file.Make();
         mex_file.MakeMFiles();
-        _log->AddMesg("MEX file " + file_name + " and associated m-files created.");
+        _log->AddMesg("MEX file " + mex_file.Name() + " and associated m-files created.");
     }
     catch (std::exception& e)
     {
@@ -416,7 +494,7 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
     ScopeTracker st("MainWindow::on_actionCUDA_kernel_with_measure_triggered", _tid);
 #endif
     std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
-                                                         "Select objective function",
+                                                         "Select objective function (measure)",
                                                          DDM::CudaFilesDir().c_str()).toStdString();
     if (objective_fun.empty()) return;
     std::string file_name = QFileDialog::getSaveFileName(nullptr,
@@ -429,8 +507,13 @@ void MainWindow::on_actionCUDA_kernel_with_measure_triggered()
         CudaKernelWithMeasure ckwm(file_name, objective_fun);
         ckwm.Make();
         ckwm.MakeMFiles();
-        _log->AddMesg("CUDA kernel file with measure " + file_name + " and associated m-files created."
-                      "  The file has an '_m' suffix appended to it.");
+        CudaKernel ck(file_name);
+        ck.Make();
+        ck.MakeMFiles();
+        _log->AddMesg("CUDA kernel file " + ckwm.Name() + " with measure " + ds::StripPath(objective_fun)
+                      + ", standard CUDA kernel, and associated m-files created."
+                      "  The kernel file has an '_cm' suffix appended to it.  Both"
+                      " need to be compiled with nvcc and the -ptx option.");
     }
     catch (std::exception& e)
     {
@@ -446,6 +529,14 @@ void MainWindow::on_actionCompile_Run_triggered()
     _fastRunGui->SetMethod(FastRunGui::COMPILED);
     _fastRunGui->show();
     setEnabled(false);
+}
+
+void MainWindow::on_actionEvent_Viewer_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionEvent_Viewer_triggered", _tid);
+#endif
+    _eventViewer->show();
 }
 
 void MainWindow::on_actionExit_triggered()
@@ -469,6 +560,7 @@ void MainWindow::on_actionLoad_triggered()
     DDM::SetModelFilesDir(_fileName);
     LoadModel(_fileName);
 }
+
 void MainWindow::on_actionLog_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -477,6 +569,37 @@ void MainWindow::on_actionLog_triggered()
     _logGui->SetFileName(_fileName);
     _logGui->show();
 }
+
+void MainWindow::on_actionMEX_file_with_measure_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionMEX_file_with_measure_triggered", _tid);
+#endif
+    std::string objective_fun = QFileDialog::getOpenFileName(nullptr,
+                                                         "Select objective function (measure)",
+                                                         DDM::CudaFilesDir().c_str()).toStdString();
+    if (objective_fun.empty()) return;
+    std::string file_name = QFileDialog::getSaveFileName(nullptr,
+                                                         "Select MEX file name",
+                                                         DDM::MEXFilesDir().c_str()).toStdString();
+    if (file_name.empty()) return;
+    try
+    {
+        DDM::SetMEXFilesDir(file_name);
+        MEXFile mex_file(file_name);
+        mex_file.Make();
+        mex_file.MakeMFiles();
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
+        _log->AddMesg("MEX file " + mfwm.Name() + " and associated m-files created.");
+    }
+    catch (std::exception& e)
+    {
+        _log->AddExcept("MainWindow::on_actionCreate_MEX_file_triggered: " + std::string(e.what()));
+    }
+}
+
 void MainWindow::on_actionNotes_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -484,6 +607,7 @@ void MainWindow::on_actionNotes_triggered()
 #endif
     _notesGui->show();
 }
+
 void MainWindow::on_actionParameters_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -527,6 +651,7 @@ void MainWindow::on_actionSave_Data_triggered()
     if (file_name.empty()) return;
     SaveData(file_name);
 }
+
 void MainWindow::on_actionSave_Model_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -535,6 +660,7 @@ void MainWindow::on_actionSave_Model_triggered()
     if (_fileName.empty()) return;
     SaveModel(_fileName);
 }
+
 void MainWindow::on_actionSave_Model_As_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -553,6 +679,7 @@ void MainWindow::on_actionSave_Model_As_triggered()
     SaveModel(file_name);
     setWindowTitle(("DynaSys " + ds::VERSION_STR + " - " + file_name).c_str());
 }
+
 void MainWindow::on_actionSave_Phase_Plot_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -560,6 +687,7 @@ void MainWindow::on_actionSave_Phase_Plot_triggered()
 #endif
     SaveFigure(ui->qwtPhasePlot, "phase plot", QSizeF(100, 100));
 }
+
 void MainWindow::on_actionSave_Time_Plot_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -567,6 +695,7 @@ void MainWindow::on_actionSave_Time_Plot_triggered()
 #endif
     SaveFigure(ui->qwtTimePlot, "time plot", QSizeF(200, 75));
 }
+
 void MainWindow::on_actionSave_Vector_Field_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -574,6 +703,7 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
 #endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
 }
+<<<<<<< HEAD
 void MainWindow::on_actionSelector_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -581,6 +711,9 @@ void MainWindow::on_actionSelector_triggered()
 #endif
     _paramSelector->show();
 }
+=======
+
+>>>>>>> master
 void MainWindow::on_actionSet_Init_to_Current_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -597,6 +730,7 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
         ui->tblInitConds->update();
     }
 }
+
 void MainWindow::on_actionSet_Input_Home_Dir_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -693,6 +827,22 @@ void MainWindow::on_btnAddVariable_clicked()
         UpdateTimePlotTable();
     }
 }
+void MainWindow::on_btnJumpToN_clicked()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_btnJumpToN_clicked", _tid);
+#endif
+    bool ok;
+    const int n = ui->edJumpToN->text().toInt(&ok);
+    if (ok && n>=0)
+    {
+        InputMgr::Instance()->JumpToSample(n);
+        DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+        const int time_now = (tp->Spec_toi("past_samps_ct")+tp->Spec_toi("dv_end"))
+                * _modelMgr->ModelStep() + 0.5;
+        tp->SetSpec("time_offset", n - time_now);
+    }
+}
 void MainWindow::on_btnRemoveCondition_clicked()
 {
 #ifdef DEBUG_FUNC
@@ -756,12 +906,15 @@ void MainWindow::on_btnStart_clicked()
     switch (_drawMgr->DrawState())
     {
         case DrawBase::DRAWING:
+        {
             _drawMgr->Stop();
             ui->btnStart->setText("Start");
             SetButtonsEnabled(true);            
             _paramEditor->setEnabled(true);
             _timer.stop();
+            StopEventViewer();
             break;
+        }
         case DrawBase::PAUSED:
             _drawMgr->Resume();
             ui->btnStart->setText("Stop");
@@ -782,6 +935,7 @@ void MainWindow::on_btnStart_clicked()
             }
             _drawMgr->Start();
             _timer.start(PLOT_REFRESH);
+            StartEventViewer();
             break;
         }
     }
@@ -962,6 +1116,13 @@ void MainWindow::on_cmbSlidePars_currentIndexChanged(int index)
     UpdateSlider(index);
 }
 
+void MainWindow::on_edJumpToN_returnPressed()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_edJumpToN_editingFinished", _tid);
+#endif
+    on_btnJumpToN_clicked();
+}
 void MainWindow::on_edModelStep_editingFinished()
 {
 #ifdef DEBUG_FUNC
@@ -1150,6 +1311,8 @@ void MainWindow::DoFastRun()
     disconnect(pp, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()));
     disconnect(pp, SIGNAL(Flag2()), this, SLOT(UpdateTPData()));
 
+    StartEventViewer();
+
     const int num_iters = _numSimSteps / _modelMgr->ModelStep() + 0.5;
     _drawMgr->Start(DrawBase::SINGLE, num_iters);
 }
@@ -1192,29 +1355,6 @@ void MainWindow::InitDefaultModel()
     SaveModel(ds::TEMP_MODEL_FILE);
 }
 
-const std::vector<QColor> MainWindow::InitTPColors() const
-{
-#ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::InitTPColors", _tid);
-#endif
-    std::vector<QColor> vc;
-    vc.push_back(Qt::black);
-    vc.push_back(Qt::blue);
-    vc.push_back(Qt::red);
-    vc.push_back(Qt::green);
-    vc.push_back(Qt::gray);
-    vc.push_back(Qt::cyan);
-    vc.push_back(Qt::magenta);
-    vc.push_back(Qt::yellow);
-    vc.push_back(Qt::darkBlue);
-    vc.push_back(Qt::darkRed);
-    vc.push_back(Qt::darkGreen);
-    vc.push_back(Qt::darkGray);
-    vc.push_back(Qt::darkCyan);
-    vc.push_back(Qt::darkMagenta);
-    vc.push_back(Qt::darkYellow);
-    return vc;
-}
 void MainWindow::InitViews()
 {
 #ifdef DEBUG_MW_FUNC
@@ -1270,7 +1410,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
             std::string file_name = QFileDialog::getOpenFileName(nullptr,
                                                                   "Select input file",
                                                                   DDM::InputFilesDir().c_str(),
-                                                                  "Text file (*.txt) ;; DSIN file (*.dsin)"
+                                                                  "Input files (*.txt *.dsin)"
                                                                  ).toStdString();
             if (!file_name.empty())
             {
@@ -1299,10 +1439,11 @@ void MainWindow::ExprnChanged(QModelIndex, QModelIndex) //slot
 void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::ParamChanged", _tid);
+    assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::ParamChanged");
 #endif
     int idx = topLeft.row();
     std::string exprn = _modelMgr->Model(ds::INP)->Expression(idx);
+//std::cerr << exprn << std::endl;
     if (_modelMgr->AreModelsInitialized())
         try
         {
@@ -1330,7 +1471,7 @@ void MainWindow::Replot()
 #endif
     try
     {
-        DrawBase* pp;
+        DrawBase* pp(nullptr);
         switch (_plotMode)
         {
             case SINGLE:
@@ -1376,10 +1517,12 @@ void MainWindow::Replot()
                         dv_end = tp->Spec_toi("dv_end"),
                         y_tp_min = tp->Spec_toi("y_tp_min"),
                         y_tp_max = tp->Spec_toi("y_tp_max"),
-                        past_samps_ct = tp->Spec_toi("past_samps_ct");
-                ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep(),
-                                  (past_samps_ct+dv_end)*_modelMgr->ModelStep(),
-                                  y_tp_min, y_tp_max );
+                        past_samps_ct = tp->Spec_toi("past_samps_ct"),
+                        time_offset = tp->Spec_toi("time_offset");
+                ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep()+time_offset,
+                                  (past_samps_ct+dv_end)*_modelMgr->ModelStep()+time_offset,
+                                  y_tp_min,
+                                  y_tp_max );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::xBottom, tp_lims.xmin, tp_lims.xmax );
                 ui->qwtTimePlot->setAxisScale( QwtPlot::yLeft, tp_lims.ymin, tp_lims.ymax );
 
@@ -1680,6 +1823,29 @@ void MainWindow::SetZPlotShown(bool is_shown)
         ui->lblPlotZ->hide();
     }
 }
+void MainWindow::StartEventViewer()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StartEventViewer", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
+    tp->SetSpec("event_index", _eventViewer->VarIndex());
+    connect(tp, SIGNAL(Flag_d(double)), _eventViewer, SLOT(TimePoints(double)));
+    connect(tp, SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
+    _eventViewer->Start(0);
+}
+void MainWindow::StopEventViewer()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StopEventViewer", _tid);
+#endif
+    DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
+    disconnect(tp, SIGNAL(Flag_d(double)), _eventViewer, SLOT(TimePoints(double)));
+    disconnect(tp, SIGNAL(Flag_i(int)), _eventViewer, SLOT(Event(int)));
+    _eventViewer->Stop();
+}
 void MainWindow::UpdateLists()
 {
 #ifdef DEBUG_FUNC
@@ -1688,6 +1854,7 @@ void MainWindow::UpdateLists()
     UpdatePulseVList();
     UpdateSliderPList();
     UpdateTimePlotTable();
+    _eventViewer->SetList( _modelMgr->DiffVarList() );
     if (_modelMgr->Model(ds::COND)->NumPars()>0)
         ui->lsConditions->setCurrentIndex( ui->lsConditions->model()->index(0,0) );
 }
@@ -1775,7 +1942,11 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("make_plots", true);
             break;
         case DrawBase::TIME_PLOT:
+            draw_object->SetSpec("event_index", -1);
+            draw_object->SetSpec("event_thresh", _eventViewer->Threshold());
+            draw_object->SetSpec("thresh_above", _eventViewer->IsThreshAbove());
             draw_object->SetSpec("num_samples", _numTPSamples);
+            draw_object->SetSpec("time_offset", 0);
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:
@@ -1802,12 +1973,7 @@ void MainWindow::UpdateTimePlotTable()
     ScopeTracker st("MainWindow::UpdateTimePlotTable", _tid);
 #endif
     delete ui->tblTimePlot->model();
-    VecStr vs,
-            dkeys = _modelMgr->Model(ds::DIFF)->ShortKeys(),
-            vkeys = _modelMgr->Model(ds::VAR)->Keys();
-    vs.push_back("IP");
-    vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
-    vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());
+    VecStr vs = _modelMgr->DiffVarList();
 
     TPVTableModel* model = new TPVTableModel(vs, this);
     _modelMgr->SetTPVModel(model);

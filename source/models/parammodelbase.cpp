@@ -96,6 +96,10 @@ std::string ParamModelBase::TempExpression(size_t i) const
 {
     return Expression(i);
 }
+std::string ParamModelBase::TempExprnForCFile(size_t i) const
+{
+    return TempExpression(i);
+}
 VecStr ParamModelBase::TempExpressions() const
 {
     const size_t num_pars = _parameters.size();

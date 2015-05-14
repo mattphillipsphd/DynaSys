@@ -8,7 +8,7 @@ const int ds::TABLEN = 4;
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_DAT_FILE = ".temp.dsdat";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
-const std::string ds::VERSION_STR = "0.3.0";
+const std::string ds::VERSION_STR = "0.3.1";
 
 #ifndef Q_OS_WIN
 const std::vector<QColor> ds::THREAD_COLORS = {Qt::black, Qt::red, Qt::green, Qt::gray, Qt::blue };
@@ -134,6 +134,26 @@ std::string ds::StripQuotes(const std::string& str)
     return out;
 }
 
+const std::vector<QColor> ds::TraceColors()
+{
+    std::vector<QColor> vc;
+    vc.push_back(Qt::black);
+    vc.push_back(Qt::blue);
+    vc.push_back(Qt::red);
+    vc.push_back(Qt::green);
+    vc.push_back(Qt::gray);
+    vc.push_back(Qt::cyan);
+    vc.push_back(Qt::magenta);
+    vc.push_back(Qt::yellow);
+    vc.push_back(Qt::darkBlue);
+    vc.push_back(Qt::darkRed);
+    vc.push_back(Qt::darkGreen);
+    vc.push_back(Qt::darkGray);
+    vc.push_back(Qt::darkCyan);
+    vc.push_back(Qt::darkMagenta);
+    vc.push_back(Qt::darkYellow);
+    return vc;
+}
 QColor ds::ThreadColor(std::thread::id tid)
 {
     return thread_map[tid];

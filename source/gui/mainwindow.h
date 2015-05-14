@@ -34,6 +34,7 @@
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
 #include "dspinboxdelegate.h"
+#include "eventviewer.h"
 #include "fastrungui.h"
 #include "loggui.h"
 #include "notesgui.h"
@@ -44,6 +45,7 @@
 #include "../generate/script/cudakernelwithmeasure.h"
 #include "../generate/object/executable.h"
 #include "../generate/script/mexfile.h"
+#include "../generate/script/mexfilewm.h"
 #include "../generate/object/sharedobj.h"
 #include "../file/datfileout.h"
 #include "../file/defaultdirmgr.h"
@@ -112,6 +114,9 @@ class MainWindow : public QMainWindow
 
     public slots:
         void Error();
+        void EventViewerSelection(int i);
+        void EventViewerThreshold(double d);
+        void EventViewerIsAbove(bool b);
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
         void LoadTempModel(void* models);
@@ -131,6 +136,7 @@ class MainWindow : public QMainWindow
         void UpdateSimPBar(int n);
 
     private slots:
+        void on_actionAll_MEX_and_CUDA_triggered();
         void on_actionAbout_triggered();
         void on_actionClear_triggered();
         void on_actionCreate_CUDA_kernel_triggered();
@@ -138,9 +144,11 @@ class MainWindow : public QMainWindow
         void on_actionCreate_SO_triggered();
         void on_actionCUDA_kernel_with_measure_triggered();
         void on_actionCompile_Run_triggered();
+        void on_actionEvent_Viewer_triggered();
         void on_actionExit_triggered();
         void on_actionLoad_triggered();
         void on_actionLog_triggered();
+        void on_actionMEX_file_with_measure_triggered();
         void on_actionNotes_triggered();
         void on_actionParameters_triggered();
         void on_actionReload_Current_triggered();
@@ -161,6 +169,7 @@ class MainWindow : public QMainWindow
         void on_btnAddExpression_clicked();
         void on_btnAddParameter_clicked();
         void on_btnAddVariable_clicked();
+        void on_btnJumpToN_clicked();
         void on_btnRemoveCondition_clicked();
         void on_btnRemoveExpression_clicked();
         void on_btnRemoveDiff_clicked();
@@ -180,6 +189,7 @@ class MainWindow : public QMainWindow
         void on_cmbPlotMode_currentIndexChanged(const QString& text);
         void on_cmbSlidePars_currentIndexChanged(int index);
 
+        void on_edJumpToN_returnPressed();
         void on_edModelStep_editingFinished();
         void on_edNumTPSamples_editingFinished();
 
@@ -217,7 +227,6 @@ class MainWindow : public QMainWindow
         void ConnectModels();
         void DoFastRun();
         void InitDefaultModel();
-        const std::vector<QColor> InitTPColors() const;
         void InitViews();
         void LoadModel(const std::string& file_name);
         ViewRect PhasePlotLimits() const;
@@ -232,6 +241,8 @@ class MainWindow : public QMainWindow
         void SetSaveActionsEnabled(bool is_enabled);
         void SetTPShown(bool is_shown);
         void SetZPlotShown(bool is_shown);
+        void StartEventViewer();
+        void StopEventViewer();
         void UpdateLists();
         void UpdateNotes();
         void UpdateParamEditor();
@@ -242,12 +253,21 @@ class MainWindow : public QMainWindow
         void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
 
+<<<<<<< HEAD
         AboutGui* _aboutGui;
         FastRunGui* _fastRunGui;
         LogGui* _logGui;
         NotesGui* _notesGui;
         ParamEditor* _paramEditor;
         ParamSelector* _paramSelector;
+=======
+        AboutGui* const _aboutGui;
+        EventViewer* const _eventViewer;
+        FastRunGui* const _fastRunGui;
+        LogGui* const _logGui;
+        NotesGui* const _notesGui;
+        ParamEditor* const _paramEditor;
+>>>>>>> master
 
         DrawMgr* const _drawMgr;
         std::string _fileName;

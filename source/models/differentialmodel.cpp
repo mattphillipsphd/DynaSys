@@ -19,10 +19,43 @@ int DifferentialModel::ShortKeyIndex(const std::string& par_name) const
 
 std::string DifferentialModel::TempExpression(size_t idx) const
 {
+    const std::string model_step = std::to_string( ModelMgr::Instance()->ModelStep() );
+    return TempExpression(idx, model_step);
+}
+
+std::string DifferentialModel::TempExprnForCFile(size_t idx) const
+{
+    return TempExpression(idx, "tau");
+}
+
+std::string DifferentialModel::ExprnInsert(const std::string& in, const std::string& exprn,
+                        const std::string& token) const
+{
+    std::string out(exprn);
+
+    size_t pos = 0,
+            in_len = in.length(),
+            tok_len = token.length();
+    while((pos = out.find(token, pos)) != std::string::npos)
+    {
+        if ( (pos>0 && std::isalnum(out.at(pos-1)))
+             || (pos<in_len && std::isalnum(out.at(pos+tok_len))) )
+        {
+            pos += tok_len;
+            continue;
+        }
+        out.replace(pos, tok_len, in);
+        pos += in_len;
+    }
+
+    return out;
+}
+
+std::string DifferentialModel::TempExpression(size_t idx, const std::string& model_step) const
+{
     const std::string& temp = TempKey(idx),
             & key = ShortKey(idx),
             & value = Value(idx);
-    const std::string model_step = std::to_string( ModelMgr::Instance()->ModelStep() );
     std::string out;
     switch (ModelMgr::Instance()->DiffMethod())
     {
@@ -51,28 +84,5 @@ std::string DifferentialModel::TempExpression(size_t idx) const
         case ModelMgr::UNKNOWN:
             throw std::runtime_error("DifferentialModel::TempExpression: Bad DIFF_METHOD type");
     }
-    return out;
-}
-
-std::string DifferentialModel::ExprnInsert(const std::string& in, const std::string& exprn,
-                        const std::string& token) const
-{
-    std::string out(exprn);
-
-    size_t pos = 0,
-            in_len = in.length(),
-            tok_len = token.length();
-    while((pos = out.find(token, pos)) != std::string::npos)
-    {
-        if ( (pos>0 && std::isalnum(out.at(pos-1)))
-             || (pos<in_len && std::isalnum(out.at(pos+tok_len))) )
-        {
-            pos += tok_len;
-            continue;
-        }
-        out.replace(pos, tok_len, in);
-        pos += in_len;
-    }
-
     return out;
 }

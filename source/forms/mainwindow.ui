@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1404</width>
+    <width>1494</width>
     <height>972</height>
    </rect>
   </property>
@@ -528,9 +528,6 @@
       </item>
       <item>
        <layout class="QGridLayout" name="gridLayout_3">
-        <item row="1" column="1">
-         <widget class="QLineEdit" name="edNumTPSamples"/>
-        </item>
         <item row="1" column="0">
          <widget class="QLabel" name="lblTimePlotN">
           <property name="text">
@@ -538,7 +535,37 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="2">
+        <item row="1" column="3">
+         <widget class="QLineEdit" name="edJumpToN">
+          <property name="maximumSize">
+           <size>
+            <width>75</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="text">
+           <string>0</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QLineEdit" name="edNumTPSamples">
+          <property name="maximumSize">
+           <size>
+            <width>60</width>
+            <height>16777215</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="2">
+         <widget class="QPushButton" name="btnJumpToN">
+          <property name="text">
+           <string>Jump To:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0" colspan="4">
          <widget class="QTableView" name="tblTimePlot">
           <property name="maximumSize">
            <size>
@@ -559,8 +586,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1404</width>
-     <height>26</height>
+     <width>1494</width>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -587,8 +614,9 @@
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>Edit</string>
+     <string>Edit/View</string>
     </property>
+    <addaction name="actionEvent_Viewer"/>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
     <addaction name="actionSet_Init_to_Current"/>
@@ -600,10 +628,12 @@
     </property>
     <addaction name="actionRun_Offline"/>
     <addaction name="actionCompile_Run"/>
-    <addaction name="actionCreate_MEX_file"/>
     <addaction name="actionCreate_SO"/>
+    <addaction name="actionCreate_MEX_file"/>
+    <addaction name="actionMEX_file_with_measure"/>
     <addaction name="actionCreate_CUDA_kernel"/>
     <addaction name="actionCUDA_kernel_with_measure"/>
+    <addaction name="actionAll_MEX_and_CUDA"/>
    </widget>
    <widget class="QMenu" name="menuParameters">
     <property name="title">
@@ -718,7 +748,7 @@
   </action>
   <action name="actionCreate_SO">
    <property name="text">
-    <string>Create SO</string>
+    <string>Create C Shared Object (.so)</string>
    </property>
   </action>
   <action name="actionCreate_CUDA_kernel">
@@ -741,9 +771,25 @@
     <string>CUDA kernel with measure</string>
    </property>
   </action>
+<<<<<<< HEAD
   <action name="actionSelector">
    <property name="text">
     <string>Selector</string>
+=======
+  <action name="actionMEX_file_with_measure">
+   <property name="text">
+    <string>MEX file with measure</string>
+   </property>
+  </action>
+  <action name="actionAll_MEX_and_CUDA">
+   <property name="text">
+    <string>All MEX and CUDA</string>
+   </property>
+  </action>
+  <action name="actionEvent_Viewer">
+   <property name="text">
+    <string>Event Viewer</string>
+>>>>>>> master
    </property>
   </action>
  </widget>

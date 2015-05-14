@@ -1,0 +1,12 @@
+.DS_Store
+.DS_Store?
+.Sync*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+desktop.ini
+Thumbs.db
+build-*
+source/DynaSys.pro.*
+.dsconfig.txt
+*/.dsconfig.txt

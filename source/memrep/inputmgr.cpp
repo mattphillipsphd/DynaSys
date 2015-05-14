@@ -16,7 +16,7 @@ InputMgr::~InputMgr()
 int InputMgr::AssignInput(double* data, const std::string& type_str)
 {
 #ifdef DEBUG_FUNC
-//    ScopeTracker st("InputMgr::AssignInput", std::this_thread::get_id());
+    ScopeTracker st("InputMgr::AssignInput", std::this_thread::get_id());
 #endif
     int input_idx(-1);
     Input::TYPE type = Input::Type(type_str);
@@ -41,6 +41,7 @@ int InputMgr::AssignInput(double* data, const std::string& type_str)
                 }),
                     file_name.end());
             _inputs[input_idx].LoadInput(file_name);
+            _stepCts[input_idx] = 0;
             break;
         }
         case Input::USER:
@@ -61,11 +62,19 @@ void InputMgr::InputEval()
     for (size_t i=0; i<num_inputs; ++i)
     {
         Input& input = _inputs[i];
-        if (++_stepCts[i]*_modelMgr->ModelStep()*input.SamplesPerUnitTime()>1.0)
-        {
+        if (++_stepCts[i]
+                % (int)(1.0 / (_modelMgr->ModelStep()*input.SamplesPerUnitTime()) + 0.5)
+                == 0)
             input.NextInput();
-            _stepCts[i] = 0;
-        }
+    }
+}
+void InputMgr::JumpToSample(int n)
+{
+    const size_t num_inputs = _inputs.size();
+    for (size_t i=0; i<num_inputs; ++i)
+    {
+        const int ct = (int)( (double)n / (_modelMgr->ModelStep()) + 0.5 );
+        _inputs[i].SeekTo(ct);
     }
 }
 
@@ -77,6 +86,6 @@ InputMgr::InputMgr() : _modelMgr(ModelMgr::Instance())
 int InputMgr::EmplaceInput(double* data)
 {
     _inputs.emplace_back(data);
-    _stepCts.push_back(std::numeric_limits<int>::max()-1);
-    return _inputs.size() - 1;
+    _stepCts.push_back(0);
+    return (int)(_inputs.size() - 1);
 }
