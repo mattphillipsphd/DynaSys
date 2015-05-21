@@ -619,7 +619,6 @@
     <addaction name="actionEvent_Viewer"/>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
-    <addaction name="actionSet_Init_to_Current"/>
     <addaction name="actionSet_Input_Home_Dir"/>
    </widget>
    <widget class="QMenu" name="menuRun">
@@ -639,7 +638,6 @@
     <property name="title">
      <string>Parameters</string>
     </property>
-    <addaction name="actionSelector"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuParameters"/>
@@ -763,7 +761,7 @@
   </action>
   <action name="actionSet_Input_Home_Dir">
    <property name="text">
-    <string>Set Default Input Dir.</string>
+    <string>Set $HOME</string>
    </property>
   </action>
   <action name="actionCUDA_kernel_with_measure">
@@ -771,11 +769,6 @@
     <string>CUDA kernel with measure</string>
    </property>
   </action>
-<<<<<<< HEAD
-  <action name="actionSelector">
-   <property name="text">
-    <string>Selector</string>
-=======
   <action name="actionMEX_file_with_measure">
    <property name="text">
     <string>MEX file with measure</string>
@@ -789,7 +782,6 @@
   <action name="actionEvent_Viewer">
    <property name="text">
     <string>Event Viewer</string>
->>>>>>> master
    </property>
   </action>
  </widget>

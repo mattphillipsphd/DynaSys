@@ -159,7 +159,6 @@ class MainWindow : public QMainWindow
         void on_actionSave_Phase_Plot_triggered();
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
-        void on_actionSelector_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
 
@@ -253,21 +252,12 @@ class MainWindow : public QMainWindow
         void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
 
-<<<<<<< HEAD
-        AboutGui* _aboutGui;
-        FastRunGui* _fastRunGui;
-        LogGui* _logGui;
-        NotesGui* _notesGui;
-        ParamEditor* _paramEditor;
-        ParamSelector* _paramSelector;
-=======
         AboutGui* const _aboutGui;
         EventViewer* const _eventViewer;
         FastRunGui* const _fastRunGui;
         LogGui* const _logGui;
         NotesGui* const _notesGui;
         ParamEditor* const _paramEditor;
->>>>>>> master
 
         DrawMgr* const _drawMgr;
         std::string _fileName;

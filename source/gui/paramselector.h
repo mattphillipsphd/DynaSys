@@ -16,7 +16,6 @@ public:
     ~ParamSelector();
 
     void SetParamTableModel(QAbstractItemModel* model);
-    void SetParamTableModel(QAbstractItemModel* model);
 
 private slots:
     void on_btnDelete_clicked();
