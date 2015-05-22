@@ -43,6 +43,8 @@ namespace ds
         DIFF,
         INIT,
         COND,
+        NC,
+        JACOB,
         NUM_MODELS //Nice trick from SO
     };
 

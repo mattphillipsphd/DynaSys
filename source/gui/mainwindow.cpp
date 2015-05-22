@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
-    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()), _userNullclineGui(new UserNullclineGui),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -352,6 +352,7 @@ void MainWindow::closeEvent(QCloseEvent *)
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
+    _userNullclineGui->close();
 }
 
 void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
@@ -728,6 +729,14 @@ void MainWindow::on_actionSet_Input_Home_Dir_triggered()
     DDM::SetInputFilesDir(dir_name);
 }
 
+void MainWindow::on_actionSet_Nullclines_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Nullclines_triggered", _tid);
+#endif
+    _userNullclineGui->show();
+}
+
 void MainWindow::on_btnAddCondition_clicked()
 {
 #ifdef DEBUG_FUNC
@@ -957,17 +966,19 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_cboxNullclines_stateChanged", _tid);
 #endif
+    DrawBase::DRAW_TYPE nc_type =
+            (_userNullclineGui->NumNCs()>0) ? DrawBase::USER_NULLCLINE : DrawBase::NULLCLINE;
     if (state==Qt::Checked)
     {
-        CreateObject(DrawBase::NULL_CLINE);
-        UpdateDOSpecs(DrawBase::NULL_CLINE);
+        CreateObject(nc_type);
+        UpdateDOSpecs(nc_type);
         if (_drawMgr->DrawState()==DrawBase::DRAWING)
-            _drawMgr->Start(DrawBase::NULL_CLINE);
+            _drawMgr->Start(nc_type);
         else
-            _drawMgr->Start(DrawBase::NULL_CLINE, 1);
+            _drawMgr->Start(nc_type, 1);
     }
     else
-        _drawMgr->StopAndRemove(DrawBase::NULL_CLINE);
+        _drawMgr->StopAndRemove(nc_type);
 }
 void MainWindow::on_cboxPlotZ_stateChanged(int state)
 {
@@ -1227,8 +1238,9 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     DSPlot* plot(nullptr);
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
+        case DrawBase::NULLCLINE:
         case DrawBase::SINGLE:
+        case DrawBase::USER_NULLCLINE:
         case DrawBase::VARIABLE_VIEW:
         case DrawBase::VECTOR_FIELD:
             plot = ui->qwtPhasePlot;
@@ -1241,17 +1253,11 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
 
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
-            break;
         case DrawBase::SINGLE:
             connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             break;
-        case DrawBase::TIME_PLOT:
-            break;
-        case DrawBase::VARIABLE_VIEW:
-            break;
-        case DrawBase::VECTOR_FIELD:
+        default:
             break;
     }
     connect(draw_object, SIGNAL(Error()), this, SLOT(Error()));
@@ -1912,7 +1918,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
     draw_object->SetSpec("steps_per_sec", ui->spnStepsPerSec->value());
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
+        case DrawBase::NULLCLINE:
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
             draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
             draw_object->SetSpec("resolution", ui->spnVFResolution->value());
@@ -1932,6 +1938,11 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("thresh_above", _eventViewer->IsThreshAbove());
             draw_object->SetSpec("num_samples", _numTPSamples);
             draw_object->SetSpec("time_offset", 0);
+            draw_object->SetOpaqueSpec("colors", &_tpColors);
+            break;
+        case DrawBase::USER_NULLCLINE:
+            draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
+            draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:

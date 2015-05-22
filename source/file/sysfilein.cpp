@@ -67,7 +67,7 @@ void SysFileIn::Load(VecStr& vmodels)
 std::vector<ParamModelBase*> SysFileIn::ReadModels()
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("SysFileIn::Load", std::this_thread::get_id());
+    ScopeTracker st("SysFileIn::ReadModels", std::this_thread::get_id());
 #endif
     std::string line;
     std::vector<ParamModelBase*> models(ds::NUM_MODELS);

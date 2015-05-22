@@ -31,6 +31,7 @@ class ModelMgr
         void AddParameter(ds::PMODEL mi, const std::string& key, const std::string& value = "");
         void CreateModels();
         void ClearModels();
+        void ClearParameters(ds::PMODEL mi);
 
         void SetCondValue(size_t row, const VecStr& results);
         void SetDiffMethod(DIFF_METHOD diff_method) { _diffMethod = diff_method; }

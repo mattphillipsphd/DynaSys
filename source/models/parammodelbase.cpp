@@ -2,6 +2,8 @@
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
+#include "../models/jacobianmodel.h"
+#include "../models/nullclinemodel.h"
 #include "../models/parammodel.h"
 #include "../models/variablemodel.h"
 
@@ -9,7 +11,7 @@ const std::string ParamModelBase::Param::DEFAULT_VAL = "0";
 
 ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
 {
-    ParamModelBase* model;
+    ParamModelBase* model = nullptr;
     switch (mi)
     {
         case ds::INP:
@@ -26,6 +28,12 @@ ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
             break;
         case ds::COND:
             model = new ConditionModel(nullptr, ds::Model(mi));
+            break;
+        case ds::NC:
+            model = new NullclineModel(nullptr, ds::Model(mi));
+            break;
+        case ds::JACOB:
+            model = new JacobianModel(nullptr, ds::Model(mi));
             break;
         default:
             throw std::runtime_error("SysFileIn::Load: Bad model name");

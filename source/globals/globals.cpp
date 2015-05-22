@@ -50,6 +50,8 @@ ds::PMODEL ds::Model(const std::string& model)
     if (model=="Differentials") return DIFF;
     if (model=="InitialConds") return INIT;
     if (model=="Conditions") return COND;
+    if (model=="Nullclines") return NC;
+    if (model=="Jacobian") return JACOB;
     throw std::runtime_error("ds::Model: Bad Model");
 }
 std::string ds::Model(PMODEL mi)
@@ -66,6 +68,10 @@ std::string ds::Model(PMODEL mi)
             return "InitialConds";
         case COND:
             return "Conditions";
+        case NC:
+            return "Nullclines";
+        case JACOB:
+            return "Jacobian";
         case NUM_MODELS:
             throw std::runtime_error("ds::Model: Not a model");
     }

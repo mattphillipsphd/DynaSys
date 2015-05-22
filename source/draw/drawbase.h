@@ -34,9 +34,10 @@ class DrawBase : public QObject
     public:
         enum DRAW_TYPE
         {
-            NULL_CLINE,
+            NULLCLINE,
             SINGLE,
             TIME_PLOT,
+            USER_NULLCLINE,
             VARIABLE_VIEW,
             VECTOR_FIELD
         };

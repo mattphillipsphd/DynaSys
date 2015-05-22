@@ -39,6 +39,7 @@
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "usernullclinegui.h"
 #include "../generate/script/cfileso.h"
 #include "../generate/script/cudakernel.h"
 #include "../generate/script/cudakernelwithmeasure.h"
@@ -160,6 +161,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Vector_Field_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
+        void on_actionSet_Nullclines_triggered();
 
         void on_btnAddCondition_clicked();
         void on_btnPulse_clicked();
@@ -257,6 +259,7 @@ class MainWindow : public QMainWindow
         LogGui* const _logGui;
         NotesGui* const _notesGui;
         ParamEditor* const _paramEditor;
+        UserNullclineGui* const _userNullclineGui;
 
         DrawMgr* const _drawMgr;
         std::string _fileName;
