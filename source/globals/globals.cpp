@@ -27,6 +27,8 @@ void ds::InitThreadColors()
 int ds::thread_ct = 0;
 std::map<std::thread::id, QColor> ds::thread_map;
 
+const std::string ds::UNC_INFIX = "_for_d";
+
 void ds::AddThread(std::thread::id tid)
 {
     thread_map[tid] = THREAD_COLORS.at( thread_ct % THREAD_COLORS.size() );
@@ -51,7 +53,7 @@ ds::PMODEL ds::Model(const std::string& model)
     if (model=="InitialConds") return INIT;
     if (model=="Conditions") return COND;
     if (model=="Nullclines") return NC;
-    if (model=="Jacobian") return JACOB;
+    if (model=="Jacobian") return JAC;
     throw std::runtime_error("ds::Model: Bad Model");
 }
 std::string ds::Model(PMODEL mi)
@@ -70,7 +72,7 @@ std::string ds::Model(PMODEL mi)
             return "Conditions";
         case NC:
             return "Nullclines";
-        case JACOB:
+        case JAC:
             return "Jacobian";
         case NUM_MODELS:
             throw std::runtime_error("ds::Model: Not a model");

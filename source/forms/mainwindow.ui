@@ -620,6 +620,7 @@
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
     <addaction name="actionSet_Nullclines"/>
+    <addaction name="actionSet_Jacobian"/>
     <addaction name="actionSet_Init_to_Current"/>
     <addaction name="actionSet_Input_Home_Dir"/>
    </widget>
@@ -783,6 +784,11 @@
   <action name="actionSet_Nullclines">
    <property name="text">
     <string>Set Nullclines</string>
+   </property>
+  </action>
+  <action name="actionSet_Jacobian">
+   <property name="text">
+    <string>Set Jacobian</string>
    </property>
   </action>
  </widget>

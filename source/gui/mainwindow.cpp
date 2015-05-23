@@ -17,7 +17,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
-    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()), _userNullclineGui(new UserNullclineGui),
+    _jacobianGui(new JacobianGui()), _logGui(new LogGui()), _notesGui(new NotesGui()),
+    _paramEditor(new ParamEditor()), _userNullclineGui(new UserNullclineGui),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -352,6 +353,7 @@ void MainWindow::closeEvent(QCloseEvent *)
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
+    _jacobianGui->close();
     _userNullclineGui->close();
 }
 
@@ -737,6 +739,14 @@ void MainWindow::on_actionSet_Nullclines_triggered()
     _userNullclineGui->show();
 }
 
+void MainWindow::on_actionSet_Jacobian_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Jacobian_triggered", _tid);
+#endif
+    _jacobianGui->show();
+}
+
 void MainWindow::on_btnAddCondition_clicked()
 {
 #ifdef DEBUG_FUNC
@@ -967,7 +977,9 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
     ScopeTracker st("MainWindow::on_cboxNullclines_stateChanged", _tid);
 #endif
     DrawBase::DRAW_TYPE nc_type =
-            (_userNullclineGui->NumNCs()>0) ? DrawBase::USER_NULLCLINE : DrawBase::NULLCLINE;
+            (_userNullclineGui->NumValidNCs()>0)
+            ? DrawBase::USER_NULLCLINE
+            : DrawBase::NULLCLINE;
     if (state==Qt::Checked)
     {
         CreateObject(nc_type);
@@ -1271,16 +1283,9 @@ void MainWindow::ConnectModels()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ConnectModels", _tid);
 #endif
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INP)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::VAR)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::DIFF)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INIT)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::COND)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    for (int i=0; i<ds::NUM_MODELS; ++i)
+        connect(const_cast<ParamModelBase*>(_modelMgr->Model((ds::PMODEL)i)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+                this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     if (_modelMgr->Model(ds::COND)->NumPars()==0)
         delete ui->lsResults->model();
     else
@@ -1386,6 +1391,15 @@ void MainWindow::InitViews()
     _modelMgr->SetView(ui->lsConditions, ds::COND);
     ui->lsConditions->setModelColumn(ConditionModel::TEST);
     ResetResultsList(-1);
+
+    _modelMgr->SetView(_userNullclineGui->Table(), ds::NC);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::MIN,true);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::MAX,true);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::FREEZE,true);
+    _userNullclineGui->Table()->horizontalHeader()->setStretchLastSection(true);
+
+    _modelMgr->SetView(_jacobianGui->Table(), ds::JAC);
+    _jacobianGui->Table()->horizontalHeader()->setStretchLastSection(true);
 }
 
 void MainWindow::ComboBoxChanged(size_t row) //slot
@@ -1943,6 +1957,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
         case DrawBase::USER_NULLCLINE:
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
             draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
+            draw_object->SetSpec("has_jacobian", _jacobianGui->IsFull());
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:

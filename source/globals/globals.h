@@ -44,12 +44,14 @@ namespace ds
         INIT,
         COND,
         NC,
-        JACOB,
+        JAC,
         NUM_MODELS //Nice trick from SO
     };
 
     extern int thread_ct;
     extern std::map<std::thread::id, QColor> thread_map;
+
+    extern const std::string UNC_INFIX;
 
     void AddThread(std::thread::id tid);
 

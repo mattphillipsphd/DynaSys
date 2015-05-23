@@ -1,35 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>LogGui</class>
- <widget class="QWidget" name="LogGui">
+ <class>JacobianGui</class>
+ <widget class="QWidget" name="JacobianGui">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>746</width>
-    <height>843</height>
+    <width>644</width>
+    <height>394</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Jacobian Matrix</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QTextEdit" name="txtLog">
-     <property name="font">
-      <font>
-       <pointsize>10</pointsize>
-      </font>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
+    <widget class="QTableView" name="tblJacobian"/>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <spacer name="horizontalSpacer">
+      <spacer name="horizontalSpacer_2">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
@@ -42,43 +33,21 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="btnClear">
-       <property name="font">
-        <font>
-         <pointsize>12</pointsize>
-        </font>
-       </property>
+      <widget class="QPushButton" name="btnCancel">
        <property name="text">
-        <string>Clear</string>
+        <string>Cancel</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btnWrite">
-       <property name="font">
-        <font>
-         <pointsize>12</pointsize>
-        </font>
-       </property>
+      <widget class="QPushButton" name="btnValidate">
        <property name="text">
-        <string>Write</string>
+        <string>Validate</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btnShowParser">
-       <property name="font">
-        <font>
-         <pointsize>12</pointsize>
-        </font>
-       </property>
-       <property name="text">
-        <string>Show Parser</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_2">
+      <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>

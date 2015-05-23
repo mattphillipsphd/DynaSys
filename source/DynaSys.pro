@@ -89,7 +89,8 @@ SOURCES += main.cpp\
     gui/usernullclinegui.cpp \
     draw/usernullcline.cpp \
     models/nullclinemodel.cpp \
-    models/jacobianmodel.cpp
+    models/jacobianmodel.cpp \
+    gui/jacobiangui.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -156,7 +157,8 @@ HEADERS  += gui/mainwindow.h \
     gui/usernullclinegui.h \
     draw/usernullcline.h \
     models/nullclinemodel.h \
-    models/jacobianmodel.h
+    models/jacobianmodel.h \
+    gui/jacobiangui.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
@@ -166,7 +168,8 @@ FORMS    += forms/mainwindow.ui \
     forms/loggui.ui \
     forms/fastrungui.ui \
     forms/eventviewer.ui \
-    forms/usernullclinegui.ui
+    forms/usernullclinegui.ui \
+    gui/jacobiangui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

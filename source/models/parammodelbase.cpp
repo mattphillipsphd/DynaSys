@@ -32,7 +32,7 @@ ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
         case ds::NC:
             model = new NullclineModel(nullptr, ds::Model(mi));
             break;
-        case ds::JACOB:
+        case ds::JAC:
             model = new JacobianModel(nullptr, ds::Model(mi));
             break;
         default:

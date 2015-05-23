@@ -36,6 +36,7 @@
 #include "dspinboxdelegate.h"
 #include "eventviewer.h"
 #include "fastrungui.h"
+#include "jacobiangui.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
@@ -161,6 +162,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Vector_Field_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
+        void on_actionSet_Jacobian_triggered();
         void on_actionSet_Nullclines_triggered();
 
         void on_btnAddCondition_clicked();
@@ -253,12 +255,13 @@ class MainWindow : public QMainWindow
         void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
 
-        AboutGui* const _aboutGui;
-        EventViewer* const _eventViewer;
-        FastRunGui* const _fastRunGui;
-        LogGui* const _logGui;
-        NotesGui* const _notesGui;
-        ParamEditor* const _paramEditor;
+        AboutGui* const         _aboutGui;
+        EventViewer* const      _eventViewer;
+        FastRunGui* const       _fastRunGui;
+        JacobianGui* const      _jacobianGui;
+        LogGui* const           _logGui;
+        NotesGui* const         _notesGui;
+        ParamEditor* const      _paramEditor;
         UserNullclineGui* const _userNullclineGui;
 
         DrawMgr* const _drawMgr;

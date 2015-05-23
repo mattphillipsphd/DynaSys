@@ -1,23 +1,23 @@
-#ifndef USERNULLCLINEGUI_H
-#define USERNULLCLINEGUI_H
+#ifndef JACOBIANGUI_H
+#define JACOBIANGUI_H
 
 #include "../globals/globals.h"
 #include "../memrep/modelmgr.h"
 
 namespace Ui {
-class UserNullclineGui;
+class JacobianGui;
 }
 
 class QTableView;
-class UserNullclineGui : public QWidget
+class JacobianGui : public QWidget
 {
     Q_OBJECT
 
     public:
-        explicit UserNullclineGui(QWidget *parent = 0);
-        ~UserNullclineGui();
+        explicit JacobianGui(QWidget *parent = 0);
+        ~JacobianGui();
 
-        size_t NumValidNCs() const;
+        bool IsFull() const;
         QTableView* Table();
 
     private slots:
@@ -25,9 +25,9 @@ class UserNullclineGui : public QWidget
         void on_btnValidate_clicked();
 
     private:
-        Ui::UserNullclineGui *ui;
+        Ui::JacobianGui *ui;
 
         ModelMgr* const _modelMgr;
 };
 
-#endif // USERNULLCLINEGUI_H
+#endif // JACOBIANGUI_H
