@@ -16,6 +16,15 @@ UserNullcline::~UserNullcline()
 #endif
 }
 
+void UserNullcline::ClearEquilibria()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("UserNullcline::ClearEquilibria", std::this_thread::get_id());
+#endif
+    for (auto it : _eqMarkers) it->detach();
+    _eqMarkers.clear();
+}
+
 void UserNullcline::ComputeData()
 {
 #ifdef DEBUG_FUNC
@@ -67,15 +76,41 @@ void UserNullcline::ComputeData()
                 }
             }
 
-            for (int i=0; i<XRES-1; ++i)
+            if (has_jacobian)
             {
-                double ix, iy;
-                bool has_int = LineIntersection(
-                            x[i], y[i], x[i+1], y[i+1],
-                            x[i], y[XRES+i], x[i+1], y[XRES+i+1],
-                            &ix, &iy);
-                if (has_int)
-                    record->equilibria.push_back( Equilibrium(ix, iy) );
+                for (int i=0; i<XRES-1; ++i)
+                {
+                    double ix, iy;
+                    bool has_int = LineIntersection(
+                                x[i], y[i], x[i+1], y[i+1],
+                                x[i], y[XRES+i], x[i+1], y[XRES+i+1],
+                                &ix, &iy);
+                    if (has_int)
+                        record->equilibria.push_back( Equilibrium(ix, iy) );
+                }
+
+                const double* jacob_vec = parser_mgr.ConstData(ds::JAC);
+                const size_t num_eqs = record->equilibria.size();
+                for (size_t i=0; i<num_eqs; ++i)
+                {
+                    parser_mgr.SetData(ds::DIFF, xidx, record->equilibria.at(i).x);
+                    parser_mgr.SetData(ds::DIFF, yidx, record->equilibria.at(i).y);
+                    parser_mgr.ParserEval(false);
+
+                    // ###
+                    const double trace = jacob_vec[0] + jacob_vec[3],
+                            det = jacob_vec[0]*jacob_vec[3] - jacob_vec[1]*jacob_vec[2];
+                    if (trace<0)
+                    {
+                        if (det>0) record->equilibria[i].eq_cat = ATTRACTOR;
+                        else record->equilibria[i].eq_cat = SADDLE;
+                    }
+                    else
+                    {
+                        if (det>0) record->equilibria[i].eq_cat = SADDLE;
+                        else record->equilibria[i].eq_cat = REPELLOR;
+                    }
+                }
             }
 
             _packets.push_back(record);
@@ -162,6 +197,8 @@ void UserNullcline::MakePlotItems()
     const int num_ncs = _modelMgr->Model(ds::NC)->NumPars();
     const size_t yidx = Spec_toi("yidx");
     const bool has_jacobian = Spec_tob("has_jacobian");
+    if (has_jacobian)
+        ClearEquilibria();
     for (int i=0; i<num_ncs; ++i)
     {
         size_t yidx_i = _modelMgr->Model(ds::DIFF)->ShortKeyIndex( DependentVar( (size_t)i ) );
@@ -176,20 +213,48 @@ void UserNullcline::MakePlotItems()
         {
             for (const auto& it : record->equilibria)
             {
+                QBrush brush;
+                switch (it.eq_cat)
+                {
+                    case UNKNOWN:
+                        continue;
+                    case ATTRACTOR:
+                        brush.setColor(Qt::black);
+                        break;
+                    case SADDLE:
+                        brush.setColor(Qt::gray);
+                        break;
+                    case REPELLOR:
+                        brush.setColor(Qt::white);
+                        break;
+                }
+
                 QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-                    QBrush(Qt::black), QPen(Qt::black, 2), QSize(50, 50) );
+                    brush, QPen(Qt::black, 2), QSize(10, 10) );
                 QwtPlotMarker* marker = new QwtPlotMarker();
                 marker->setSymbol(symbol);
                 marker->setXValue(it.x);
                 marker->setYValue(it.y);
-                marker->setZ(-1);
+                marker->setZ(0.5);
                 marker->setRenderHint( QwtPlotItem::RenderAntialiased, true );
                 AddPlotItem(marker);
+                _eqMarkers.push_back(marker);
             }
         }
     }
 
+    if (has_jacobian)
+        DrawBase::Initialize();
+
     delete record;
+}
+
+UserNullcline::EQ_CAT UserNullcline::EquilibriumCat(double x0, double y0) const
+{
+    EQ_CAT eq_cat(UNKNOWN);
+    const size_t num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
+
+    return eq_cat;
 }
 
 //http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect

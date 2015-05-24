@@ -88,10 +88,10 @@ class ParamModelBase : public QAbstractTableModel
         virtual int columnCount(const QModelIndex &parent) const override = 0;
         virtual QVariant data(const QModelIndex &index, int role) const override;
         virtual Qt::ItemFlags flags(const QModelIndex &index) const override;
-        QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+        virtual QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
         virtual bool insertRows(int row, int count, const QModelIndex& parent) override;
         virtual bool removeRows(int row, int count, const QModelIndex& parent) override;
-        int rowCount() const;
+        virtual int rowCount() const;
         virtual int rowCount(const QModelIndex &parent) const override;
         virtual bool setData(const QModelIndex &index, const QVariant &value, int role) override;
         virtual bool setHeaderData(int section, Qt::Orientation orientation, const QVariant &value, int role) override;

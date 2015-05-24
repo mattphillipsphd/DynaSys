@@ -5,25 +5,39 @@ const std::string JacobianModel::DELIM = ",";
 JacobianModel::JacobianModel(QObject *parent, const std::string& name) :
     ParamModelBase(parent, name)
 {
-
 }
 
 JacobianModel::~JacobianModel()
 {
-
 }
 
 void JacobianModel::ProcessParamFileLine(const std::string& key, std::string rem)
 {
-    AddParameter(key, rem);
+    VecStr gradvec = ds::Split(rem, DELIM);
+    const size_t num_eqns = gradvec.size();
+    size_t pos0 = key.find_first_of('('),
+            pos1 = key.find_last_of(')');
+    std::string diff = key.substr(pos0+1, (pos1-pos0)-1);
+    for (size_t i=0; i<num_eqns; ++i)
+    {
+        std::string key_i = "_grad_" + diff + "_" + std::to_string(i);
+        AddParameter(key_i, gradvec.at(i));
+    }
 }
 std::string JacobianModel::String() const
 {
     std::string str;
     str += "#" + ds::Model( Id() ) + "\n";
-    const size_t num_pars = NumPars();
+    const size_t num_pars = sqrt(NumPars());
+    int ct = 0;
     for (size_t i=0; i<num_pars; ++i)
-        str += Key(i) + "\t" + Value(i) + "\n";
+    {
+        std::string key = "grad("
+                + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(i) + ")";
+        for (size_t j=0; j<num_pars-1; ++j)
+            str += key + "\t" + Value(ct++) + ",";
+        str += Value(ct) + "\n";
+    }
     str += "\n";
     return str;
 }
@@ -43,19 +57,41 @@ QVariant JacobianModel::data(const QModelIndex &index, int role) const
     {
         case Qt::EditRole:
         case Qt::DisplayRole:
-        {
-            if (index.row()>=rowCount() || index.row()>=columnCount())
-                throw std::runtime_error("NumericModelBase::data: Index out of bounds");
-
-            VecStr gradvec = ds::Split( Parameter(index.row())->value, DELIM );
-            value = gradvec.at(index.column()).c_str();
+            value = Value(index.row()*columnCount() + index.column()).c_str();
             break;
-        }
         default:
             break;
     }
     return value;
 }
+
+QVariant JacobianModel::headerData(int section, Qt::Orientation orientation, int role) const
+{
+    if (role!=Qt::DisplayRole) return QVariant();
+    QVariant header;
+    switch (orientation)
+    {
+        case Qt::Horizontal:
+            header = ("d" + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(section)).c_str();
+            break;
+        case Qt::Vertical:
+            header = ("grad("
+                      + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(section) + ")").c_str();
+            break;
+    }
+    return header;
+}
+
+int JacobianModel::rowCount() const
+{
+    return rowCount( QModelIndex() );
+}
+
+int JacobianModel::rowCount(const QModelIndex&) const
+{
+    return sqrt( NumPars() );
+}
+
 bool JacobianModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     std::string val = value.toString().toStdString();
@@ -66,9 +102,8 @@ bool JacobianModel::setData(const QModelIndex &index, const QVariant &value, int
             if (index.row()>=rowCount() || index.row()>=columnCount())
                 throw std::runtime_error("NumericModelBase::setData: Index out of bounds");
 
-            VecStr gradvec = ds::Split( Parameter(index.row())->value, DELIM );
-            gradvec[index.column()] = val;
-            Parameter(index.row())->value = ds::Join(gradvec, DELIM);
+            int idx = index.row()*columnCount() + index.column();
+            Parameter(idx)->value = val;
             break;
         }
         default:

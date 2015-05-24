@@ -12,6 +12,7 @@ class UserNullcline : public DrawBase
         virtual void MakePlotItems() override;
 
     protected:
+        void ClearEquilibria();
         virtual void ComputeData() override;
         std::string DependentVar(size_t i) const;
         std::string EquationVar(size_t i) const;
@@ -23,9 +24,9 @@ class UserNullcline : public DrawBase
         enum EQ_CAT
         {
             UNKNOWN = -1,
-            STABLE,
+            ATTRACTOR,
             SADDLE,
-            UNSTABLE
+            REPELLOR
         };
         struct Equilibrium
         {
@@ -54,11 +55,13 @@ class UserNullcline : public DrawBase
             double* x, * y;
         };
 
+        EQ_CAT EquilibriumCat(double x0, double y0) const;
         bool LineIntersection(double p0_x, double p0_y, double p1_x, double p1_y,
             double p2_x, double p2_y, double p3_x, double p3_y, double *i_x, double *i_y);
 
         const static int XRES;
         std::vector<QColor> _colors;
+        std::vector<QwtPlotMarker*> _eqMarkers;
         std::deque<Record*> _packets;
 };
 
