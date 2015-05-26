@@ -14,10 +14,12 @@ class JacobianModel : public ParamModelBase
         virtual ~JacobianModel() override;
 
         virtual bool DoEvaluate() const override { return true; }
-        virtual bool DoInitialize() const { return false; }
+        virtual bool DoInitialize() const override { return false; }
+        virtual std::string Key(size_t i) const override;
+        virtual std::string ParamString(size_t i) const override;
         virtual void ProcessParamFileLine(const std::string& key, std::string rem) override;
-
         virtual std::string String() const override;
+        virtual std::string TempExpression(size_t i) const override;
 
         virtual int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override;

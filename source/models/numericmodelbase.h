@@ -36,6 +36,7 @@ class NumericModelBase : public ParamModelBase
 #endif
         virtual ~NumericModelBase() override;
 
+        virtual std::string ParamString(size_t i) const override;
         virtual void ProcessParamFileLine(const std::string& key, std::string rem) override;
 
         virtual void AddParameter(const std::string& key, const std::string& value = "") override;

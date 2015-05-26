@@ -284,6 +284,13 @@ void DrawBase::SetData(void* data)
     _data = data;
 }
 
+void DrawBase::RemovePlotItem(const QwtPlotItem* item)
+{
+#ifdef QT_DEBUG
+    assert(std::this_thread::get_id()==_guiTid);
+#endif
+    _plotItems.erase( std::remove(_plotItems.begin(), _plotItems.end(), item) );
+}
 void DrawBase::ReservePlotItems(size_t num)
 {
 #ifdef QT_DEBUG

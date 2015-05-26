@@ -61,12 +61,14 @@ class ParamModelBase : public QAbstractTableModel
         ds::PMODEL Id() const { return _id; }
         virtual VecStr Initializations() const { return VecStr(); }
         bool IsFreeze(size_t idx) const;
-        std::string Key(size_t i) const;
+        virtual std::string Key(size_t i) const;
         int KeyIndex(const std::string& par_name) const;
         VecStr Keys() const;
         std::string Name() const;
         size_t NumPars() const { return _parameters.size(); }
+        virtual std::string ParamString(size_t i) const;
         virtual void ProcessParamFileLine(const std::string& key, std::string rem) = 0;
+        virtual void SaveString(std::ofstream& out) const;
         virtual std::string ShortKey(size_t i) const;
         virtual int ShortKeyIndex(const std::string& par_name) const;
         VecStr ShortKeys() const;

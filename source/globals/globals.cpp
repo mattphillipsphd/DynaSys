@@ -24,6 +24,21 @@ void ds::InitThreadColors()
 }
 #endif
 
+std::string ds::EqCatStr(EQ_CAT eq_cat)
+{
+    std::string str;
+    switch(eq_cat)
+    {
+        case UNKNOWN: str = "unknown"; break;
+        case STABLE_NODE: str = "stable node"; break;
+        case STABLE_FOCUS: str = "stable focus"; break;
+        case SADDLE: str = "saddle"; break;
+        case UNSTABLE_NODE: str = "unstable node"; break;
+        case UNSTABLE_FOCUS: str = "unstable focus"; break;
+    }
+    return str;
+}
+
 int ds::thread_ct = 0;
 std::map<std::thread::id, QColor> ds::thread_map;
 

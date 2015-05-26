@@ -88,6 +88,18 @@ VecStr ParamModelBase::Keys() const
         vs.push_back(Key(i));
     return vs;
 }
+std::string ParamModelBase::ParamString(size_t i) const
+{
+    return Key(i) + "\t" + Value(i) + "\n";
+}
+void ParamModelBase::SaveString(std::ofstream& out) const
+{
+    const size_t num_pars = rowCount();
+    out << Name() << "\t" << num_pars << std::endl;
+    for (size_t j=0; j<num_pars; ++j)
+        out << ParamString(j);
+    out << std::endl;
+}
 std::string ParamModelBase::ShortKey(size_t i) const
 {
     return Key(i);

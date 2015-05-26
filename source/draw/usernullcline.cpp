@@ -21,7 +21,11 @@ void UserNullcline::ClearEquilibria()
 #ifdef DEBUG_FUNC
     ScopeTracker st("UserNullcline::ClearEquilibria", std::this_thread::get_id());
 #endif
-    for (auto it : _eqMarkers) it->detach();
+    for (auto it : _eqMarkers)
+    {
+        it->detach();
+        RemovePlotItem(it);
+    }
     _eqMarkers.clear();
 }
 
@@ -37,7 +41,7 @@ void UserNullcline::ComputeData()
 
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
-                num_ncs = _modelMgr->Model(ds::NC)->NumPars();
+                num_ncs = (int)_modelMgr->Model(ds::NC)->NumPars();
         const bool has_jacobian = Spec_tob("has_jacobian");
 
         const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
@@ -55,19 +59,31 @@ void UserNullcline::ComputeData()
 
             ParserMgr& parser_mgr = GetParserMgr(0);
             const ParamModelBase* const diff_model = _modelMgr->Model(ds::DIFF);
-            const double* const resets = parser_mgr.ConstData(ds::INIT);
-            const int num_diffs = diff_model->NumPars();
+            const double* const resets = parser_mgr.ConstData(ds::INIT),
+                    * const dcurrent = parser_mgr.ConstData(ds::DIFF),
+                    * const vcurrent = parser_mgr.ConstData(ds::VAR);
+            const int num_diffs = (int)diff_model->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
             for (int i=0; i<XRES; ++i)
             {
+                //Set up the model
                 const double xij = i*xinc + xmin;
-
-                const double* ncs = parser_mgr.ConstData(ds::NC);
                 for (int j=0; j<num_diffs; ++j)
-                    if (j==xidx) parser_mgr.SetData(ds::DIFF, xidx, xij);
-                    else parser_mgr.SetData(ds::DIFF, j, resets[j]);
+                    if (j==xidx)
+                        parser_mgr.SetData(ds::DIFF, j, xij);
+                    else if (j==yidx) //Shouldn't matter at all what this gets set to
+                        parser_mgr.SetData(ds::DIFF, j, resets[j]);
+                    else
+                        parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
+                for (int j=0; j<num_vars; ++j)
+                    parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+
+                //Evaluate the model
                 parser_mgr.ParserEval(false);
 
-                x[i] = xij;
+                //Retrieve the results
+                x[i] = xij;               
+                const double* ncs = parser_mgr.ConstData(ds::NC);
                 for (int j=0; j<num_ncs; ++j)
                 {
                     size_t yidx_j = diff_model->ShortKeyIndex( DependentVar( (size_t)j ) );
@@ -86,7 +102,7 @@ void UserNullcline::ComputeData()
                                 x[i], y[XRES+i], x[i+1], y[XRES+i+1],
                                 &ix, &iy);
                     if (has_int)
-                        record->equilibria.push_back( Equilibrium(ix, iy) );
+                        record->equilibria.push_back( ds::Equilibrium(ix, iy) );
                 }
 
                 const double* jacob_vec = parser_mgr.ConstData(ds::JAC);
@@ -97,19 +113,7 @@ void UserNullcline::ComputeData()
                     parser_mgr.SetData(ds::DIFF, yidx, record->equilibria.at(i).y);
                     parser_mgr.ParserEval(false);
 
-                    // ###
-                    const double trace = jacob_vec[0] + jacob_vec[3],
-                            det = jacob_vec[0]*jacob_vec[3] - jacob_vec[1]*jacob_vec[2];
-                    if (trace<0)
-                    {
-                        if (det>0) record->equilibria[i].eq_cat = ATTRACTOR;
-                        else record->equilibria[i].eq_cat = SADDLE;
-                    }
-                    else
-                    {
-                        if (det>0) record->equilibria[i].eq_cat = SADDLE;
-                        else record->equilibria[i].eq_cat = REPELLOR;
-                    }
+                    record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_eqs);
                 }
             }
 
@@ -150,7 +154,6 @@ void UserNullcline::Initialize()
     _colors = *static_cast< const std::vector<QColor>* >( OpaqueSpec("colors") );
     const size_t num_colors = _colors.size();
     SetNeedRecompute(true);
-    FreezeNonUser();
     InitParserMgrs(1);
 
     ClearPlotItems();
@@ -194,7 +197,7 @@ void UserNullcline::MakePlotItems()
 
     const double* const x = record->x,
             * const y = record->y;
-    const int num_ncs = _modelMgr->Model(ds::NC)->NumPars();
+    const int num_ncs = (int)_modelMgr->Model(ds::NC)->NumPars();
     const size_t yidx = Spec_toi("yidx");
     const bool has_jacobian = Spec_tob("has_jacobian");
     if (has_jacobian)
@@ -208,40 +211,42 @@ void UserNullcline::MakePlotItems()
         for (int k=0; k<XRES; ++k)
             nullcline[k] = QPointF( x[k], y[i*XRES+k] );
         curv->setSamples(nullcline);
-
-        if (has_jacobian)
-        {
-            for (const auto& it : record->equilibria)
-            {
-                QBrush brush;
-                switch (it.eq_cat)
-                {
-                    case UNKNOWN:
-                        continue;
-                    case ATTRACTOR:
-                        brush.setColor(Qt::black);
-                        break;
-                    case SADDLE:
-                        brush.setColor(Qt::gray);
-                        break;
-                    case REPELLOR:
-                        brush.setColor(Qt::white);
-                        break;
-                }
-
-                QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-                    brush, QPen(Qt::black, 2), QSize(10, 10) );
-                QwtPlotMarker* marker = new QwtPlotMarker();
-                marker->setSymbol(symbol);
-                marker->setXValue(it.x);
-                marker->setYValue(it.y);
-                marker->setZ(0.5);
-                marker->setRenderHint( QwtPlotItem::RenderAntialiased, true );
-                AddPlotItem(marker);
-                _eqMarkers.push_back(marker);
-            }
-        }
     }
+
+    emit Flag_pv(nullptr); //Clear the vector of equilibria
+    if (has_jacobian)
+        for (const auto& it : record->equilibria)
+        {
+            QBrush brush;
+            switch (it.eq_cat)
+            {
+                case ds::UNKNOWN:
+                    continue;
+                case ds::STABLE_NODE:
+                case ds::STABLE_FOCUS:
+                    brush = QBrush(Qt::black);
+                    break;
+                case ds::SADDLE:
+                    brush = QBrush(Qt::gray);
+                    break;
+                case ds::UNSTABLE_NODE:
+                case ds::UNSTABLE_FOCUS:
+                    brush = QBrush(Qt::white);
+                    break;
+            }
+
+            QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
+                brush, QPen(Qt::black, 1), QSize(10, 10) );
+            QwtPlotMarker* marker = new QwtPlotMarker();
+            marker->setSymbol(symbol);
+            marker->setXValue(it.x);
+            marker->setYValue(it.y);
+            marker->setZ(0.5);
+            marker->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+            AddPlotItem(marker);
+            _eqMarkers.push_back(marker);
+            emit Flag_pv( new ds::Equilibrium(it) );
+        }
 
     if (has_jacobian)
         DrawBase::Initialize();
@@ -249,10 +254,37 @@ void UserNullcline::MakePlotItems()
     delete record;
 }
 
-UserNullcline::EQ_CAT UserNullcline::EquilibriumCat(double x0, double y0) const
+double UserNullcline::Determinant2D(const double *mat, int size) const
 {
-    EQ_CAT eq_cat(UNKNOWN);
-    const size_t num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
+    assert(size == 2);
+    return mat[0]*mat[3] - mat[1]*mat[2];
+}
+
+ds::EQ_CAT UserNullcline::EquilibriumCat(const double* mat, int size) const
+{
+    ds::EQ_CAT eq_cat(ds::UNKNOWN);
+    const double trace = Trace(mat, size),
+            det = Determinant2D(mat, size);
+    if (trace<0)
+    {
+        if (det>0)
+        {
+            if (trace*trace > 4*det) eq_cat = ds::STABLE_FOCUS;
+            else eq_cat = ds::STABLE_NODE;
+        }
+        else
+            eq_cat = ds::SADDLE;
+    }
+    else
+    {
+        if (det>0)
+            eq_cat = ds::SADDLE;
+        else
+        {
+            if (trace*trace > 4*det) eq_cat = ds::UNSTABLE_NODE;
+            eq_cat = ds::UNSTABLE_FOCUS;
+        }
+    }
 
     return eq_cat;
 }
@@ -284,3 +316,12 @@ bool UserNullcline::LineIntersection(double p0_x, double p0_y, double p1_x, doub
 
     return false; // No collision
 }
+
+double UserNullcline::Trace(const double* mat, int size) const
+{
+    double trace = mat[0];
+    for (int i=1; i<size; ++i)
+        trace += mat[(i+1)*(i+1) - 1];
+    return trace;
+}
+

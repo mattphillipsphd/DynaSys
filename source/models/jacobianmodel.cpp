@@ -11,6 +11,21 @@ JacobianModel::~JacobianModel()
 {
 }
 
+std::string JacobianModel::Key(size_t i) const
+{
+    return Parameter((size_t)i)->key;
+}
+std::string JacobianModel::ParamString(size_t i) const
+{
+    const int num_pars = rowCount();
+    std::string key = "grad("
+            + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(i) + ")";
+    std::string str;
+    for (size_t j=0; j<num_pars-1; ++j)
+        str += key + "\t" + Value(i*num_pars+j) + ",";
+    str += Value((i+1)*num_pars-1) + "\n";
+    return str;
+}
 void JacobianModel::ProcessParamFileLine(const std::string& key, std::string rem)
 {
     VecStr gradvec = ds::Split(rem, DELIM);
@@ -40,6 +55,10 @@ std::string JacobianModel::String() const
     }
     str += "\n";
     return str;
+}
+std::string JacobianModel::TempExpression(size_t i) const
+{
+    return Value(i).empty() ? "" : TempKey(i) + " = " + Value(i);
 }
 
 int JacobianModel::columnCount() const

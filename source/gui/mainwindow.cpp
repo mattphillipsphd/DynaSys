@@ -307,6 +307,16 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     t.detach();
     _timer.start(PLOT_REFRESH);
 }
+void MainWindow::UpdateEquilibria(void* eq) //slot
+{
+    if (!eq)
+    {
+        for (auto it : _equilibria) delete it;
+        _equilibria.clear();
+    }
+    else
+        _equilibria.push_back( static_cast<ds::Equilibrium*>(eq) );
+}
 void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
 //#ifdef DEBUG_FUNC
@@ -314,6 +324,15 @@ void MainWindow::UpdateMousePos(QPointF pos) //slot
 //#endif
     ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
+
+    std::string eq_str("");
+    for (const auto& it : _equilibria)
+        if (abs(pos.x() - it->x)<1 && abs(pos.y() - it->y)<1)
+        {
+            eq_str = ds::EqCatStr(it->eq_cat);
+            break;
+        }
+    ui->lblEqCat->setText(eq_str.c_str());
 }
 void MainWindow::UpdateTimePlot() //slot
 {
@@ -1268,6 +1287,9 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
         case DrawBase::SINGLE:
             connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
+            break;
+        case DrawBase::USER_NULLCLINE:
+            connect(draw_object, SIGNAL(Flag_pv(void*)), this, SLOT(UpdateEquilibria(void*)));
             break;
         default:
             break;

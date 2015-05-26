@@ -126,6 +126,7 @@ class MainWindow : public QMainWindow
         void Pause();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
+        void UpdateEquilibria(void* eq);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
         void UpdateTPData();
@@ -265,6 +266,7 @@ class MainWindow : public QMainWindow
         UserNullclineGui* const _userNullclineGui;
 
         DrawMgr* const _drawMgr;
+        std::vector<ds::Equilibrium*> _equilibria;
         std::string _fileName;
         std::vector<JobRecord> _jobs;
         Log* const _log;

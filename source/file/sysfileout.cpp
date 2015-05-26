@@ -22,16 +22,7 @@ void SysFileOut::Save() const
     for (int i=0; i<ds::NUM_MODELS; ++i)
     {
         const ParamModelBase* model = model_mgr->Model((ds::PMODEL)i);
-        const int num_pars = (int)model->NumPars();
-        _out << model->Name() << "\t" << num_pars << std::endl;
-        for (int i=0; i<num_pars; ++i)
-        {
-            _out << model->Key(i) << "\t" << model->Value(i);
-            if (const NumericModelBase* nmodel = dynamic_cast<const NumericModelBase*>(model))
-                 _out << "\t" << nmodel->Minimum(i) << "\t" << nmodel->Maximum(i);
-            _out << std::endl;
-        }
-        _out << std::endl;
+        model->SaveString(_out);
     }
 
     model_mgr->GetNotes()->Write(_out);
