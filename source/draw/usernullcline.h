@@ -38,6 +38,7 @@ class UserNullcline : public DrawBase
         };
 
         double Determinant2D(const double* mat, int size) const; //Matrix is ROW-MAJOR
+        double Determinant3D(const double* mat, int size) const; //Matrix is ROW-MAJOR
         ds::EQ_CAT EquilibriumCat(const double* mat, int size) const;
         bool LineIntersection(double p0_x, double p0_y, double p1_x, double p1_y,
             double p2_x, double p2_y, double p3_x, double p3_y, double *i_x, double *i_y);

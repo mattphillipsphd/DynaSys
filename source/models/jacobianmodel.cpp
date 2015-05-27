@@ -21,7 +21,7 @@ std::string JacobianModel::ParamString(size_t i) const
     std::string key = "grad("
             + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(i) + ")";
     std::string str;
-    for (size_t j=0; j<num_pars-1; ++j)
+    for (int j=0; j<num_pars-1; ++j)
         str += key + "\t" + Value(i*num_pars+j) + ",";
     str += Value((i+1)*num_pars-1) + "\n";
     return str;
@@ -83,7 +83,10 @@ QVariant JacobianModel::data(const QModelIndex &index, int role) const
     }
     return value;
 }
-
+Qt::ItemFlags JacobianModel::flags(const QModelIndex& index) const
+{
+    return QAbstractTableModel::flags(index) | Qt::ItemIsEditable;
+}
 QVariant JacobianModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role!=Qt::DisplayRole) return QVariant();
@@ -100,7 +103,6 @@ QVariant JacobianModel::headerData(int section, Qt::Orientation orientation, int
     }
     return header;
 }
-
 int JacobianModel::rowCount() const
 {
     return rowCount( QModelIndex() );
@@ -110,7 +112,6 @@ int JacobianModel::rowCount(const QModelIndex&) const
 {
     return sqrt( NumPars() );
 }
-
 bool JacobianModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     std::string val = value.toString().toStdString();

@@ -237,7 +237,8 @@ void DrawBase::IterCompleted(int num_iters) //slot
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if ((_iterCt+=num_iters) >= _iterMax)
-        _drawState = STOPPED;
+        _drawState = PAUSED;
+//        _drawState = STOPPED;
     _lastStep = std::chrono::system_clock::now();
 }
 
@@ -289,7 +290,9 @@ void DrawBase::RemovePlotItem(const QwtPlotItem* item)
 #ifdef QT_DEBUG
     assert(std::this_thread::get_id()==_guiTid);
 #endif
-    _plotItems.erase( std::remove(_plotItems.begin(), _plotItems.end(), item) );
+    auto it = std::remove(_plotItems.begin(), _plotItems.end(), item);
+    if (it != _plotItems.end())
+        _plotItems.erase(it);
 }
 void DrawBase::ReservePlotItems(size_t num)
 {

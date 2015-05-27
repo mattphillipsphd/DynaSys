@@ -7,6 +7,7 @@ VectorField::VectorField(DSPlot* plot) : DrawBase(plot)
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::VectorField", std::this_thread::get_id());
 #endif
+    SetDeleteOnFinish(true);
 }
 VectorField::~VectorField()
 {
@@ -88,6 +89,11 @@ void VectorField::ComputeData()
                     }
                 }
 
+            for (int j=0; j<num_vars; ++j)
+                parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+            for (int j=0; j<num_diffs; ++j)
+                parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
+
             _packets.push_back(data);
         }
         catch (std::exception& e)
@@ -105,7 +111,7 @@ void VectorField::ComputeData()
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
-    if (DeleteOnFinish()) emit ReadyToDelete();
+    if (DrawState()==STOPPED && DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void VectorField::Initialize()
@@ -175,7 +181,8 @@ void VectorField::InitParserMgrs()
 #endif
     _resolution = (size_t)Spec_toi("resolution");
     FreezeNonUser();
-    DrawBase::InitParserMgrs(_resolution*_resolution);
+    DrawBase::InitParserMgrs(1);
+//    DrawBase::InitParserMgrs(_resolution*_resolution);
 }
 
 void VectorField::ResetPlotItems()

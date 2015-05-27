@@ -17,7 +17,7 @@
    <item>
     <widget class="QLabel" name="label">
      <property name="text">
-      <string>&lt;X&gt;_for_d&lt;Y&gt; is the nullcline for Y with X as the dependent variable.</string>
+      <string>&lt;X&gt;_for_d&lt;Y&gt; is the nullcline for Y' with X as the dependent variable.</string>
      </property>
     </widget>
    </item>

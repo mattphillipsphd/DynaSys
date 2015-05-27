@@ -7,6 +7,7 @@ UserNullcline::UserNullcline(DSPlot* plot) : DrawBase(plot)
 #ifdef DEBUG_FUNC
     ScopeTracker st("UserNullcline::UserNullcline", std::this_thread::get_id());
 #endif
+    SetDeleteOnFinish(true);
 }
 
 UserNullcline::~UserNullcline()
@@ -86,7 +87,7 @@ void UserNullcline::ComputeData()
                 const double* ncs = parser_mgr.ConstData(ds::NC);
                 for (int j=0; j<num_ncs; ++j)
                 {
-                    size_t yidx_j = diff_model->ShortKeyIndex( DependentVar( (size_t)j ) );
+                    int yidx_j = (int)diff_model->ShortKeyIndex( DependentVar( (size_t)j ) );
                     if (yidx_j != yidx) continue;
                     y[j*XRES + i] = ncs[j];
                 }
@@ -113,9 +114,14 @@ void UserNullcline::ComputeData()
                     parser_mgr.SetData(ds::DIFF, yidx, record->equilibria.at(i).y);
                     parser_mgr.ParserEval(false);
 
-                    record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_eqs);
+                    record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_diffs);
                 }
             }
+
+            for (int j=0; j<num_vars; ++j)
+                parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+            for (int j=0; j<num_diffs; ++j)
+                parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
 
             _packets.push_back(record);
         }
@@ -130,7 +136,7 @@ void UserNullcline::ComputeData()
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
-    if (DeleteOnFinish()) emit ReadyToDelete();
+    if (DrawState()==STOPPED && DeleteOnFinish()) emit ReadyToDelete();
 }
 std::string UserNullcline::DependentVar(size_t i) const
 {
@@ -236,7 +242,7 @@ void UserNullcline::MakePlotItems()
             }
 
             QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
-                brush, QPen(Qt::black, 1), QSize(10, 10) );
+                brush, QPen(Qt::black, 1), QSize(12, 12) );
             QwtPlotMarker* marker = new QwtPlotMarker();
             marker->setSymbol(symbol);
             marker->setXValue(it.x);
@@ -260,25 +266,34 @@ double UserNullcline::Determinant2D(const double *mat, int size) const
     return mat[0]*mat[3] - mat[1]*mat[2];
 }
 
+double UserNullcline::Determinant3D(const double *mat, int size) const
+{
+    assert(size == 3);
+    //0 1 2
+    //3 4 5
+    //6 7 8
+    const double aminor[4] = {mat[4], mat[5], mat[7], mat[8]},
+            bminor[4] = {mat[3], mat[5], mat[6], mat[8]},
+            cminor[4] = {mat[3], mat[4], mat[6], mat[7]};
+    return mat[0]*Determinant2D(aminor, size-1)
+            - mat[1]*Determinant2D(bminor, size-1)
+            + mat[2]*Determinant2D(cminor, size-1);
+}
+
 ds::EQ_CAT UserNullcline::EquilibriumCat(const double* mat, int size) const
 {
     ds::EQ_CAT eq_cat(ds::UNKNOWN);
     const double trace = Trace(mat, size),
-            det = Determinant2D(mat, size);
-    if (trace<0)
+            det = (size==2) ? Determinant2D(mat, size) : Determinant3D(mat, size);
+    if (det<0)
+        eq_cat = ds::SADDLE;
+    else
     {
-        if (det>0)
+        if (trace<0)
         {
             if (trace*trace > 4*det) eq_cat = ds::STABLE_FOCUS;
             else eq_cat = ds::STABLE_NODE;
         }
-        else
-            eq_cat = ds::SADDLE;
-    }
-    else
-    {
-        if (det>0)
-            eq_cat = ds::SADDLE;
         else
         {
             if (trace*trace > 4*det) eq_cat = ds::UNSTABLE_NODE;

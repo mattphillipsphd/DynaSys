@@ -325,14 +325,28 @@ void MainWindow::UpdateMousePos(QPointF pos) //slot
     ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
 
+    DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
+    const int xidx = pp->Spec_toi("xidx"),
+            yidx = pp->Spec_toi("yidx");
+    const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
+            xmax = _modelMgr->Maximum(ds::INIT, xidx),
+            ymin = _modelMgr->Minimum(ds::INIT, yidx),
+            ymax = _modelMgr->Maximum(ds::INIT, yidx),
+            xwin = (xmax - xmin)/100,
+            ywin = (ymax - ymin)/100;
+
+    ui->lblEqCat->clear();
     std::string eq_str("");
     for (const auto& it : _equilibria)
-        if (abs(pos.x() - it->x)<1 && abs(pos.y() - it->y)<1)
+        if (abs(pos.x() - it->x)<xwin && abs(pos.y() - it->y)<ywin)
         {
             eq_str = ds::EqCatStr(it->eq_cat);
             break;
         }
     ui->lblEqCat->setText(eq_str.c_str());
+    QFont font;
+    font.setWeight(QFont::Bold);
+    ui->lblEqCat->setFont(font);
 }
 void MainWindow::UpdateTimePlot() //slot
 {
@@ -950,6 +964,20 @@ void MainWindow::on_btnStart_clicked()
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
             _paramEditor->setEnabled(false);
+            if (ui->cboxNullclines->isChecked())
+            {
+                DrawBase::DRAW_TYPE nc_type =
+                        (_userNullclineGui->NumValidNCs()>0)
+                        ? DrawBase::USER_NULLCLINE
+                        : DrawBase::NULLCLINE;
+                CreateObject(nc_type);
+                UpdateDOSpecs(nc_type);
+            }
+            if (ui->cboxVectorField->isChecked())
+            {
+                CreateObject(DrawBase::VECTOR_FIELD);
+                UpdateDOSpecs(DrawBase::VECTOR_FIELD);
+            }
             size_t num_objects = _drawMgr->NumDrawObjects();
             for (size_t i=0; i<num_objects; ++i)
             {
@@ -1475,6 +1503,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
         try
         {
             _drawMgr->QuickEval(exprn);
+//            _drawMgr->Start(DrawBase::VECTOR_FIELD, 1);
         }
         catch (std::exception& e)
         {

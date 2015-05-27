@@ -169,7 +169,7 @@ FORMS    += forms/mainwindow.ui \
     forms/fastrungui.ui \
     forms/eventviewer.ui \
     forms/usernullclinegui.ui \
-    gui/jacobiangui.ui
+    forms/jacobiangui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0
