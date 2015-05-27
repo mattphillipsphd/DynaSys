@@ -395,12 +395,12 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
             double* data = _modelData[i].first,
                     * temp_data = _modelData[i].second;
             const size_t num_pars = model->NumPars();
-            for (size_t i=0; i<num_pars; ++i)
+            for (size_t j=0; j<num_pars; ++j)
             {
-                const std::string& key = model->ShortKey(i);
-                parser.DefineVar(key, &data[i]);
+                const std::string& key = model->ShortKey(j);
+                parser.DefineVar(key, &data[j]);
                 if (model->DoEvaluate())
-                    parser.DefineVar(model->TempKey(i), &temp_data[i]);
+                    parser.DefineVar(model->TempKey(j), &temp_data[j]);
             }
         }
     }

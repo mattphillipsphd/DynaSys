@@ -34,9 +34,10 @@ class DrawBase : public QObject
     public:
         enum DRAW_TYPE
         {
-            NULL_CLINE,
+            NULLCLINE,
             SINGLE,
             TIME_PLOT,
+            USER_NULLCLINE,
             VARIABLE_VIEW,
             VECTOR_FIELD
         };
@@ -142,6 +143,7 @@ class DrawBase : public QObject
         void Flag3();
         void Flag_i(int);
         void Flag_d(double);
+        void Flag_pv(void*);
         void ReadyToDelete();
 
     protected slots:
@@ -159,6 +161,7 @@ class DrawBase : public QObject
         void InitParserMgrs(size_t num);
         std::mutex& Mutex() { return _mutex; }
         void RecomputeIfNeeded();
+        void RemovePlotItem(const QwtPlotItem* item);
         void ReservePlotItems(size_t num);
 
         void SetData(void* data);

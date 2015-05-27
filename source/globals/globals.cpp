@@ -24,8 +24,25 @@ void ds::InitThreadColors()
 }
 #endif
 
+std::string ds::EqCatStr(EQ_CAT eq_cat)
+{
+    std::string str;
+    switch(eq_cat)
+    {
+        case UNKNOWN: str = "unknown"; break;
+        case STABLE_NODE: str = "stable node"; break;
+        case STABLE_FOCUS: str = "stable focus"; break;
+        case SADDLE: str = "saddle"; break;
+        case UNSTABLE_NODE: str = "unstable node"; break;
+        case UNSTABLE_FOCUS: str = "unstable focus"; break;
+    }
+    return str;
+}
+
 int ds::thread_ct = 0;
 std::map<std::thread::id, QColor> ds::thread_map;
+
+const std::string ds::UNC_INFIX = "_for_d";
 
 void ds::AddThread(std::thread::id tid)
 {
@@ -50,6 +67,8 @@ ds::PMODEL ds::Model(const std::string& model)
     if (model=="Differentials") return DIFF;
     if (model=="InitialConds") return INIT;
     if (model=="Conditions") return COND;
+    if (model=="Nullclines") return NC;
+    if (model=="Jacobian") return JAC;
     throw std::runtime_error("ds::Model: Bad Model");
 }
 std::string ds::Model(PMODEL mi)
@@ -66,6 +85,10 @@ std::string ds::Model(PMODEL mi)
             return "InitialConds";
         case COND:
             return "Conditions";
+        case NC:
+            return "Nullclines";
+        case JAC:
+            return "Jacobian";
         case NUM_MODELS:
             throw std::runtime_error("ds::Model: Not a model");
     }

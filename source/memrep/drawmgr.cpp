@@ -203,7 +203,7 @@ void DrawMgr::Erase() //slot
 {
     std::lock_guard<std::mutex> lock(_mutex);
     QObject* dobj = sender();
-    _objects.erase( std::find(_objects.begin(), _objects.end(), dobj) );
+    _objects.erase( std::remove(_objects.begin(), _objects.end(), dobj) );
 }
 
 DrawMgr::DrawMgr() : _drawState(DrawBase::STOPPED), _log(Log::Instance())

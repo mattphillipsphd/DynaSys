@@ -11,6 +11,11 @@ NumericModelBase::~NumericModelBase()
 {
 }
 
+std::string NumericModelBase::ParamString(size_t i) const
+{
+    return Key(i) + "\t" + Value(i)
+            + "\t" + std::to_string(Minimum(i)) + "\t" + std::to_string(Maximum(i)) + "\n";
+}
 void NumericModelBase::ProcessParamFileLine(const std::string& key, std::string rem)
 {
     std::string pmin(NumParam::DEFAULT_MIN), pmax(NumParam::DEFAULT_MAX), value(rem);

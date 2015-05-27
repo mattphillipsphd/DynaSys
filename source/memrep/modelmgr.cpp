@@ -62,6 +62,14 @@ void ModelMgr::ClearModels()
         delete it;
     _models = MakeModelVec();
 }
+void ModelMgr::ClearParameters(ds::PMODEL mi)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::ClearParameters", std::this_thread::get_id());
+#endif
+    const size_t num_rows = _models.at(mi)->NumPars();
+    _models[mi]->removeRows(0, num_rows, QModelIndex());
+}
 
 void ModelMgr::SetCondValue(size_t row, const VecStr& results)
 {

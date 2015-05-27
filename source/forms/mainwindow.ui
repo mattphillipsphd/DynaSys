@@ -119,6 +119,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="lblEqCat">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -587,7 +594,7 @@
      <x>0</x>
      <y>0</y>
      <width>1494</width>
-     <height>25</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -619,6 +626,9 @@
     <addaction name="actionEvent_Viewer"/>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
+    <addaction name="actionSet_Nullclines"/>
+    <addaction name="actionSet_Jacobian"/>
+    <addaction name="actionSet_Init_to_Current"/>
     <addaction name="actionSet_Input_Home_Dir"/>
    </widget>
    <widget class="QMenu" name="menuRun">
@@ -782,6 +792,16 @@
   <action name="actionEvent_Viewer">
    <property name="text">
     <string>Event Viewer</string>
+   </property>
+  </action>
+  <action name="actionSet_Nullclines">
+   <property name="text">
+    <string>Set Nullclines</string>
+   </property>
+  </action>
+  <action name="actionSet_Jacobian">
+   <property name="text">
+    <string>Set Jacobian</string>
    </property>
   </action>
  </widget>

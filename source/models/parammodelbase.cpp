@@ -2,6 +2,8 @@
 #include "../models/conditionmodel.h"
 #include "../models/differentialmodel.h"
 #include "../models/initialcondmodel.h"
+#include "../models/jacobianmodel.h"
+#include "../models/nullclinemodel.h"
 #include "../models/parammodel.h"
 #include "../models/variablemodel.h"
 
@@ -9,7 +11,7 @@ const std::string ParamModelBase::Param::DEFAULT_VAL = "0";
 
 ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
 {
-    ParamModelBase* model;
+    ParamModelBase* model = nullptr;
     switch (mi)
     {
         case ds::INP:
@@ -26,6 +28,12 @@ ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
             break;
         case ds::COND:
             model = new ConditionModel(nullptr, ds::Model(mi));
+            break;
+        case ds::NC:
+            model = new NullclineModel(nullptr, ds::Model(mi));
+            break;
+        case ds::JAC:
+            model = new JacobianModel(nullptr, ds::Model(mi));
             break;
         default:
             throw std::runtime_error("SysFileIn::Load: Bad model name");
@@ -79,6 +87,18 @@ VecStr ParamModelBase::Keys() const
     for (size_t i=0; i<num_pars; ++i)
         vs.push_back(Key(i));
     return vs;
+}
+std::string ParamModelBase::ParamString(size_t i) const
+{
+    return Key(i) + "\t" + Value(i) + "\n";
+}
+void ParamModelBase::SaveString(std::ofstream& out) const
+{
+    const size_t num_pars = rowCount();
+    out << Name() << "\t" << num_pars << std::endl;
+    for (size_t j=0; j<num_pars; ++j)
+        out << ParamString(j);
+    out << std::endl;
 }
 std::string ParamModelBase::ShortKey(size_t i) const
 {

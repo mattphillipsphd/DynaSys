@@ -2,6 +2,7 @@
 #include "nullcline.h"
 #include "phaseplot.h"
 #include "timeplot.h"
+#include "usernullcline.h"
 #include "variableview.h"
 #include "vectorfield.h"
 
@@ -18,9 +19,9 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
     DrawBase* draw_object(nullptr);
     switch (draw_type)
     {
-        case NULL_CLINE:
+        case NULLCLINE:
             draw_object = new Nullcline(plot);
-            draw_object->_drawType = NULL_CLINE;
+            draw_object->_drawType = NULLCLINE;
             break;
         case SINGLE:
             draw_object = new PhasePlot(plot);
@@ -29,6 +30,10 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
         case TIME_PLOT:
             draw_object = new TimePlot(plot);
             draw_object->_drawType = TIME_PLOT;
+            break;
+        case USER_NULLCLINE:
+            draw_object = new UserNullcline(plot);
+            draw_object->_drawType = USER_NULLCLINE;
             break;
         case VARIABLE_VIEW:
             draw_object = new VariableView(plot);
@@ -232,7 +237,8 @@ void DrawBase::IterCompleted(int num_iters) //slot
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if ((_iterCt+=num_iters) >= _iterMax)
-        _drawState = STOPPED;
+        _drawState = PAUSED;
+//        _drawState = STOPPED;
     _lastStep = std::chrono::system_clock::now();
 }
 
@@ -279,6 +285,15 @@ void DrawBase::SetData(void* data)
     _data = data;
 }
 
+void DrawBase::RemovePlotItem(const QwtPlotItem* item)
+{
+#ifdef QT_DEBUG
+    assert(std::this_thread::get_id()==_guiTid);
+#endif
+    auto it = std::remove(_plotItems.begin(), _plotItems.end(), item);
+    if (it != _plotItems.end())
+        _plotItems.erase(it);
+}
 void DrawBase::ReservePlotItems(size_t num)
 {
 #ifdef QT_DEBUG

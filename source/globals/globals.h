@@ -43,11 +43,38 @@ namespace ds
         DIFF,
         INIT,
         COND,
+        NC,
+        JAC,
         NUM_MODELS //Nice trick from SO
     };
 
+    enum EQ_CAT
+    {
+        UNKNOWN = -1,
+        STABLE_NODE,
+        STABLE_FOCUS,
+        SADDLE,
+        UNSTABLE_NODE,
+        UNSTABLE_FOCUS
+    };
+    struct Equilibrium
+    {
+        Equilibrium(double x, double y, EQ_CAT ec = UNKNOWN)
+            : x(x), y(y), eq_cat(ec)
+        {}
+        Equilibrium() : eq_cat(UNKNOWN)
+        {}
+        Equilibrium(const Equilibrium& other) : x(other.x), y(other.y), eq_cat(other.eq_cat)
+        {}
+        double x, y;
+        EQ_CAT eq_cat;
+    };
+    std::string EqCatStr(EQ_CAT eq_cat);
+
     extern int thread_ct;
     extern std::map<std::thread::id, QColor> thread_map;
+
+    extern const std::string UNC_INFIX;
 
     void AddThread(std::thread::id tid);
 

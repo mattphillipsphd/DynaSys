@@ -7,6 +7,7 @@ VectorField::VectorField(DSPlot* plot) : DrawBase(plot)
 #ifdef DEBUG_FUNC
     ScopeTracker st("VectorField::VectorField", std::this_thread::get_id());
 #endif
+    SetDeleteOnFinish(true);
 }
 VectorField::~VectorField()
 {
@@ -55,17 +56,29 @@ void VectorField::ComputeData()
             std::lock_guard<std::mutex> lock( Mutex() );
             RecomputeIfNeeded();
             QPolygonF* data = new QPolygonF[_resolution*_resolution];
+            ParserMgr& parser_mgr = GetParserMgr(0);
+            const double* const dcurrent = parser_mgr.ConstData(ds::DIFF),
+                    * const vcurrent = parser_mgr.ConstData(ds::VAR);
+            const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
             for (size_t i=0; i<_resolution; ++i)
                 for (size_t j=0; j<_resolution; ++j)
                 {
-                    const int idx = i*_resolution+j;
-                    ParserMgr& parser_mgr = GetParserMgr(idx);
-                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
+//                    const int idx = i*_resolution+j;
+//                    ParserMgr& parser_mgr = GetParserMgr(idx);
                     const double x = i*xinc + xmin,
                                 y = j*yinc + ymin;
+                    for (int k=0; k<num_diffs; ++k)
+                        if (k==xidx)
+                            parser_mgr.SetData(ds::DIFF, k, x);
+                        else if (k==yidx)
+                            parser_mgr.SetData(ds::DIFF, k, y);
+                        else
+                            parser_mgr.SetData(ds::DIFF, k, dcurrent[k]);
+                    for (int k=0; k<num_vars; ++k)
+                        parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
 
-                    parser_mgr.SetData(ds::DIFF, xidx, x);
-                    parser_mgr.SetData(ds::DIFF, yidx, y);
+                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
                     QPolygonF& pts = data[i*_resolution+j];
                     pts = QPolygonF(_tailLength+1);
                     pts[0] = QPointF(x, y);
@@ -75,6 +88,11 @@ void VectorField::ComputeData()
                         pts[k] = QPointF(diffs[xidx], diffs[yidx]);
                     }
                 }
+
+            for (int j=0; j<num_vars; ++j)
+                parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+            for (int j=0; j<num_diffs; ++j)
+                parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
 
             _packets.push_back(data);
         }
@@ -93,7 +111,7 @@ void VectorField::ComputeData()
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
-    if (DeleteOnFinish()) emit ReadyToDelete();
+    if (DrawState()==STOPPED && DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void VectorField::Initialize()
@@ -163,7 +181,8 @@ void VectorField::InitParserMgrs()
 #endif
     _resolution = (size_t)Spec_toi("resolution");
     FreezeNonUser();
-    DrawBase::InitParserMgrs(_resolution*_resolution);
+    DrawBase::InitParserMgrs(1);
+//    DrawBase::InitParserMgrs(_resolution*_resolution);
 }
 
 void VectorField::ResetPlotItems()

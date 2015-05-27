@@ -29,7 +29,7 @@ class ConditionModel : public ParamModelBase
         virtual ~ConditionModel() override;
 
         virtual bool DoEvaluate() const override { return false; }
-        virtual bool DoInitialize() const { return false; }
+        virtual bool DoInitialize() const override { return false; }
         virtual void ProcessParamFileLine(const std::string& key, std::string rem) override;
 
         void AddCondition(const std::string& condition, const VecStr& exprns = VecStr());
