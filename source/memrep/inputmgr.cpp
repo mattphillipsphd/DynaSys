@@ -77,7 +77,16 @@ void InputMgr::JumpToSample(int n)
         _inputs[i].SeekTo(ct);
     }
 }
-
+Input::TYPE InputMgr::Type(size_t i) const
+{
+    assert(i<_inputs.size());
+    return _inputs.at(i).Type();
+}
+double InputMgr::Value(size_t i) const
+{
+    assert(i<_inputs.size());
+    return _inputs.at(i).Value();
+}
 
 InputMgr::InputMgr() : _modelMgr(ModelMgr::Instance())
 {

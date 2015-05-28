@@ -44,7 +44,7 @@ class DrawMgr : public QObject
         void Error();
 
     private slots:
-        void Erase();
+        void EraseObject();
 
     private:
         DrawMgr();

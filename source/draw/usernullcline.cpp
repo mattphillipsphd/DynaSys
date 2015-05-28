@@ -43,7 +43,7 @@ void UserNullcline::ComputeData()
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
                 num_ncs = (int)_modelMgr->Model(ds::NC)->NumPars();
-        const bool has_jacobian = Spec_tob("has_jacobian");
+        const bool has_jacobian = Spec_tob("has_jacobian") && false;
 
         const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
                 xmax = _modelMgr->Maximum(ds::INIT, xidx);
@@ -76,8 +76,18 @@ void UserNullcline::ComputeData()
                         parser_mgr.SetData(ds::DIFF, j, resets[j]);
                     else
                         parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
+                size_t non_user_ct = 0;
                 for (int j=0; j<num_vars; ++j)
-                    parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+                {
+                    std::string value = _modelMgr->Model(ds::VAR)->Value(j);
+                    if (Input::Type(value) != Input::USER)
+                    {
+                        const double val = _inputMgr->Value( non_user_ct++ );
+                        parser_mgr.SetData(ds::VAR, j, val);
+                    }
+                    else
+                        parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+                }
 
                 //Evaluate the model
                 parser_mgr.ParserEval(false);

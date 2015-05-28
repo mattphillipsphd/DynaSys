@@ -21,7 +21,7 @@ void DrawMgr::AddObject(DrawBase* object)
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     _objects.push_back(object);
-    connect(object, SIGNAL(ReadyToDelete()), this, SLOT(Erase()));
+    connect(object, SIGNAL(ReadyToDelete()), this, SLOT(EraseObject()));
 }
 void DrawMgr::ClearObjects()
 {
@@ -144,7 +144,7 @@ void DrawMgr::StopAndRemove(DrawBase::DRAW_TYPE draw_type)
         else
         {
             std::lock_guard<std::mutex> lock(_mutex);
-            std::remove(_objects.begin(), _objects.end(), obj);
+            _objects.erase( std::remove(_objects.begin(), _objects.end(), obj) );
         }
     }
 }
@@ -199,10 +199,11 @@ int DrawMgr::NumDrawObjects() const
     return _objects.size();
 }
 
-void DrawMgr::Erase() //slot
+void DrawMgr::EraseObject() //slot
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    QObject* dobj = sender();
+    DrawBase* dobj = dynamic_cast<DrawBase*>( sender() );
+    assert(dobj);
     _objects.erase( std::remove(_objects.begin(), _objects.end(), dobj) );
 }
 

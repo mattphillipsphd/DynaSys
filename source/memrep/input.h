@@ -48,6 +48,7 @@ class Input
 
         int SamplesPerUnitTime() const { return _samplesPerUnitTime; }
         TYPE Type() const { return _type; }
+        double Value() const { return *_value; }
 
     private:
 #ifdef __GNUG__

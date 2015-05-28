@@ -176,6 +176,7 @@ class DrawBase : public QObject
         QwtPlotItem* PlotItem(size_t i) { return _plotItems[i]; }
         int RemainingSleepMs() const;
 
+        InputMgr* const _inputMgr;
         Log* const _log;
         ModelMgr* const _modelMgr;
 

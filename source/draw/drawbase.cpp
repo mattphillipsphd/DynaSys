@@ -237,13 +237,13 @@ void DrawBase::IterCompleted(int num_iters) //slot
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if ((_iterCt+=num_iters) >= _iterMax)
-        _drawState = PAUSED;
-//        _drawState = STOPPED;
+//        _drawState = PAUSED;
+        _drawState = STOPPED;
     _lastStep = std::chrono::system_clock::now();
 }
 
 DrawBase::DrawBase(DSPlot* plot)
-    : _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
+    : _inputMgr(InputMgr::Instance()), _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
       _data(nullptr), _deleteOnFinish(false), _guiTid(std::this_thread::get_id()),
       _iterCt(0), _iterMax(-1), _lastStep(std::chrono::system_clock::now()),
       _needRecompute(false), _plot(plot)
@@ -261,9 +261,9 @@ void DrawBase::ClearPlotItems()
 }
 void DrawBase::RecomputeIfNeeded()
 {
-#ifdef DEBUG_FUNC
-    ScopeTracker st("DrawBase::RecomputeIfNeeded", std::this_thread::get_id());
-#endif
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("DrawBase::RecomputeIfNeeded", std::this_thread::get_id());
+//#endif
     if (_needRecompute)
     {
         for (auto& it : _parserMgrs)
