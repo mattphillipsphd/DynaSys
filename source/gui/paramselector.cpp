@@ -72,7 +72,9 @@ void ParamSelector::on_btnNew_clicked()
             pv->input_files.push_back( PairStr(key, val) );
     }
 
-    _modelMgr->InsertParVariant(idx, pv);
+    ui->txtNotes->clear();
+
+    _modelMgr->InsertParVariant(idx+1, pv);
     LoadData(idx+1);
 }
 void ParamSelector::on_btnSet_clicked()
@@ -105,7 +107,7 @@ void ParamSelector::on_btnSet_clicked()
             continue;
         }
         std::string value = ui->tblPars->item(i,0)->text().toStdString();
-        _modelMgr->SetValue(ds::INP, idx, value);
+        _modelMgr->SetValue(ds::VAR, idx, value);
     }
 }
 
@@ -126,7 +128,6 @@ void ParamSelector::UpdateParVariant(int i)
 #endif
     ui->tblPars->clear();
     ui->tblInputFiles->clear();
-    ui->txtNotes->clear();
 
     const ModelMgr::ParVariant* pv = _modelMgr->GetParVariant(i);
     const size_t num_pars = pv->pars.size();
@@ -145,7 +146,7 @@ void ParamSelector::UpdateParVariant(int i)
     const size_t num_input_files = pv->input_files.size();
     ui->tblInputFiles->setRowCount(num_input_files);
     ui->tblInputFiles->setColumnCount(1);
-    ui->tblPars->setHorizontalHeaderItem(0, new QTableWidgetItem("Input Files"));
+    ui->tblInputFiles->setHorizontalHeaderItem(0, new QTableWidgetItem("Input Files"));
     ui->tblInputFiles->horizontalHeader()->setStretchLastSection(true);
     for (size_t i=0; i<num_input_files; ++i)
     {

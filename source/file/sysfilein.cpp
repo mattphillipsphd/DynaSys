@@ -183,7 +183,7 @@ std::vector<ModelMgr::ParVariant*> SysFileIn::ReadParVariants()
         std::string paragraph;
         std::getline(_in, paragraph); //The "Notes" line
         std::getline(_in, paragraph);
-         while (paragraph != ModelMgr::ParVariant::END_NOTES)
+        while (paragraph != ModelMgr::ParVariant::END_NOTES)
         {
             pv->notes += paragraph + "\n";
             std::getline(_in, paragraph);
