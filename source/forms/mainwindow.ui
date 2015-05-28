@@ -594,7 +594,7 @@
      <x>0</x>
      <y>0</y>
      <width>1494</width>
-     <height>21</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -648,6 +648,7 @@
     <property name="title">
      <string>Parameters</string>
     </property>
+    <addaction name="actionSelect_Parameters"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuParameters"/>
@@ -802,6 +803,11 @@
   <action name="actionSet_Jacobian">
    <property name="text">
     <string>Set Jacobian</string>
+   </property>
+  </action>
+  <action name="actionSelect_Parameters">
+   <property name="text">
+    <string>Select</string>
    </property>
   </action>
  </widget>

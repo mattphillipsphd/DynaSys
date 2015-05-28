@@ -18,10 +18,11 @@ class SysFileIn
         void Load(VecStr& vmodels);
 
     private:
-        std::vector<ParamModelBase*> ReadModels();
+        std::vector<ParamModelBase*> ReadModels(int num_models);
         double ReadModelStep();
         Notes* ReadNotes();
         int ReadNumModels();
+        std::vector<ModelMgr::ParVariant*> ReadParVariants();
         int ReadVersion();
 
         const std::string _name;

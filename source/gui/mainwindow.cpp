@@ -18,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
     _jacobianGui(new JacobianGui()), _logGui(new LogGui()), _notesGui(new NotesGui()),
-    _paramEditor(new ParamEditor()), _userNullclineGui(new UserNullclineGui),
+    _paramEditor(new ParamEditor()), _paramSelector(new ParamSelector()), _userNullclineGui(new UserNullclineGui),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -326,6 +326,7 @@ void MainWindow::UpdateMousePos(QPointF pos) //slot
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
 
     DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
+    if (!pp) return;
     const int xidx = pp->Spec_toi("xidx"),
             yidx = pp->Spec_toi("yidx");
     const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
@@ -364,6 +365,7 @@ void MainWindow::UpdateTimePlot() //slot
         }
     }
 }
+
 void MainWindow::UpdateTPData() //slot
 {
 #ifdef DEBUG_FUNC
@@ -386,6 +388,7 @@ void MainWindow::closeEvent(QCloseEvent *)
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
+    _paramSelector->close();
     _jacobianGui->close();
     _userNullclineGui->close();
 }
@@ -733,6 +736,14 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
     ScopeTracker st("MainWindow::on_actionSave_Vector_Field_triggered", _tid);
 #endif
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
+}
+
+void MainWindow::on_actionSelect_Parameters_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSelect_Parameters_triggered", _tid);
+#endif
+    _paramSelector->show();
 }
 
 void MainWindow::on_actionSet_Init_to_Current_triggered()
@@ -1631,6 +1642,7 @@ void MainWindow::LoadModel(const std::string& file_name)
         in.Load();
         InitViews();
         ConnectModels();
+        SetParVariants();
 
         ui->cmbPlotMode->setCurrentIndex(0);
         if (!_drawMgr->GetObject(DrawBase::SINGLE))
@@ -1817,6 +1829,13 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
 
     ui->cmbPlotMode->setEnabled(is_enabled);
     ui->spnVFResolution->setEnabled(is_enabled); //Would like to work this in, too hard currently
+}
+void MainWindow::SetParVariants()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetParVariants", _tid);
+#endif
+    _paramSelector->LoadData();
 }
 void MainWindow::SetParamsEnabled(bool is_enabled)
 {

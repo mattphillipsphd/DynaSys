@@ -162,6 +162,7 @@ class MainWindow : public QMainWindow
         void on_actionSave_Phase_Plot_triggered();
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
+        void on_actionSelect_Parameters_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
         void on_actionSet_Jacobian_triggered();
@@ -242,6 +243,7 @@ class MainWindow : public QMainWindow
         void SetActionBtnsEnabled(bool is_enabled);
         void SetButtonsEnabled(bool is_enabled);
         void SetParamsEnabled(bool is_enabled);
+        void SetParVariants(); // ### Should be moved into its own class
         void SetSaveActionsEnabled(bool is_enabled);
         void SetTPShown(bool is_shown);
         void SetZPlotShown(bool is_shown);
@@ -264,6 +266,7 @@ class MainWindow : public QMainWindow
         LogGui* const           _logGui;
         NotesGui* const         _notesGui;
         ParamEditor* const      _paramEditor;
+        ParamSelector* const    _paramSelector;
         UserNullclineGui* const _userNullclineGui;
 
         DrawMgr* const _drawMgr;

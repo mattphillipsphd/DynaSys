@@ -6,18 +6,24 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>598</width>
     <height>488</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Parameter Set Selection</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout" stretch="0,2,1,2">
+  <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,2">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QPushButton" name="btnNew">
+       <property name="maximumSize">
+        <size>
+         <width>75</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>New</string>
        </property>
@@ -25,21 +31,40 @@
      </item>
      <item>
       <widget class="QPushButton" name="btnDelete">
+       <property name="maximumSize">
+        <size>
+         <width>75</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>Delete</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="comboBox"/>
+      <widget class="QPushButton" name="btnSet">
+       <property name="maximumSize">
+        <size>
+         <width>75</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>Set</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmbSelect"/>
      </item>
     </layout>
    </item>
    <item>
-    <widget class="QTableView" name="tblPars"/>
+    <widget class="QTableWidget" name="tblPars"/>
    </item>
    <item>
-    <widget class="QTableView" name="tblInputFiles"/>
+    <widget class="QTableWidget" name="tblInputFiles"/>
    </item>
    <item>
     <widget class="QPlainTextEdit" name="txtNotes"/>

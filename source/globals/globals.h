@@ -1,14 +1,18 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <assert.h>
 #include <cctype>
 #include <exception>
 #include <map>
+#include <memory>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include <QColor>
+#include <QInputDialog>
 #include <QList>
 #include <QStringList>
 
@@ -16,6 +20,8 @@
 #define DEBUG_FUNC
 #endif
 
+typedef std::pair<std::string, std::string> PairStr;
+typedef std::map<std::string, std::string> MapStr;
 typedef std::vector<std::string> VecStr;
 namespace ds
 {

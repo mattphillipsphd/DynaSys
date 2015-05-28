@@ -86,6 +86,7 @@ SOURCES += main.cpp\
     generate/script/matlab_interface/mrunmexwm.cpp \
     generate/script/mexfilewm.cpp \
     gui/eventviewer.cpp \
+    gui/paramselector.cpp \
     gui/usernullclinegui.cpp \
     draw/usernullcline.cpp \
     models/nullclinemodel.cpp \
@@ -154,6 +155,7 @@ HEADERS  += gui/mainwindow.h \
     generate/script/matlab_interface/mrunmexwm.h \
     generate/script/mexfilewm.h \
     gui/eventviewer.h \
+    gui/paramselector.h \
     gui/usernullclinegui.h \
     draw/usernullcline.h \
     models/nullclinemodel.h \
@@ -164,6 +166,7 @@ FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
     forms/variablegui.ui \
     forms/parameditor.ui \
+    forms/paramselector.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
     forms/fastrungui.ui \

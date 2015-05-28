@@ -20,7 +20,9 @@ class SysFileOut
 
     private:
         void SaveHeader() const;
+        void SaveParVariants() const;
 
+        ModelMgr* const _modelMgr;
         const std::string _name;
         mutable std::ofstream _out;
 };

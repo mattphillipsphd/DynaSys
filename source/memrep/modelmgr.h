@@ -21,6 +21,17 @@ class ModelMgr
             RUNGE_KUTTA
         };
 
+        struct ParVariant
+        {
+            ParVariant(const std::string& title) : title(title)
+            {}
+            const std::string title;
+            std::vector<PairStr> pars;
+            std::vector<PairStr> input_files;
+            std::string notes;
+            static const std::string END_NOTES;
+        };
+
         static ModelMgr* Instance();
 
         ~ModelMgr();
@@ -32,6 +43,8 @@ class ModelMgr
         void CreateModels();
         void ClearModels();
         void ClearParameters(ds::PMODEL mi);
+        void DeleteParVariant(size_t idx);
+        void InsertParVariant(size_t idx, ParVariant* pv);
 
         void SetCondValue(size_t row, const VecStr& results);
         void SetDiffMethod(DIFF_METHOD diff_method) { _diffMethod = diff_method; }
@@ -42,6 +55,10 @@ class ModelMgr
         void SetModelStep(double step) { _modelStep = step; }
         void SetNotes(Notes *notes);
         void SetNotes(const std::string& text);
+        void SetParVariants(const std::vector<ParVariant*>& par_variants);
+        void SetPVPar(size_t index, size_t pidx, const std::string& val);
+        void SetPVInputFile(size_t index, size_t pidx, const std::string& input_file);
+        void SetPVNotes(size_t index, const std::string& notes);
         void SetRange(ds::PMODEL mi, size_t idx, double min, double max);
         void SetTPVModel(TPVTableModel* tpv_model);
         void SetValue(ds::PMODEL mi, size_t idx, const std::string& value);
@@ -56,11 +73,13 @@ class ModelMgr
         DIFF_METHOD DiffMethod() const { return _diffMethod; }
         VecStr DiffVarList() const;
         const Notes* GetNotes() const { return _notes; }
+        const ParVariant* GetParVariant(size_t i) const { return _parVariants.at(i); }
         bool IsFreeze(ds::PMODEL mi, size_t idx) const;
         double Maximum(ds::PMODEL mi, size_t idx) const;
         double Minimum(ds::PMODEL mi, size_t idx) const;
         inline const ParamModelBase* Model(ds::PMODEL mi) const { return _models.at(mi); }
         inline double ModelStep() const { return _modelStep; }
+        int NumParVariants() const { return _parVariants.size(); }
         double Range(ds::PMODEL mi, size_t idx) const;
         TPVTableModel* TPVModel() { return _tpvModel; }
         std::string Value(ds::PMODEL mi, size_t idx) const;
@@ -77,6 +96,7 @@ class ModelMgr
 
         inline ConditionModel* CondModel();
         inline const ConditionModel* CondModel() const;
+        void DeleteParVariants();
         std::vector<ParamModelBase*> MakeModelVec() const;
 
         DIFF_METHOD _diffMethod;
@@ -85,6 +105,7 @@ class ModelMgr
         double _modelStep;
         mutable std::mutex _mutex;
         Notes* _notes;
+        std::vector<ParVariant*> _parVariants;
         TPVTableModel* _tpvModel;
 };
 
