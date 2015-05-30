@@ -95,6 +95,7 @@ void DrawMgr::Start()
     try
     {
         std::lock_guard<std::mutex> lock(_mutex);
+        InputMgr::Instance()->ClearInputs();
         for (auto it : _objects)
         {
             it->ClearPlotItems();

@@ -43,7 +43,7 @@ void UserNullcline::ComputeData()
         const int xidx = Spec_toi("xidx"),
                 yidx = Spec_toi("yidx"),
                 num_ncs = (int)_modelMgr->Model(ds::NC)->NumPars();
-        const bool has_jacobian = Spec_tob("has_jacobian") && false;
+        const bool has_jacobian = Spec_tob("has_jacobian");
 
         const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
                 xmax = _modelMgr->Maximum(ds::INIT, xidx);
@@ -76,21 +76,21 @@ void UserNullcline::ComputeData()
                         parser_mgr.SetData(ds::DIFF, j, resets[j]);
                     else
                         parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
-                size_t non_user_ct = 0;
+
+                //Evaluate the model--the user variables (which may depend on state variables
+                //and possibly appear in the nullcline statements), and the nullclines
                 for (int j=0; j<num_vars; ++j)
                 {
-                    std::string value = _modelMgr->Model(ds::VAR)->Value(j);
-                    if (Input::Type(value) != Input::USER)
-                    {
-                        const double val = _inputMgr->Value( non_user_ct++ );
-                        parser_mgr.SetData(ds::VAR, j, val);
-                    }
-                    else
-                        parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+                    if (Input::Type( _modelMgr->Model(ds::VAR)->Value(j)) != Input::USER) continue;
+                    std::string var = _modelMgr->Model(ds::VAR)->Expression(j);
+                    parser_mgr.QuickEval(var);
                 }
-
-                //Evaluate the model
-                parser_mgr.ParserEval(false);
+                for (int j=0; j<num_ncs; ++j)
+                {
+                    std::string nullcline = _modelMgr->Model(ds::NC)->Expression(j);
+                    parser_mgr.QuickEval(nullcline);
+                }
+//                parser_mgr.ParserEval(false);
 
                 //Retrieve the results
                 x[i] = xij;               
@@ -117,21 +117,23 @@ void UserNullcline::ComputeData()
                 }
 
                 const double* jacob_vec = parser_mgr.ConstData(ds::JAC);
-                const size_t num_eqs = record->equilibria.size();
+                const size_t num_eqs = record->equilibria.size(),
+                        num_jacs = _modelMgr->Model(ds::JAC)->NumPars();
                 for (size_t i=0; i<num_eqs; ++i)
                 {
                     parser_mgr.SetData(ds::DIFF, xidx, record->equilibria.at(i).x);
                     parser_mgr.SetData(ds::DIFF, yidx, record->equilibria.at(i).y);
-                    parser_mgr.ParserEval(false);
+                    for (size_t j=0; j<num_jacs; ++j)
+                    {
+                        std::string jac_ij = _modelMgr->Model(ds::JAC)->Expression(j);
+                        parser_mgr.QuickEval(jac_ij);
+                    }
+//                    parser_mgr.ParserEval(false);
 
                     record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_diffs);
                 }
             }
 
-            for (int j=0; j<num_vars; ++j)
-                parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
-            for (int j=0; j<num_diffs; ++j)
-                parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
 
             _packets.push_back(record);
         }

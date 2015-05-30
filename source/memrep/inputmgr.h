@@ -19,8 +19,10 @@ class InputMgr
         void InputEval();
             //To be called on every iteration of the model
         void JumpToSample(int n);
+
+        size_t NumInputs() const { return _inputs.size(); }
         Input::TYPE Type(size_t i) const;
-        double Value(size_t i) const;
+        double* Value(size_t i) const;
 
     private:
         InputMgr();

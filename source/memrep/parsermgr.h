@@ -27,7 +27,6 @@ class ParserMgr
         ~ParserMgr();
 
         void AddExpression(const std::string& exprn);
-        void AssignVariable(int row, const std::string& text);
         void ClearExpressions();
         void InitData(); //Initializes the data variables to their appropriate initial values
         void InitializeFull();
@@ -52,15 +51,16 @@ class ParserMgr
         void AssociateVars(mu::Parser& parser);
         double* Data(ds::PMODEL mi);
         void DeepCopy(const ParserMgr& other);
-        std::vector< std::pair<double*, double*> > MakeModelData();
+        std::vector< std::pair<double**, double**> > MakeModelData();
         inline double* TempData(ds::PMODEL model);
 
         InputMgr* const _inputMgr;
         Log* const _log;
-        const std::vector< std::pair<double*, double*> > _modelData;
+        const std::vector< std::pair<double**, double**> > _modelData;
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
+            //  This is an array of pointers to pointers, not a pointer to an array of pointers.
         ModelMgr* const _modelMgr;
         std::mutex _mutex;
         mu::Parser _parser, _parserResult;

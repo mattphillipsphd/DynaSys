@@ -82,7 +82,7 @@ Input::TYPE InputMgr::Type(size_t i) const
     assert(i<_inputs.size());
     return _inputs.at(i).Type();
 }
-double InputMgr::Value(size_t i) const
+double* InputMgr::Value(size_t i) const
 {
     assert(i<_inputs.size());
     return _inputs.at(i).Value();

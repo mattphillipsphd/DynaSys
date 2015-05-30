@@ -243,7 +243,7 @@ void DrawBase::IterCompleted(int num_iters) //slot
 }
 
 DrawBase::DrawBase(DSPlot* plot)
-    : _inputMgr(InputMgr::Instance()), _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
+    : /*_inputMgr(InputMgr::Instance()), */_log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
       _data(nullptr), _deleteOnFinish(false), _guiTid(std::this_thread::get_id()),
       _iterCt(0), _iterMax(-1), _lastStep(std::chrono::system_clock::now()),
       _needRecompute(false), _plot(plot)

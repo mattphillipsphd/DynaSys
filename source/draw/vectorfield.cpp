@@ -180,7 +180,7 @@ void VectorField::InitParserMgrs()
     ScopeTracker st("VectorField::InitParserMgrs", std::this_thread::get_id());
 #endif
     _resolution = (size_t)Spec_toi("resolution");
-    FreezeNonUser();
+//    FreezeNonUser();
     DrawBase::InitParserMgrs(1);
 //    DrawBase::InitParserMgrs(_resolution*_resolution);
 }

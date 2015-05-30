@@ -139,7 +139,7 @@ std::vector<ModelMgr::ParVariant*> SysFileIn::ReadParVariants()
 #endif
     std::string line;
     std::getline(_in, line);
-    while (line.empty()) std::getline(_in, line);
+    while (line.empty() || std::isspace(line.at(0))) std::getline(_in, line);
     size_t tab = line.find_first_of('\t');
     const int num_variants = std::stoi( line.substr(tab+1) );
 
@@ -149,7 +149,7 @@ std::vector<ModelMgr::ParVariant*> SysFileIn::ReadParVariants()
         //Title
         std::string title;
         std::getline(_in, title);
-        while (title.empty()) std::getline(_in, title);
+        while (title.empty() || std::isspace(title.at(0))) std::getline(_in, title);
         ModelMgr::ParVariant* pv = new ModelMgr::ParVariant(title);
 
 
@@ -183,7 +183,7 @@ std::vector<ModelMgr::ParVariant*> SysFileIn::ReadParVariants()
         std::string paragraph;
         std::getline(_in, paragraph); //The "Notes" line
         std::getline(_in, paragraph);
-        while (paragraph != ModelMgr::ParVariant::END_NOTES)
+        while ( !strstr(paragraph.c_str(), ModelMgr::ParVariant::END_NOTES.c_str()) && !_in.eof())
         {
             pv->notes += paragraph + "\n";
             std::getline(_in, paragraph);
