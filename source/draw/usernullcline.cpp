@@ -85,11 +85,13 @@ void UserNullcline::ComputeData()
                     std::string var = _modelMgr->Model(ds::VAR)->Expression(j);
                     parser_mgr.QuickEval(var);
                 }
+                parser_mgr.TempEval(ds::VAR);
                 for (int j=0; j<num_ncs; ++j)
                 {
                     std::string nullcline = _modelMgr->Model(ds::NC)->Expression(j);
                     parser_mgr.QuickEval(nullcline);
                 }
+
 //                parser_mgr.ParserEval(false);
 
                 //Retrieve the results

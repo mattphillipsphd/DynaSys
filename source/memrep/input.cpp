@@ -23,17 +23,18 @@ Input::TYPE Input::Type(const std::string& text)
     return USER;
 }
 
-Input::Input(double* const value)
-    : _ct(0), _input(nullptr), _log(Log::Instance()),
-      _samplesPerUnitTime(-1), _type(UNKNOWN), _value(value)
+Input::Input(double* value, int index)
+    : _ct(0), _index(index), _input(nullptr), _log(Log::Instance()),
+      _samplesPerUnitTime(-1), _type(UNKNOWN)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("Input::Input", std::this_thread::get_id());
 #endif
+    _listeners.push_back(value);
 }
 Input::Input(const Input& other)
-    : _ct(other._ct), _input(nullptr), _log(Log::Instance()),
-      _samplesPerUnitTime(other._samplesPerUnitTime), _type(other._type), _value(other._value)
+    : _ct(other._ct), _index(other._index), _input(nullptr), _log(Log::Instance()),
+      _samplesPerUnitTime(other._samplesPerUnitTime), _type(other._type), _listeners(other._listeners)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("Input::Input(const Input& other)", std::this_thread::get_id());
@@ -49,6 +50,10 @@ Input::~Input()
     if (_input) delete[] _input;
 }
 
+void Input::AddListener(double* listener)
+{
+    _listeners.push_back(listener);
+}
 void Input::GenerateInput(TYPE type)
 {
 #ifdef DEBUG_FUNC
@@ -87,7 +92,7 @@ void Input::GenerateInput(TYPE type)
 
     _samplesPerUnitTime = 1;
     _type = type;
-    *_value = _input[_ct];
+    UpdateListeners();
 }
 void Input::LoadInput(const std::string& file_name)
 {
@@ -107,7 +112,7 @@ void Input::LoadInput(const std::string& file_name)
             throw std::runtime_error("Input::LoadInput: Bad file extension.");
 
         _type = INPUT_FILE;
-        *_value = _input[_ct];
+        UpdateListeners();
     }
     catch (std::exception& e)
     {
@@ -121,11 +126,15 @@ void Input::NextInput(int n)
         throw std::runtime_error("Input::NextInput: _input is null");
     _ct+=n;
     _ct &= INPUT_MASK;
-    *_value = _input[_ct];
+    UpdateListeners();
 }
 double Input::NextInputHalf() const
 {
-    return (*_value + SeeNextInput()) / 2.0;
+    return (_input[_ct] + SeeNextInput()) / 2.0;
+}
+void Input::RemoveListener(double* listener)
+{
+    _listeners.erase( std::remove(_listeners.begin(), _listeners.end(), listener) );
 }
 double Input::SeeNextInput() const
 {
@@ -237,4 +246,10 @@ void Input::ResetInput()
         _input = nullptr;
     }
     _type = UNKNOWN;
+}
+
+void Input::UpdateListeners()
+{
+    for (auto it : _listeners)
+        *it = _input[_ct];
 }

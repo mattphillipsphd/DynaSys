@@ -104,7 +104,7 @@ void DrawMgr::Start()
     }
     catch (std::exception& e)
     {
-        _log->AddExcept("DrawMgr::StartThread: " + std::string(e.what()));
+        _log->AddExcept("DrawMgr::Start: " + std::string(e.what()));
         emit Error();
         return;
     }

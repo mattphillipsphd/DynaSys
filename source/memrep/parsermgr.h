@@ -36,6 +36,7 @@ class ParserMgr
         void ParserEvalAndConds(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         void TempEval();
+        void TempEval(ds::PMODEL mi);
 
         void SetConditions();
         void SetData(ds::PMODEL mi, size_t idx, double val);
@@ -51,12 +52,12 @@ class ParserMgr
         void AssociateVars(mu::Parser& parser);
         double* Data(ds::PMODEL mi);
         void DeepCopy(const ParserMgr& other);
-        std::vector< std::pair<double**, double**> > MakeModelData();
+        std::vector< std::pair<double*, double*> > MakeModelData();
         inline double* TempData(ds::PMODEL model);
 
         InputMgr* const _inputMgr;
         Log* const _log;
-        const std::vector< std::pair<double**, double**> > _modelData;
+        const std::vector< std::pair<double*, double*> > _modelData;
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.

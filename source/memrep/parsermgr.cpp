@@ -26,10 +26,7 @@ ParserMgr::~ParserMgr()
     for (auto it : _modelData)
     {
         for (int i=0; i<ds::MAX_NUM_PARS; ++i)
-        {
-            delete it.first[i];
-            delete it.second[i];
-        }
+            _inputMgr->RemoveListener(i, &it.second[i]);
         delete[] it.first;
         delete[] it.second;
     }
@@ -101,14 +98,12 @@ void ParserMgr::InitData()
             //But don't do it with differentials because they need to start at their initialized
             //value
 
-        // ###### _inputMgr is a singleton!! This overwrites assignments!
-        bool need_new_inputs = _inputMgr->NumInputs()==0;
         for (size_t i=0; i<ds::NUM_MODELS; ++i)
         {
             const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
             if (!model->DoInitialize()) continue;
-            double** data = _modelData[i].first,
-                    ** temp_data = _modelData[i].second;
+            double* data = _modelData[i].first,
+                    * temp_data = _modelData[i].second;
             const size_t num_pars = model->NumPars();
             for (size_t k=0; k<num_pars; ++k)
             {
@@ -116,16 +111,11 @@ void ParserMgr::InitData()
 
                 //Assign the source of the data--i.e. attach an input source if needed
                 if (!model->IsFreeze(k))
-                {
-                    if (need_new_inputs)
-                        _inputMgr->AssignInput(temp_data[k], value);
-                    else if (k<3)
-                        temp_data[k] = _inputMgr->Value(k);
-                }
+                     _inputMgr->AssignInput(&temp_data[k], value);
 
                 //Initialize
-                if (model->Id()==ds::INP) // ###
-                    *(data[k]) = *(temp_data[k]) = std::stod(value.c_str());
+                if (model->Id() == ds::INP) // ###
+                    data[k] = temp_data[k] = std::stod(value.c_str());
             }
         }
 
@@ -264,17 +254,18 @@ void ParserMgr::QuickEval(const std::string& exprn)
 
 void ParserMgr::TempEval()
 {
-    for (size_t i=0; i<ds::NUM_MODELS; ++i)
+    for (size_t i=0; i<ds::NUM_MODELS; ++i) TempEval((ds::PMODEL)i);
+}
+void ParserMgr::TempEval(ds::PMODEL mi)
+{
+    const ParamModelBase* model = _modelMgr->Model(mi);
+    if ( model->DoEvaluate() )
     {
-        const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
-        if ( model->DoEvaluate() )
-        {
-            const size_t num_pars = model->NumPars();
-            double** data = _modelData[i].first;
-            double** temp = _modelData.at(i).second;
-            for (size_t k=0; k<num_pars; ++k)
-                *(data[k]) = *(temp[k]);
-        }
+        const size_t num_pars = model->NumPars();
+        int i = (int)mi;
+        double* data = _modelData[i].first;
+        const double* temp = _modelData.at(i).second;
+        memcpy(data, temp, sizeof(double)*num_pars);
     }
 }
 
@@ -299,7 +290,7 @@ void ParserMgr::SetData(ds::PMODEL mi, size_t idx, double val)
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::SetData", std::this_thread::get_id());
 #endif
-    *(_modelData[mi].first[idx]) = val;
+    _modelData[mi].first[idx] = val;
 }
 
 void ParserMgr::SetExpression(const std::string& exprn)
@@ -358,17 +349,15 @@ const double* ParserMgr::ConstData(ds::PMODEL mi) const
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::ConstData", std::this_thread::get_id());
 #endif
-    return *_modelData.at(mi).first;
+    return _modelData.at(mi).first;
 }
 double* ParserMgr::Data(ds::PMODEL mi)
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::Data", std::this_thread::get_id());
 #endif
-    return *_modelData[mi].first;
+    return _modelData[mi].first;
 }
-So... Need the vector layout after all.  Revert all ** changes, and create a separate interface
-to InputMgr to manage updating??
 
 std::string ParserMgr::AnnotateErrMsg(const std::string& err_mesg, const mu::Parser& parser) const
 {
@@ -399,15 +388,15 @@ void ParserMgr::AssociateVars(mu::Parser& parser)
         {
             const ParamModelBase* model = _modelMgr->Model((ds::PMODEL)i);
             if (model->Id()==ds::INIT || model->Id()==ds::COND) continue;
-            double** data = _modelData[i].first,
-                    ** temp_data = _modelData[i].second;
+            double* data = _modelData[i].first,
+                    * temp_data = _modelData[i].second;
             const size_t num_pars = model->NumPars();
             for (size_t j=0; j<num_pars; ++j)
             {
                 const std::string& key = model->ShortKey(j);
-                parser.DefineVar(key, data[j]);
+                parser.DefineVar(key, &data[j]);
                 if (model->DoEvaluate())
-                    parser.DefineVar(model->TempKey(j), temp_data[j]);
+                    parser.DefineVar(model->TempKey(j), &temp_data[j]);
             }
         }
     }
@@ -421,28 +410,23 @@ void ParserMgr::DeepCopy(const ParserMgr& other)
     for (size_t i=0; i<ds::NUM_MODELS; ++i)
     {
         const size_t num_pars = _modelMgr->Model((ds::PMODEL)i)->NumPars();
-        memcpy(_modelData[i].first, other._modelData.at(i).first, num_pars*sizeof(double*));
-        memcpy(_modelData[i].second, other._modelData.at(i).second, num_pars*sizeof(double*));
+        memcpy(_modelData[i].first, other._modelData.at(i).first, num_pars*sizeof(double));
+        memcpy(_modelData[i].second, other._modelData.at(i).second, num_pars*sizeof(double));
     }
 
     InitData();
     InitParsers();
 }
-std::vector< std::pair<double**,double**> > ParserMgr::MakeModelData()
+std::vector<std::pair<double*, double*> > ParserMgr::MakeModelData()
 {
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::MakeModelData", std::this_thread::get_id());
 #endif
-    auto model_data = std::vector< std::pair<double**,double**> >(ds::NUM_MODELS);
+    auto model_data = std::vector< std::pair<double*,double*> >(ds::NUM_MODELS);
     for (size_t i=0; i<ds::NUM_MODELS; ++i)
     {
-        model_data[i].first = new double*[ds::MAX_NUM_PARS];
-        model_data[i].second = new double*[ds::MAX_NUM_PARS];
-        for (int j=0; j<ds::MAX_NUM_PARS; ++j)
-        {
-            model_data[i].first[j] = new double;
-            model_data[i].second[j] = new double;
-        }
+        model_data[i].first = new double[ds::MAX_NUM_PARS];
+        model_data[i].second = new double[ds::MAX_NUM_PARS];
     }
     return model_data;
 }
@@ -451,6 +435,6 @@ double* ParserMgr::TempData(ds::PMODEL model)
 #ifdef DEBUG_PM_FUNC
     ScopeTracker st("ParserMgr::TempData", std::this_thread::get_id());
 #endif
-    return *_modelData[model].second;
+    return _modelData[model].second;
 }
 

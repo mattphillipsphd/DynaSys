@@ -1382,19 +1382,29 @@ void MainWindow::InitDefaultModel()
     _modelMgr->CreateModels();
     InitViews();
 
-    _modelMgr->AddParameter(ds::INP, "a", "4");
-    _modelMgr->AddParameter(ds::INP, "b", "10");
+    _modelMgr->AddParameter(ds::INP, "a", "0.25");
+    _modelMgr->AddParameter(ds::INP, "b", "0.5");
+    _modelMgr->AddParameter(ds::INP, "c", "-0.75");
+    _modelMgr->AddParameter(ds::INP, "d", "-1");
 
-    _modelMgr->AddParameter(ds::VAR, "q", "a*b"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
+    _modelMgr->AddParameter(ds::VAR, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
     _modelMgr->AddParameter(ds::VAR, "r", "u*v");
 
-    _modelMgr->AddParameter(ds::DIFF, "v'", "(u + r + a)/b");
-    _modelMgr->AddParameter(ds::DIFF, "u'", "q*(b - v)");
+    _modelMgr->AddParameter(ds::DIFF, "v'", "a*v + b*u + noise");
+    _modelMgr->AddParameter(ds::DIFF, "u'", "c*v + d*u");
 
     _modelMgr->AddParameter(ds::INIT, "v(0)", "1");
     _modelMgr->AddParameter(ds::INIT, "u(0)", "0");
-    _modelMgr->SetRange(ds::INIT, 0, -40, 40);
-    _modelMgr->SetRange(ds::INIT, 1, -40, 40);
+    _modelMgr->SetRange(ds::INIT, 0, -10, 10);
+    _modelMgr->SetRange(ds::INIT, 1, -10, 10);
+
+    _modelMgr->AddParameter(ds::NC, "u_for_dv", "-(v*a + noise) / b");
+    _modelMgr->AddParameter(ds::NC, "u_for_du", "-v * c / d");
+
+    _modelMgr->AddParameter(ds::JAC, "_grad_v_dv", "a");
+    _modelMgr->AddParameter(ds::JAC, "_grad_v_du", "b");
+    _modelMgr->AddParameter(ds::JAC, "_grad_u_dv", "c");
+    _modelMgr->AddParameter(ds::JAC, "_grad_u_du", "d");
 
     VecStr vs;
     vs.push_back("v = 1"); vs.push_back("u = 2");
