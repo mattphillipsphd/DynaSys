@@ -89,11 +89,6 @@ void VectorField::ComputeData()
                     }
                 }
 
-            for (int j=0; j<num_vars; ++j)
-                parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
-            for (int j=0; j<num_diffs; ++j)
-                parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
-
             _packets.push_back(data);
         }
         catch (std::exception& e)

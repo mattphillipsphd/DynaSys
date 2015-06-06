@@ -9,6 +9,7 @@ class NullclineModel : public NumericModelBase
 
     public:
         NullclineModel(QObject *parent, const std::string& name);
+        virtual ~NullclineModel() override;
 
         virtual bool DoEvaluate() const override { return true; }
         virtual bool DoInitialize() const override { return false; }

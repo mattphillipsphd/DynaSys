@@ -83,7 +83,7 @@ void InputMgr::JumpToSample(int n)
 }
 void InputMgr::RemoveListener(int idx, double* listener)
 {
-    for (auto it : _inputs)
+    for (auto& it : _inputs)
         if (it.Index() == idx)
             it.RemoveListener(listener);
 }

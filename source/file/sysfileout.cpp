@@ -80,7 +80,7 @@ void SysFileOut::SaveParVariants() const
             _out << pv->input_files.at(j).first << "\t" << pv->input_files.at(j).second << std::endl;
 
         _out << "Notes" << std::endl;
-        _out << pv->notes << std::endl;
+        _out << pv->notes;
         _out << ModelMgr::ParVariant::END_NOTES << std::endl;
         _out << std::endl;
     }

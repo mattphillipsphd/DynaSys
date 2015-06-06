@@ -94,6 +94,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(on_actionSave_Model_triggered()));
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
     connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
+    connect(_paramSelector, SIGNAL(SaveParVariant()), this, SLOT(on_actionSave_Model_triggered()));
 
     connect(&_timer, SIGNAL(timeout()), this, SLOT(Replot()));
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
@@ -975,6 +976,9 @@ void MainWindow::on_btnStart_clicked()
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
             _paramEditor->setEnabled(false);
+            _drawMgr->StopAndRemove(DrawBase::NULLCLINE);
+            _drawMgr->StopAndRemove(DrawBase::USER_NULLCLINE);
+            _drawMgr->StopAndRemove(DrawBase::VECTOR_FIELD);
             if (ui->cboxNullclines->isChecked())
             {
                 DrawBase::DRAW_TYPE nc_type =
@@ -1386,6 +1390,11 @@ void MainWindow::InitDefaultModel()
     _modelMgr->AddParameter(ds::INP, "b", "0.5");
     _modelMgr->AddParameter(ds::INP, "c", "-0.75");
     _modelMgr->AddParameter(ds::INP, "d", "-1");
+    for (size_t i=0; i<_modelMgr->Model(ds::INP)->NumPars(); ++i)
+    {
+        _modelMgr->SetMinimum(ds::INP, i, -10);
+        _modelMgr->SetMinimum(ds::INP, i, 10);
+    }
 
     _modelMgr->AddParameter(ds::VAR, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
     _modelMgr->AddParameter(ds::VAR, "r", "u*v");
@@ -1646,6 +1655,9 @@ void MainWindow::LoadModel(const std::string& file_name)
 #endif
     try
     {
+        ui->cboxNullclines->setChecked(false);
+        ui->cboxVectorField->setChecked(false);
+
         _drawMgr->ClearObjects();
 
         SysFileIn in(file_name);

@@ -111,7 +111,7 @@ void ParserMgr::InitData()
 
                 //Assign the source of the data--i.e. attach an input source if needed
                 if (!model->IsFreeze(k))
-                     _inputMgr->AssignInput(&temp_data[k], value);
+                     _inputMgr->AssignInput(&temp_data[k], value, k);
 
                 //Initialize
                 if (model->Id() == ds::INP) // ###
@@ -334,8 +334,8 @@ void ParserMgr::SetExpressions()
                     AddExpression(model->TempKey(k) + " = " + freeze_val);
                 }
             if (model->Id()==ds::VAR) // ### Really need separate parsers for both here
-                for (size_t i=0; i<num_pars; ++i)
-                    AddExpression(model->Key(i) + " = " + model->TempKey(i));
+                for (size_t k=0; k<num_pars; ++k)
+                    AddExpression(model->Key(k) + " = " + model->TempKey(k));
         }
     }
     catch (mu::ParserError& e)

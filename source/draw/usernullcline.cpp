@@ -60,11 +60,12 @@ void UserNullcline::ComputeData()
 
             ParserMgr& parser_mgr = GetParserMgr(0);
             const ParamModelBase* const diff_model = _modelMgr->Model(ds::DIFF);
-            const double* const resets = parser_mgr.ConstData(ds::INIT),
-                    * const dcurrent = parser_mgr.ConstData(ds::DIFF),
-                    * const vcurrent = parser_mgr.ConstData(ds::VAR);
             const int num_diffs = (int)diff_model->NumPars(),
                     num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+            double* resets = new double[num_diffs],
+                    * dcurrent = new double[num_diffs];
+            memcpy(resets, parser_mgr.ConstData(ds::INIT), sizeof(double)*num_diffs);
+            memcpy(dcurrent, parser_mgr.ConstData(ds::DIFF), sizeof(double)*num_diffs);
             for (int i=0; i<XRES; ++i)
             {
                 //Set up the model
@@ -81,8 +82,8 @@ void UserNullcline::ComputeData()
                 //and possibly appear in the nullcline statements), and the nullclines
                 for (int j=0; j<num_vars; ++j)
                 {
-                    if (Input::Type( _modelMgr->Model(ds::VAR)->Value(j)) != Input::USER) continue;
-                    std::string var = _modelMgr->Model(ds::VAR)->Expression(j);
+                    if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) != Input::USER ) continue;
+                    std::string var = _modelMgr->Model(ds::VAR)->TempExpression(j);
                     parser_mgr.QuickEval(var);
                 }
                 parser_mgr.TempEval(ds::VAR);
@@ -91,8 +92,6 @@ void UserNullcline::ComputeData()
                     std::string nullcline = _modelMgr->Model(ds::NC)->Expression(j);
                     parser_mgr.QuickEval(nullcline);
                 }
-
-//                parser_mgr.ParserEval(false);
 
                 //Retrieve the results
                 x[i] = xij;               
@@ -103,7 +102,9 @@ void UserNullcline::ComputeData()
                     if (yidx_j != yidx) continue;
                     y[j*XRES + i] = ncs[j];
                 }
-            }
+            }         
+            delete[] resets;
+            delete[] dcurrent;
 
             if (has_jacobian)
             {
@@ -130,12 +131,10 @@ void UserNullcline::ComputeData()
                         std::string jac_ij = _modelMgr->Model(ds::JAC)->Expression(j);
                         parser_mgr.QuickEval(jac_ij);
                     }
-//                    parser_mgr.ParserEval(false);
 
                     record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_diffs);
                 }
             }
-
 
             _packets.push_back(record);
         }

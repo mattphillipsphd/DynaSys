@@ -12,6 +12,8 @@
 class SysFileIn
 {
     public:
+        static ModelMgr::ParVariant* ReadParVariant(std::ifstream& in);
+
         SysFileIn(const std::string& name);
 
         void Load();

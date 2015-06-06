@@ -213,6 +213,7 @@ void PhasePlot::Initialize()
         _curve = new QwtPlotCurve();
         _curve->setPen( Qt::black, 1 );
         _curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+        _curve->setZ(0.25);
         AddPlotItem(_curve);
     }
 

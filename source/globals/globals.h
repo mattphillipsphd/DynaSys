@@ -1,20 +1,37 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <algorithm>
 #include <assert.h>
+#include <atomic>
 #include <cctype>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <exception>
+#include <iostream>
 #include <map>
 #include <memory>
+#include <random>
 #include <string>
 #include <thread>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 #include <QColor>
+#include <QDateTime>
+#include <QDebug>
+#include <QFileDialog>
+#include <QFile>
+#include <QIcon>
 #include <QInputDialog>
 #include <QList>
+#include <QMainWindow>
+#include <QMessageBox>
 #include <QStringList>
+#include <QStringListModel>
+#include <QTimer>
 
 #ifdef QT_DEBUG
 #define DEBUG_FUNC

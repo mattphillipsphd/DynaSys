@@ -1,28 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <deque>
-#include <iostream>
-#include <memory>
-#include <random>
-#include <thread>
-#include <unordered_set>
-
-#include <QColor>
-#include <QDebug>
-#include <QFileDialog>
-#include <QFile>
-#include <QIcon>
-#include <QInputDialog>
-#include <QMainWindow>
-#include <QMessageBox>
-#include <QStringListModel>
-#include <QTimer>
-
 #include <qwt_scale_div.h>
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>

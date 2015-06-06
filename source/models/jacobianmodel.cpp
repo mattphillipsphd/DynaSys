@@ -91,6 +91,7 @@ QVariant JacobianModel::headerData(int section, Qt::Orientation orientation, int
 {
     if (role!=Qt::DisplayRole) return QVariant();
     QVariant header;
+    if (ModelMgr::Instance()->Model(ds::DIFF)->NumPars()==0) return header;
     switch (orientation)
     {
         case Qt::Horizontal:

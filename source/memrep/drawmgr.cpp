@@ -204,7 +204,7 @@ void DrawMgr::EraseObject() //slot
 {
     std::lock_guard<std::mutex> lock(_mutex);
     DrawBase* dobj = dynamic_cast<DrawBase*>( sender() );
-    assert(dobj);
+//    assert(dobj);  //Don't have any strong safety guarantees so could be a dead object
     _objects.erase( std::remove(_objects.begin(), _objects.end(), dobj) );
 }
 

@@ -134,7 +134,8 @@ double Input::NextInputHalf() const
 }
 void Input::RemoveListener(double* listener)
 {
-    _listeners.erase( std::remove(_listeners.begin(), _listeners.end(), listener) );
+    auto it = std::remove(_listeners.begin(), _listeners.end(), listener);
+    if (it!=_listeners.end()) _listeners.erase(it);
 }
 double Input::SeeNextInput() const
 {

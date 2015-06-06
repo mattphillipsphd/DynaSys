@@ -1,5 +1,55 @@
 #include "sysfilein.h"
 
+ModelMgr::ParVariant* SysFileIn::ReadParVariant(std::ifstream& in)
+{
+    //Title
+    std::string title;
+    std::getline(in, title);
+    while (title.empty() || std::isspace(title.at(0))) std::getline(in, title);
+    ModelMgr::ParVariant* pv = new ModelMgr::ParVariant(title);
+
+    //Inputs (parameters)
+    std::string line;
+    std::getline(in, line);
+    size_t tab = line.find_first_of('\t');
+    const int num_pars = std::stoi( line.substr(tab+1) );
+    for (int j=0; j<num_pars; ++j)
+    {
+        std::getline(in, line);
+        tab = line.find_first_of('\t');
+        std::string key = line.substr(0, tab),
+                val = line.substr(tab+1);
+        pv->pars.push_back( PairStr(key, val) );
+    }
+
+    //Input files
+    std::getline(in, line);
+    tab = line.find_first_of('\t');
+    const int numinput_files = std::stoi( line.substr(tab+1) );
+    for (int j=0; j<numinput_files; ++j)
+    {
+        std::getline(in, line);
+        tab = line.find_first_of('\t');
+        std::string key = line.substr(0, tab),
+                val = line.substr(tab+1);
+        while (val.size()>0 && std::isspace(val.at(0))) val.erase(0,1);
+        while (val.size()>0 && std::isspace(val.back())) val.erase(val.size()-1);
+        pv->input_files.push_back( PairStr(key, val) );
+    }
+
+    //Notes
+    std::string paragraph;
+    std::getline(in, paragraph); //The "Notes" line
+    std::getline(in, paragraph);
+    while ( !strstr(paragraph.c_str(), ModelMgr::ParVariant::END_NOTES.c_str()) && !in.eof())
+    {
+        pv->notes += paragraph + "\n";
+        std::getline(in, paragraph);
+    }
+
+    return pv;
+}
+
 SysFileIn::SysFileIn(const std::string& name)
     : _name(name)
 {
@@ -145,52 +195,7 @@ std::vector<ModelMgr::ParVariant*> SysFileIn::ReadParVariants()
 
     std::vector<ModelMgr::ParVariant*> par_variants(num_variants);
     for (int i=0; i<num_variants; ++i)
-    {
-        //Title
-        std::string title;
-        std::getline(_in, title);
-        while (title.empty() || std::isspace(title.at(0))) std::getline(_in, title);
-        ModelMgr::ParVariant* pv = new ModelMgr::ParVariant(title);
-
-
-        //Inputs (parameters)
-        std::getline(_in, line);
-        tab = line.find_first_of('\t');
-        const int num_pars = std::stoi( line.substr(tab+1) );
-        for (int j=0; j<num_pars; ++j)
-        {
-            std::getline(_in, line);
-            tab = line.find_first_of('\t');
-            std::string key = line.substr(0, tab),
-                    val = line.substr(tab+1);
-            pv->pars.push_back( PairStr(key, val) );
-        }
-
-        //Input files
-        std::getline(_in, line);
-        tab = line.find_first_of('\t');
-        const int num_input_files = std::stoi( line.substr(tab+1) );
-        for (int j=0; j<num_input_files; ++j)
-        {
-            std::getline(_in, line);
-            tab = line.find_first_of('\t');
-            std::string key = line.substr(0, tab),
-                    val = line.substr(tab+1);
-            pv->input_files.push_back( PairStr(key, val) );
-        }
-
-        //Notes
-        std::string paragraph;
-        std::getline(_in, paragraph); //The "Notes" line
-        std::getline(_in, paragraph);
-        while ( !strstr(paragraph.c_str(), ModelMgr::ParVariant::END_NOTES.c_str()) && !_in.eof())
-        {
-            pv->notes += paragraph + "\n";
-            std::getline(_in, paragraph);
-        }
-
-        par_variants[i] = pv;
-    }
+        par_variants[i] = ReadParVariant(_in);
 
     return par_variants;
 }

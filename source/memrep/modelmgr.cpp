@@ -165,7 +165,6 @@ void ModelMgr::SetView(QAbstractItemView* view, ds::PMODEL mi)
     view->setModel(_models[mi]);
 }
 
-
 bool ModelMgr::AreModelsInitialized() const
 {
     return _models.at(0) != nullptr;

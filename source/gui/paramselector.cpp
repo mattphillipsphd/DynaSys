@@ -19,7 +19,14 @@ void ParamSelector::LoadData(int index)
     ScopeTracker st("ParamSelector::LoadData", std::this_thread::get_id());
 #endif
     const size_t num_pvs = _modelMgr->NumParVariants();
-    if (num_pvs==0) return;
+    if (num_pvs==0)
+    {
+        ui->cmbSelect->clear();
+        ui->tblPars->setRowCount(0);
+        ui->tblInputFiles->setRowCount(0);
+        ui->txtNotes->clear();
+        return;
+    }
     _doNotUpdate = true;
     ui->cmbSelect->clear();
     for (size_t i=0; i<num_pvs; ++i)
@@ -45,37 +52,35 @@ void ParamSelector::on_btnNew_clicked()
     ScopeTracker st("ParamSelector::on_btnNew_clicked", std::this_thread::get_id());
 #endif
     int idx = ui->cmbSelect->currentIndex();
-    if (idx==-1) return;
 
     bool ok;
     std::string title = QInputDialog::getText(this, "Title of parameter variant",
-                                         "Enter title:", QLineEdit::Normal,
+                                         "Enter title (empty to select file):", QLineEdit::Normal,
                                          "", &ok).toStdString();
-    if (!ok || title.empty()) return;
-
-    ModelMgr::ParVariant* pv = new ModelMgr::ParVariant(title);
-
-    const size_t num_pars = _modelMgr->Model(ds::INP)->NumPars();
-    for (size_t j=0; j<num_pars; ++j)
+    if (!ok) return;
+    ModelMgr::ParVariant* pv;
+    if (title.empty())
     {
-        std::string key = _modelMgr->Model(ds::INP)->ShortKey(j),
-                val = _modelMgr->Model(ds::INP)->Value(j);
-        pv->pars.push_back( PairStr(key, val) );
+        std::string file_name = QFileDialog::getOpenFileName(nullptr,
+                                                              "Select parameter variant file",
+                                                              "",
+                                                              "Parameter variant files (*.txt *.pvar)"
+                                                             ).toStdString();
+        if (file_name.empty()) return;
+        pv = ReadPVFromFile(file_name);
     }
-
-    const size_t num_input_files = _modelMgr->Model(ds::VAR)->NumPars();
-    for (size_t j=0; j<num_input_files; ++j)
-    {
-        std::string key = _modelMgr->Model(ds::VAR)->ShortKey(j),
-                val = _modelMgr->Model(ds::VAR)->Value(j);
-        if (val.at(0) == '"')
-            pv->input_files.push_back( PairStr(key, val) );
-    }
-
-    ui->txtNotes->clear();
+    else
+        pv = ReadPVFromGui(title);
 
     _modelMgr->InsertParVariant(idx+1, pv);
     LoadData(idx+1);
+}
+void ParamSelector::on_btnSave_clicked()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamSelector::on_btnSave_clicked", std::this_thread::get_id());
+#endif
+    emit SaveParVariant();
 }
 void ParamSelector::on_btnSet_clicked()
 {
@@ -106,7 +111,7 @@ void ParamSelector::on_btnSet_clicked()
             _log->AddMesg("Warning: input file parameter " + key + " does not exist, not updated.");
             continue;
         }
-        std::string value = ui->tblPars->item(i,0)->text().toStdString();
+        std::string value = ui->tblInputFiles->item(i,0)->text().toStdString();
         _modelMgr->SetValue(ds::VAR, idx, value);
     }
 }
@@ -119,6 +124,50 @@ void ParamSelector::on_cmbSelect_currentIndexChanged(int index)
     if (index==-1 || _doNotUpdate) return;
     UpdateParVariant(index);
     LoadData(index);
+}
+
+ModelMgr::ParVariant* ParamSelector::ReadPVFromFile(const std::string& file_name) const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamSelector::ReadPVFromFile", std::this_thread::get_id());
+#endif
+    std::ifstream in;
+    in.open(file_name);
+
+    ModelMgr::ParVariant* pv = SysFileIn::ReadParVariant(in);
+
+    in.close();
+
+    return pv;
+}
+
+ModelMgr::ParVariant* ParamSelector::ReadPVFromGui(const std::string& title) const
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ParamSelector::ReadPVFromGui", std::this_thread::get_id());
+#endif
+    ModelMgr::ParVariant* pv = new ModelMgr::ParVariant(title);
+
+    const size_t num_pars = _modelMgr->Model(ds::INP)->NumPars();
+    for (size_t j=0; j<num_pars; ++j)
+    {
+        std::string key = _modelMgr->Model(ds::INP)->ShortKey(j),
+                val = _modelMgr->Model(ds::INP)->Value(j);
+        pv->pars.push_back( PairStr(key, val) );
+    }
+
+    const size_t num_input_files = _modelMgr->Model(ds::VAR)->NumPars();
+    for (size_t j=0; j<num_input_files; ++j)
+    {
+        std::string key = _modelMgr->Model(ds::VAR)->ShortKey(j),
+                val = _modelMgr->Model(ds::VAR)->Value(j);
+        if (val.at(0) == '"')
+            pv->input_files.push_back( PairStr(key, val) );
+    }
+
+    pv->notes =  QDateTime::currentDateTime().toString().toStdString();
+
+    return pv;
 }
 
 void ParamSelector::UpdateParVariant(int i)
@@ -182,6 +231,7 @@ void ParamSelector::on_txtNotes_textChanged()
 #ifdef DEBUG_FUNC
     ScopeTracker st("ParamSelector::on_txtNotes_textChanged", std::this_thread::get_id());
 #endif
-    const size_t index = ui->cmbSelect->currentIndex();
+    const int index = ui->cmbSelect->currentIndex();
+    if (index == -1) return;
     _modelMgr->SetPVNotes( index, ui->txtNotes->document()->toPlainText().toStdString() );
 }
