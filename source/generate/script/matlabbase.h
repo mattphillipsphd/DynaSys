@@ -20,6 +20,7 @@ class MatlabBase : public CFileBase
         MatlabBase(const std::string& name, const std::string& extension, FILE_TYPE type);
 
         void MakeMFiles() const;
+        virtual std::string ObjectiveFunc() const = 0;
 
     protected:
         MDefsFile* const _mDefsFile;

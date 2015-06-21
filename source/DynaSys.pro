@@ -86,9 +86,9 @@ SOURCES += main.cpp\
     generate/script/matlab_interface/mrunmexwm.cpp \
     generate/script/mexfilewm.cpp \
     gui/eventviewer.cpp \
-    gui/paramselector.cpp \
     gui/usernullclinegui.cpp \
     draw/usernullcline.cpp \
+    gui/paramselector.cpp \
     models/nullclinemodel.cpp \
     models/jacobianmodel.cpp \
     gui/jacobiangui.cpp
@@ -155,8 +155,8 @@ HEADERS  += gui/mainwindow.h \
     generate/script/matlab_interface/mrunmexwm.h \
     generate/script/mexfilewm.h \
     gui/eventviewer.h \
-    gui/paramselector.h \
     gui/usernullclinegui.h \
+    gui/paramselector.h \
     draw/usernullcline.h \
     models/nullclinemodel.h \
     models/jacobianmodel.h \
@@ -211,3 +211,4 @@ win32 {
 #For Ubuntu on the home desktop
 #INCLUDEPATH += /home/matt/openblas/openblas-0.2.6-nothread/lapack-3.4.2/lapacke/include
 #LIBS += /home/matt/openblas/openblas-0.2.6-nothread/libopenblas.a -lgfortran
+

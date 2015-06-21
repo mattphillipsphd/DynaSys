@@ -40,7 +40,8 @@ void SysFileOut::Save(const VecStr& vmodels,
     SaveHeader();
     _out << vmodels.size() << std::endl;
     for (auto it : vmodels)
-        _out << it;
+        _out << it;    
+    SaveParVariants();
     notes->Write(_out);
 
     _out.close();
@@ -81,6 +82,7 @@ void SysFileOut::SaveParVariants() const
 
         _out << "Notes" << std::endl;
         _out << pv->notes;
+        if (pv->notes.at( pv->notes.size()-1) != '\n') _out << "\n";
         _out << ModelMgr::ParVariant::END_NOTES << std::endl;
         _out << std::endl;
     }

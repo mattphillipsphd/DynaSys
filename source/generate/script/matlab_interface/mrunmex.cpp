@@ -22,7 +22,9 @@ void MRunMEX::Make(std::ofstream &out) const
     if (name_defs.find_last_of('.') != std::string::npos)
         name_defs.erase(name_defs.find_last_of('.'));
     out <<
-            "[input_names, inputs] = " + name_defs + ";\n"
+            "xInfo = " + name_defs + ";\n"
+            "input_names = xInfo.input_names;\n"
+            "inputs = xInfo.inputs;\n"
             "num_inputs = length(inputs);\n"
             "\n"
             "for iArg=1:length(varargin)\n"

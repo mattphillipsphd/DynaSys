@@ -63,9 +63,11 @@ void UserNullcline::ComputeData()
             const int num_diffs = (int)diff_model->NumPars(),
                     num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
             double* resets = new double[num_diffs],
-                    * dcurrent = new double[num_diffs];
+                    * dcurrent = new double[num_diffs],
+                    * vcurrent = new double[num_vars];
             memcpy(resets, parser_mgr.ConstData(ds::INIT), sizeof(double)*num_diffs);
             memcpy(dcurrent, parser_mgr.ConstData(ds::DIFF), sizeof(double)*num_diffs);
+            memcpy(vcurrent, parser_mgr.ConstData(ds::VAR), sizeof(double)*num_vars);
             for (int i=0; i<XRES; ++i)
             {
                 //Set up the model
@@ -77,15 +79,24 @@ void UserNullcline::ComputeData()
                         parser_mgr.SetData(ds::DIFF, j, resets[j]);
                     else
                         parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
+                for (int j=0; j<num_vars; ++j)
+                    if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) != Input::USER )
+                        parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+                    //This is for input files and random numbers
 
                 //Evaluate the model--the user variables (which may depend on state variables
                 //and possibly appear in the nullcline statements), and the nullclines
                 for (int j=0; j<num_vars; ++j)
-                {
-                    if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) != Input::USER ) continue;
-                    std::string var = _modelMgr->Model(ds::VAR)->TempExpression(j);
-                    parser_mgr.QuickEval(var);
-                }
+                    if (_modelMgr->IsFreeze(ds::VAR,j))
+                    {
+                        std::string temp_key = _modelMgr->Model(ds::VAR)->TempKey(j);
+                        parser_mgr.QuickEval(temp_key + " = 0.0");
+                    }
+                    else if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) == Input::USER )
+                    {
+                        std::string var = _modelMgr->Model(ds::VAR)->TempExpression(j);
+                        parser_mgr.QuickEval(var);
+                    }
                 parser_mgr.TempEval(ds::VAR);
                 for (int j=0; j<num_ncs; ++j)
                 {
@@ -102,7 +113,7 @@ void UserNullcline::ComputeData()
                     if (yidx_j != yidx) continue;
                     y[j*XRES + i] = ncs[j];
                 }
-            }         
+            }
             delete[] resets;
             delete[] dcurrent;
 

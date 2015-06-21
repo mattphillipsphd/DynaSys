@@ -91,7 +91,7 @@ void TimePlot::MakePlotItems()
 
     //Get the available packets
     std::unique_lock<std::mutex> lock( Mutex() );
-    if (_packets.empty()) return;
+//    if (_packets.empty()) return;
     while (!_packets.empty())
     {
         const Packet* packet = _packets.front();
@@ -129,8 +129,9 @@ void TimePlot::MakePlotItems()
     SetSpec("past_samps_ct", past_samps_ct);
 
     //Get all of the information from the parameter fields, introducing new variables as needed.
-    const int num_tp_points = (int)_ip.size(),
-            dv_start = std::max(0, (int)_diffPts.at(0).size()-num_tp_points),
+    const int num_tp_points = (int)_ip.size();
+    if (num_tp_points==0) return;
+    const int dv_start = std::max(0, (int)_diffPts.at(0).size()-num_tp_points),
             dv_end = dv_start + num_tp_points;
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values

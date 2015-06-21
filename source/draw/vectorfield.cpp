@@ -51,6 +51,11 @@ void VectorField::ComputeData()
         SetSpec("yinc", yinc);
         ArrowHead::SetConversions(xinc, yinc, xpix_inc, ypix_inc);
 
+        const double xminb = xmin - 10*xinc,
+                xmaxb = xmax + 10*xinc,
+                yminb = ymin - 10*yinc,
+                ymaxb = ymax + 10*yinc;
+
         try
         {
             std::lock_guard<std::mutex> lock( Mutex() );
@@ -76,7 +81,9 @@ void VectorField::ComputeData()
                         else
                             parser_mgr.SetData(ds::DIFF, k, dcurrent[k]);
                     for (int k=0; k<num_vars; ++k)
-                        parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
+                        if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(k)) != Input::USER )
+                            parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
+                        //This is for input files and random numbers
 
                     const double* diffs = parser_mgr.ConstData(ds::DIFF);
                     QPolygonF& pts = data[i*_resolution+j];
@@ -85,7 +92,9 @@ void VectorField::ComputeData()
                     for (int k=1; k<=_tailLength; ++k)
                     {
                         parser_mgr.ParserEval(false);
-                        pts[k] = QPointF(diffs[xidx], diffs[yidx]);
+                        const double dx = std::min(xmaxb, std::max(xminb, diffs[xidx])),
+                                dy = std::min(ymaxb, std::max(yminb, diffs[yidx]));
+                        pts[k] = QPointF(dx, dy);
                     }
                 }
 

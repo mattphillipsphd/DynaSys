@@ -111,7 +111,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
     connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
 
-//    _timer.start(PLOT_REFRESH);
+    connect(_paramSelector, SIGNAL(StopSim()), this, SLOT(StopSimulation()));
 }
 MainWindow::~MainWindow()
 {
@@ -178,9 +178,10 @@ void MainWindow::Error()
 void MainWindow::EventViewerSelection(int i)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::EventViewerSelection", _tid);
+    ScopeTracker st("MainWindow::EventViewerSelection", _tid); //slot
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("event_index", i);
 }
 void MainWindow::EventViewerThreshold(double d)
@@ -189,6 +190,7 @@ void MainWindow::EventViewerThreshold(double d)
     ScopeTracker st("MainWindow::EventViewerThreshold", _tid);
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("event_thresh", d);
 }
 void MainWindow::EventViewerIsAbove(bool b)
@@ -197,6 +199,7 @@ void MainWindow::EventViewerIsAbove(bool b)
     ScopeTracker st("MainWindow::EventViewerIsAbove", _tid);
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("thresh_above", b);
 }
 void MainWindow::LoadTempModel(void* models) //slot
@@ -217,6 +220,13 @@ void MainWindow::LoadTempModel(void* models) //slot
     {
         _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
     }
+}
+void MainWindow::NeedParserRecompute() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::NeedParserRecompute", _tid);
+#endif
+    _drawMgr->SetNeedRecompute();
 }
 void MainWindow::ParamEditorClosed() //slot
 {
@@ -307,6 +317,14 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     std::thread t( std::bind(&MainWindow::DoFastRun, this) );
     t.detach();
     _timer.start(PLOT_REFRESH);
+}
+void MainWindow::StopSimulation() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StopSimulation", std::this_thread::get_id());
+#endif
+    if (_drawMgr->DrawState() == DrawBase::DRAWING)
+        on_btnStart_clicked();
 }
 void MainWindow::UpdateEquilibria(void* eq) //slot
 {
@@ -988,7 +1006,7 @@ void MainWindow::on_btnStart_clicked()
                 CreateObject(nc_type);
                 UpdateDOSpecs(nc_type);
             }
-            if (ui->cboxVectorField->isChecked())
+            if (ui->cboxVectorField->isChecked() || _plotMode==VECTOR_FIELD)
             {
                 CreateObject(DrawBase::VECTOR_FIELD);
                 UpdateDOSpecs(DrawBase::VECTOR_FIELD);
@@ -1332,7 +1350,7 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             break;
         case DrawBase::USER_NULLCLINE:
-            connect(draw_object, SIGNAL(Flag_pv(void*)), this, SLOT(UpdateEquilibria(void*)));
+            connect(draw_object, SIGNAL(Flag_pv(void*)), this, SLOT(UpdateEquilibria(void*)), Qt::DirectConnection);
             break;
         default:
             break;
@@ -1391,10 +1409,7 @@ void MainWindow::InitDefaultModel()
     _modelMgr->AddParameter(ds::INP, "c", "-0.75");
     _modelMgr->AddParameter(ds::INP, "d", "-1");
     for (size_t i=0; i<_modelMgr->Model(ds::INP)->NumPars(); ++i)
-    {
-        _modelMgr->SetMinimum(ds::INP, i, -10);
-        _modelMgr->SetMinimum(ds::INP, i, 10);
-    }
+        _modelMgr->SetRange(ds::INP, 0, -10, 10);
 
     _modelMgr->AddParameter(ds::VAR, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
     _modelMgr->AddParameter(ds::VAR, "r", "u*v");
@@ -1446,6 +1461,7 @@ void MainWindow::InitViews()
     ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
+    connect(cbbd_v, SIGNAL(MouseReleased()), this, SLOT(NeedParserRecompute()));
     ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
     VecStr vstr;
     vstr.push_back(Input::INPUT_FILE_STR);
@@ -1550,7 +1566,7 @@ void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
 }
-void MainWindow::Replot()
+void MainWindow::Replot() //slot
 {
 #ifdef DEBUG_FUNC
     assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::Replot");

@@ -7,6 +7,7 @@ class MDefsFile : public MFileBase
 {
     public:
         MDefsFile(const std::string& name);
+        void SetMeasure(const std::string& measure) { _measure = measure; }
         void Make() const { MFileBase::Make(); } // ### ??? Getting compiler error without this!
 
     protected:
@@ -17,6 +18,9 @@ class MDefsFile : public MFileBase
             return "";
 //            throw std::exception("MDefsFile::NameRun: Invalid function call");
         }
+
+    private:
+        std::string _measure;
 };
 
 #endif // MDEFSFILE_H

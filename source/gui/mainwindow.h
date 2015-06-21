@@ -100,11 +100,13 @@ class MainWindow : public QMainWindow
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
         void LoadTempModel(void* models);
+        void NeedParserRecompute();
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
+        void StopSimulation();
         void UpdateEquilibria(void* eq);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();

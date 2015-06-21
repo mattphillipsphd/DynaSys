@@ -797,12 +797,12 @@
   </action>
   <action name="actionSet_Nullclines">
    <property name="text">
-    <string>Set Nullclines</string>
+    <string>Nullclines</string>
    </property>
   </action>
   <action name="actionSet_Jacobian">
    <property name="text">
-    <string>Set Jacobian</string>
+    <string>Jacobian</string>
    </property>
   </action>
   <action name="actionSelect_Parameters">

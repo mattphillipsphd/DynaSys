@@ -51,6 +51,7 @@ void ParamSelector::on_btnNew_clicked()
 #ifdef DEBUG_FUNC
     ScopeTracker st("ParamSelector::on_btnNew_clicked", std::this_thread::get_id());
 #endif
+    emit StopSim();
     int idx = ui->cmbSelect->currentIndex();
 
     bool ok;

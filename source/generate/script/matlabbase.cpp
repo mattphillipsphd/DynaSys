@@ -17,8 +17,10 @@ void MatlabBase::MakeMFiles() const
     ScopeTracker st("MatlabBase::MakeMFiles", std::this_thread::get_id());
 #endif
     _mRunFile->SetSuffix( Suffix() ); //Because of inheritance, can't do this in constructor
-    _mDefsFile->Make();
     _mRunFile->Make();
+
+    _mDefsFile->SetMeasure( ObjectiveFunc() );
+    _mDefsFile->Make();
 }
 
 

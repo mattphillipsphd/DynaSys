@@ -13,6 +13,7 @@ class NullclineModel : public NumericModelBase
 
         virtual bool DoEvaluate() const override { return true; }
         virtual bool DoInitialize() const override { return false; }
+        virtual std::string ParamString(size_t i) const override;
         virtual std::string TempExpression(size_t i) const override;
 
     private:

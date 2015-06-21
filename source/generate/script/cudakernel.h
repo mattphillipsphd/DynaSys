@@ -16,6 +16,7 @@ class CudaKernel : public MatlabBase
         std::string ArrayEltReplace(const std::string& exprn) const;
         virtual std::string FuncArgs(ds::PMODEL mi, size_t i) const override;
         virtual void MakeHFile() override {}
+        virtual std::string ObjectiveFunc() const override;
         virtual std::string Suffix() const override;
         std::string ToArrayElt(const std::string& var) const;
 

@@ -239,6 +239,7 @@ void ParserMgr::QuickEval(const std::string& exprn)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         std::string temp = _parser.GetExpr();
+        if (std::isspace( temp.back() )) temp.pop_back(); //mu::Parser adds a newline!
         _parser.SetExpr(exprn);
         _parser.Eval();
         _parser.SetExpr(temp);

@@ -24,6 +24,7 @@ class ParamSelector : public QWidget
 
     signals:
         void SaveParVariant();
+        void StopSim();
 
     private slots:
         void on_btnDelete_clicked();

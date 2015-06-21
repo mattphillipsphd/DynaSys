@@ -18,6 +18,7 @@
 #include "../globals/log.h"
 #include "../globals/scopetracker.h"
 #include "../gui/dsplot.h"
+#include "../memrep/inputmgr.h"
 #include "../memrep/modelmgr.h"
 #include "../memrep/parsermgr.h"
 
@@ -176,13 +177,14 @@ class DrawBase : public QObject
         QwtPlotItem* PlotItem(size_t i) { return _plotItems[i]; }
         int RemainingSleepMs() const;
 
-//        InputMgr* const _inputMgr;
+        InputMgr* const _inputMgr;
         Log* const _log;
         ModelMgr* const _modelMgr;
 
     private:
         void DetachItems();
         void ResetIterCt() { _iterCt = 0; }
+        void SendError() const;
         void SetIterMax(long long int iter_max) { _iterMax = iter_max; }
 
         void* _data;

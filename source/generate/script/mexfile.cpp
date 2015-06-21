@@ -12,6 +12,11 @@ MEXFile::MEXFile(const std::string& name, FILE_TYPE file_type)
 #endif
 }
 
+std::string MEXFile::ObjectiveFunc() const
+{
+    return "";
+}
+
 std::string MEXFile::Suffix() const
 {
     return "_m";
