@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>General Jacobian Matrix</string>
+   <string>Jacobian Matrix</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>

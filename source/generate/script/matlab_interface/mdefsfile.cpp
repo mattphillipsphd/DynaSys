@@ -33,7 +33,7 @@ void MDefsFile::Make(std::ofstream& out) const
             "\n";
 
     //The objective function (measure)
-    out << "xInfo.measure = '" + _measure + "'';\n";
+    out << "xInfo.measure = '" + _measure + "';\n";
     out << "\n";
 
     //All the input parameter names

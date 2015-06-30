@@ -79,7 +79,7 @@
         </font>
        </property>
        <property name="text">
-        <string>Events per unit time x1000:</string>
+        <string>Events/sec:</string>
        </property>
       </widget>
      </item>

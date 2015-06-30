@@ -5,7 +5,6 @@ Nullcline::Nullcline(DSPlot* plot) : DrawBase(plot)
 #ifdef DEBUG_FUNC
     ScopeTracker st("Nullcline::Nullcline", std::this_thread::get_id());
 #endif
-    SetDeleteOnFinish(true);
 }
 Nullcline::~Nullcline()
 {
@@ -54,14 +53,10 @@ void Nullcline::ComputeData()
                 * xdiff = new double[resolution2],
                 * ydiff = new double[resolution2];
 
-        const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-                num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
         try
         {
             std::lock_guard<std::mutex> lock( Mutex() );
             RecomputeIfNeeded();
-            const double* const dcurrent = GetParserMgr(0).ConstData(ds::DIFF),
-                    * const vcurrent = GetParserMgr(0).ConstData(ds::VAR);
             for (int i=0; i<resolution; ++i)
                 for (int j=0; j<resolution; ++j)
                 {
@@ -80,11 +75,6 @@ void Nullcline::ComputeData()
 
                     x[idx] = xij;
                     y[idx] = yij;
-
-                    for (int k=0; k<num_vars; ++k)
-                        parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
-                    for (int k=0; k<num_diffs; ++k)
-                        parser_mgr.SetData(ds::DIFF, k, dcurrent[k]);
                 }
 
             double lastx, lasty;
@@ -152,7 +142,7 @@ void Nullcline::ComputeData()
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
-    if (DrawState()==STOPPED && DeleteOnFinish()) emit ReadyToDelete();
+    if (DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void Nullcline::Initialize()

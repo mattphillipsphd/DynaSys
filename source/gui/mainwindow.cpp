@@ -428,19 +428,19 @@ void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
     try
     {
         DDM::SetMEXFilesDir(file_name);
-        MEXFileWithMeasure mfwm(file_name, objective_fun);
-        mfwm.Make();
-        mfwm.MakeMFiles();
         MEXFile mf(file_name);
         mf.Make();
         mf.MakeMFiles();
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
         DDM::SetCudaFilesDir(file_name);
-        CudaKernelWithMeasure ckwm(file_name, objective_fun);
-        ckwm.Make();
-        ckwm.MakeMFiles();
         CudaKernel ck(file_name);
         ck.Make();
         ck.MakeMFiles();
+        CudaKernelWithMeasure ckwm(file_name, objective_fun);
+        ckwm.Make();
+        ckwm.MakeMFiles();
         _log->AddMesg("MEX file with measure " + ds::StripPath(objective_fun)
                       + ", standard MEX file, and associated m-files created."
                       "  The MEX file with measure file has an '_mm' suffix appended to it.  Both"
