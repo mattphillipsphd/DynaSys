@@ -79,7 +79,9 @@ void MRunCKWM::WriteDefsCall(std::ofstream& out) const
     if (name_defs.find_last_of('.') != std::string::npos)
         name_defs.erase(name_defs.find_last_of('.'));
     out <<
-           "[~, inputs, ~, ~, ~, tau] = " + name_defs + ";\n"
+           "xInfo = " + name_defs + ";\n"
+           "inputs = xInfo.inputs;\n"
+           "tau = xInfo.tau;\n"
            "\n";
 }
 void MRunCKWM::WriteHeader(std::ofstream& out) const

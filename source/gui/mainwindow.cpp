@@ -17,7 +17,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     _aboutGui(new AboutGui()), _eventViewer(new EventViewer()), _fastRunGui(new FastRunGui()),
-    _logGui(new LogGui()), _notesGui(new NotesGui()), _paramEditor(new ParamEditor()),
+    _jacobianGui(new JacobianGui()), _logGui(new LogGui()), _notesGui(new NotesGui()),
+    _paramEditor(new ParamEditor()), _paramSelector(new ParamSelector()), _userNullclineGui(new UserNullclineGui),
     _drawMgr(DrawMgr::Instance()), _fileName(""),
     _log(Log::Instance()), _modelMgr(ModelMgr::Instance()), _numTPSamples(DrawBase::TP_WINDOW_LENGTH),
     _plotMode(SINGLE), _pulseResetValue("-666"), _pulseStepsRemaining(-1),
@@ -93,6 +94,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_notesGui, SIGNAL(SaveNotes()), this, SLOT(on_actionSave_Model_triggered()));
     connect(_paramEditor, SIGNAL(CloseEditor()), this, SLOT(ParamEditorClosed()));
     connect(_paramEditor, SIGNAL(ModelChanged(void*)), this, SLOT(LoadTempModel(void*)));
+    connect(_paramSelector, SIGNAL(SaveParVariant()), this, SLOT(on_actionSave_Model_triggered()));
 
     connect(&_timer, SIGNAL(timeout()), this, SLOT(Replot()));
     connect(ui->qwtPhasePlot, SIGNAL(MousePos(QPointF)), this, SLOT(UpdateMousePos(QPointF)));
@@ -109,7 +111,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(_eventViewer, SIGNAL(Threshold(double)), this, SLOT(EventViewerThreshold(double)));
     connect(_eventViewer, SIGNAL(IsThreshAbove(bool)), this, SLOT(EventViewerIsAbove(bool)));
 
-//    _timer.start(PLOT_REFRESH);
+    connect(_paramSelector, SIGNAL(StopSim()), this, SLOT(StopSimulation()));
 }
 MainWindow::~MainWindow()
 {
@@ -176,9 +178,10 @@ void MainWindow::Error()
 void MainWindow::EventViewerSelection(int i)
 {
 #ifdef DEBUG_FUNC
-    ScopeTracker st("MainWindow::EventViewerSelection", _tid);
+    ScopeTracker st("MainWindow::EventViewerSelection", _tid); //slot
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("event_index", i);
 }
 void MainWindow::EventViewerThreshold(double d)
@@ -187,6 +190,7 @@ void MainWindow::EventViewerThreshold(double d)
     ScopeTracker st("MainWindow::EventViewerThreshold", _tid);
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("event_thresh", d);
 }
 void MainWindow::EventViewerIsAbove(bool b)
@@ -195,6 +199,7 @@ void MainWindow::EventViewerIsAbove(bool b)
     ScopeTracker st("MainWindow::EventViewerIsAbove", _tid);
 #endif
     DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
+    if (!tp) return;
     tp->SetSpec("thresh_above", b);
 }
 void MainWindow::LoadTempModel(void* models) //slot
@@ -215,6 +220,13 @@ void MainWindow::LoadTempModel(void* models) //slot
     {
         _log->AddExcept("MainWindow::LoadTempModel: " + std::string(e.what()));
     }
+}
+void MainWindow::NeedParserRecompute() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::NeedParserRecompute", _tid);
+#endif
+    _drawMgr->SetNeedRecompute();
 }
 void MainWindow::ParamEditorClosed() //slot
 {
@@ -306,6 +318,24 @@ void MainWindow::StartFastRun(int duration, int save_mod_n)
     t.detach();
     _timer.start(PLOT_REFRESH);
 }
+void MainWindow::StopSimulation() //slot
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::StopSimulation", std::this_thread::get_id());
+#endif
+    if (_drawMgr->DrawState() == DrawBase::DRAWING)
+        on_btnStart_clicked();
+}
+void MainWindow::UpdateEquilibria(void* eq) //slot
+{
+    if (!eq)
+    {
+        for (auto it : _equilibria) delete it;
+        _equilibria.clear();
+    }
+    else
+        _equilibria.push_back( static_cast<ds::Equilibrium*>(eq) );
+}
 void MainWindow::UpdateMousePos(QPointF pos) //slot
 {
 //#ifdef DEBUG_FUNC
@@ -313,6 +343,30 @@ void MainWindow::UpdateMousePos(QPointF pos) //slot
 //#endif
     ui->lblMouseX->setText( std::to_string(pos.x()).c_str() );
     ui->lblMouseY->setText( std::to_string(pos.y()).c_str() );
+
+    DrawBase* pp = _drawMgr->GetObject(DrawBase::SINGLE);
+    if (!pp) return;
+    const int xidx = pp->Spec_toi("xidx"),
+            yidx = pp->Spec_toi("yidx");
+    const double xmin = _modelMgr->Minimum(ds::INIT, xidx),
+            xmax = _modelMgr->Maximum(ds::INIT, xidx),
+            ymin = _modelMgr->Minimum(ds::INIT, yidx),
+            ymax = _modelMgr->Maximum(ds::INIT, yidx),
+            xwin = (xmax - xmin)/100,
+            ywin = (ymax - ymin)/100;
+
+    ui->lblEqCat->clear();
+    std::string eq_str("");
+    for (const auto& it : _equilibria)
+        if (abs(pos.x() - it->x)<xwin && abs(pos.y() - it->y)<ywin)
+        {
+            eq_str = ds::EqCatStr(it->eq_cat);
+            break;
+        }
+    ui->lblEqCat->setText(eq_str.c_str());
+    QFont font;
+    font.setWeight(QFont::Bold);
+    ui->lblEqCat->setFont(font);
 }
 void MainWindow::UpdateTimePlot() //slot
 {
@@ -330,6 +384,7 @@ void MainWindow::UpdateTimePlot() //slot
         }
     }
 }
+
 void MainWindow::UpdateTPData() //slot
 {
 #ifdef DEBUG_FUNC
@@ -352,6 +407,9 @@ void MainWindow::closeEvent(QCloseEvent *)
     _logGui->close();
     _notesGui->close();
     _paramEditor->close();
+    _paramSelector->close();
+    _jacobianGui->close();
+    _userNullclineGui->close();
 }
 
 void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
@@ -370,19 +428,19 @@ void MainWindow::on_actionAll_MEX_and_CUDA_triggered()
     try
     {
         DDM::SetMEXFilesDir(file_name);
-        MEXFileWithMeasure mfwm(file_name, objective_fun);
-        mfwm.Make();
-        mfwm.MakeMFiles();
         MEXFile mf(file_name);
         mf.Make();
         mf.MakeMFiles();
+        MEXFileWithMeasure mfwm(file_name, objective_fun);
+        mfwm.Make();
+        mfwm.MakeMFiles();
         DDM::SetCudaFilesDir(file_name);
-        CudaKernelWithMeasure ckwm(file_name, objective_fun);
-        ckwm.Make();
-        ckwm.MakeMFiles();
         CudaKernel ck(file_name);
         ck.Make();
         ck.MakeMFiles();
+        CudaKernelWithMeasure ckwm(file_name, objective_fun);
+        ckwm.Make();
+        ckwm.MakeMFiles();
         _log->AddMesg("MEX file with measure " + ds::StripPath(objective_fun)
                       + ", standard MEX file, and associated m-files created."
                       "  The MEX file with measure file has an '_mm' suffix appended to it.  Both"
@@ -699,6 +757,14 @@ void MainWindow::on_actionSave_Vector_Field_triggered()
     SaveFigure(ui->qwtPhasePlot, "vector field", QSizeF(100, 100));
 }
 
+void MainWindow::on_actionSelect_Parameters_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSelect_Parameters_triggered", _tid);
+#endif
+    _paramSelector->show();
+}
+
 void MainWindow::on_actionSet_Init_to_Current_triggered()
 {
 #ifdef DEBUG_FUNC
@@ -726,6 +792,22 @@ void MainWindow::on_actionSet_Input_Home_Dir_triggered()
                                                          DDM::InputFilesDir().c_str()).toStdString();
     if (dir_name.empty()) return;
     DDM::SetInputFilesDir(dir_name);
+}
+
+void MainWindow::on_actionSet_Nullclines_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Nullclines_triggered", _tid);
+#endif
+    _userNullclineGui->show();
+}
+
+void MainWindow::on_actionSet_Jacobian_triggered()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::on_actionSet_Jacobian_triggered", _tid);
+#endif
+    _jacobianGui->show();
 }
 
 void MainWindow::on_btnAddCondition_clicked()
@@ -912,6 +994,23 @@ void MainWindow::on_btnStart_clicked()
             SetButtonsEnabled(false);
             ui->btnStart->setText("Stop");
             _paramEditor->setEnabled(false);
+            _drawMgr->StopAndRemove(DrawBase::NULLCLINE);
+            _drawMgr->StopAndRemove(DrawBase::USER_NULLCLINE);
+            _drawMgr->StopAndRemove(DrawBase::VECTOR_FIELD);
+            if (ui->cboxNullclines->isChecked())
+            {
+                DrawBase::DRAW_TYPE nc_type =
+                        (_userNullclineGui->NumValidNCs()>0)
+                        ? DrawBase::USER_NULLCLINE
+                        : DrawBase::NULLCLINE;
+                CreateObject(nc_type);
+                UpdateDOSpecs(nc_type);
+            }
+            if (ui->cboxVectorField->isChecked() || _plotMode==VECTOR_FIELD)
+            {
+                CreateObject(DrawBase::VECTOR_FIELD);
+                UpdateDOSpecs(DrawBase::VECTOR_FIELD);
+            }
             size_t num_objects = _drawMgr->NumDrawObjects();
             for (size_t i=0; i<num_objects; ++i)
             {
@@ -957,17 +1056,21 @@ void MainWindow::on_cboxNullclines_stateChanged(int state)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_cboxNullclines_stateChanged", _tid);
 #endif
+    DrawBase::DRAW_TYPE nc_type =
+            (_userNullclineGui->NumValidNCs()>0)
+            ? DrawBase::USER_NULLCLINE
+            : DrawBase::NULLCLINE;
     if (state==Qt::Checked)
     {
-        CreateObject(DrawBase::NULL_CLINE);
-        UpdateDOSpecs(DrawBase::NULL_CLINE);
+        CreateObject(nc_type);
+        UpdateDOSpecs(nc_type);
         if (_drawMgr->DrawState()==DrawBase::DRAWING)
-            _drawMgr->Start(DrawBase::NULL_CLINE);
+            _drawMgr->Start(nc_type);
         else
-            _drawMgr->Start(DrawBase::NULL_CLINE, 1);
+            _drawMgr->Start(nc_type, 1);
     }
     else
-        _drawMgr->StopAndRemove(DrawBase::NULL_CLINE);
+        _drawMgr->StopAndRemove(nc_type);
 }
 void MainWindow::on_cboxPlotZ_stateChanged(int state)
 {
@@ -1227,8 +1330,9 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
     DSPlot* plot(nullptr);
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
+        case DrawBase::NULLCLINE:
         case DrawBase::SINGLE:
+        case DrawBase::USER_NULLCLINE:
         case DrawBase::VARIABLE_VIEW:
         case DrawBase::VECTOR_FIELD:
             plot = ui->qwtPhasePlot;
@@ -1241,17 +1345,14 @@ DrawBase* MainWindow::CreateObject(DrawBase::DRAW_TYPE draw_type)
 
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
-            break;
         case DrawBase::SINGLE:
             connect(draw_object, SIGNAL(Flag1()), this, SLOT(UpdatePulseParam()), Qt::QueuedConnection);
             connect(draw_object, SIGNAL(Flag2()), this, SLOT(UpdateTPData()), Qt::BlockingQueuedConnection);
             break;
-        case DrawBase::TIME_PLOT:
+        case DrawBase::USER_NULLCLINE:
+            connect(draw_object, SIGNAL(Flag_pv(void*)), this, SLOT(UpdateEquilibria(void*)), Qt::DirectConnection);
             break;
-        case DrawBase::VARIABLE_VIEW:
-            break;
-        case DrawBase::VECTOR_FIELD:
+        default:
             break;
     }
     connect(draw_object, SIGNAL(Error()), this, SLOT(Error()));
@@ -1265,16 +1366,9 @@ void MainWindow::ConnectModels()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::ConnectModels", _tid);
 #endif
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INP)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::VAR)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::DIFF)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::INIT)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
-    connect(const_cast<ParamModelBase*>(_modelMgr->Model(ds::COND)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SLOT(ExprnChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
+    for (int i=0; i<ds::NUM_MODELS; ++i)
+        connect(const_cast<ParamModelBase*>(_modelMgr->Model((ds::PMODEL)i)), SIGNAL(dataChanged(QModelIndex,QModelIndex)),
+                this, SLOT(ParamChanged(QModelIndex,QModelIndex)), Qt::QueuedConnection);
     if (_modelMgr->Model(ds::COND)->NumPars()==0)
         delete ui->lsResults->model();
     else
@@ -1310,23 +1404,37 @@ void MainWindow::InitDefaultModel()
     _modelMgr->CreateModels();
     InitViews();
 
-    _modelMgr->AddParameter(ds::INP, "a", "4");
-    _modelMgr->AddParameter(ds::INP, "b", "10");
+    _modelMgr->AddParameter(ds::INP, "a", "0.25");
+    _modelMgr->AddParameter(ds::INP, "b", "0.5");
+    _modelMgr->AddParameter(ds::INP, "c", "-0.75");
+    _modelMgr->AddParameter(ds::INP, "d", "-1");
+    for (size_t i=0; i<_modelMgr->Model(ds::INP)->NumPars(); ++i)
+        _modelMgr->SetRange(ds::INP, 0, -10, 10);
 
-    _modelMgr->AddParameter(ds::VAR, "q", "a*b"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
+    _modelMgr->AddParameter(ds::VAR, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
     _modelMgr->AddParameter(ds::VAR, "r", "u*v");
 
-    _modelMgr->AddParameter(ds::DIFF, "v'", "(u + r + a)/b");
-    _modelMgr->AddParameter(ds::DIFF, "u'", "q*(b - v)");
+    _modelMgr->AddParameter(ds::DIFF, "v'", "a*v + b*u + noise/10");
+    _modelMgr->AddParameter(ds::DIFF, "u'", "c*v + d*u");
 
     _modelMgr->AddParameter(ds::INIT, "v(0)", "1");
     _modelMgr->AddParameter(ds::INIT, "u(0)", "0");
-    _modelMgr->SetRange(ds::INIT, 0, -40, 40);
-    _modelMgr->SetRange(ds::INIT, 1, -40, 40);
+    _modelMgr->SetRange(ds::INIT, 0, -10, 10);
+    _modelMgr->SetRange(ds::INIT, 1, -10, 10);
 
-    VecStr vs;
-    vs.push_back("v = 1"); vs.push_back("u = 2");
-    _modelMgr->AddCondParameter("v>40", vs);
+    _modelMgr->AddParameter(ds::NC, "u_for_dv", "-(v*a + noise/10) / b");
+    _modelMgr->AddParameter(ds::NC, "u_for_du", "-v * c / d");
+
+    _modelMgr->AddParameter(ds::JAC, "_grad_v_dv", "a");
+    _modelMgr->AddParameter(ds::JAC, "_grad_v_du", "b");
+    _modelMgr->AddParameter(ds::JAC, "_grad_u_dv", "c");
+    _modelMgr->AddParameter(ds::JAC, "_grad_u_du", "d");
+
+    VecStr vs1, vs2;
+    vs1.push_back("v = 1"); vs1.push_back("u = 2");
+    _modelMgr->AddCondParameter("abs(v)>40", vs1);
+    vs2.push_back("v = 2"); vs2.push_back("u = 1");
+    _modelMgr->AddCondParameter("abs(u)>40", vs2);
     ui->lsConditions->setModelColumn(ConditionModel::TEST);
     ResetResultsList(0);
 
@@ -1355,6 +1463,7 @@ void MainWindow::InitViews()
     ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
     ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
     CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
+    connect(cbbd_v, SIGNAL(MouseReleased()), this, SLOT(NeedParserRecompute()));
     ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
     VecStr vstr;
     vstr.push_back(Input::INPUT_FILE_STR);
@@ -1380,6 +1489,15 @@ void MainWindow::InitViews()
     _modelMgr->SetView(ui->lsConditions, ds::COND);
     ui->lsConditions->setModelColumn(ConditionModel::TEST);
     ResetResultsList(-1);
+
+    _modelMgr->SetView(_userNullclineGui->Table(), ds::NC);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::MIN,true);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::MAX,true);
+    _userNullclineGui->Table()->setColumnHidden(NumericModelBase::FREEZE,true);
+    _userNullclineGui->Table()->horizontalHeader()->setStretchLastSection(true);
+
+    _modelMgr->SetView(_jacobianGui->Table(), ds::JAC);
+    _jacobianGui->Table()->horizontalHeader()->setStretchLastSection(true);
 }
 
 void MainWindow::ComboBoxChanged(size_t row) //slot
@@ -1433,6 +1551,7 @@ void MainWindow::ParamChanged(QModelIndex topLeft, QModelIndex) //slot
         try
         {
             _drawMgr->QuickEval(exprn);
+//            _drawMgr->Start(DrawBase::VECTOR_FIELD, 1);
         }
         catch (std::exception& e)
         {
@@ -1449,7 +1568,7 @@ void MainWindow::ResultsChanged(QModelIndex, QModelIndex) //slot
     if (cond_row==-1) return;
     UpdateResultsModel(cond_row);
 }
-void MainWindow::Replot()
+void MainWindow::Replot() //slot
 {
 #ifdef DEBUG_FUNC
     assert(std::this_thread::get_id()==_tid && "Thread error: MainWindow::Replot");
@@ -1554,12 +1673,16 @@ void MainWindow::LoadModel(const std::string& file_name)
 #endif
     try
     {
+        ui->cboxNullclines->setChecked(false);
+        ui->cboxVectorField->setChecked(false);
+
         _drawMgr->ClearObjects();
 
         SysFileIn in(file_name);
         in.Load();
         InitViews();
         ConnectModels();
+        SetParVariants();
 
         ui->cmbPlotMode->setCurrentIndex(0);
         if (!_drawMgr->GetObject(DrawBase::SINGLE))
@@ -1747,6 +1870,13 @@ void MainWindow::SetButtonsEnabled(bool is_enabled)
     ui->cmbPlotMode->setEnabled(is_enabled);
     ui->spnVFResolution->setEnabled(is_enabled); //Would like to work this in, too hard currently
 }
+void MainWindow::SetParVariants()
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("MainWindow::SetParVariants", _tid);
+#endif
+    _paramSelector->LoadData();
+}
 void MainWindow::SetParamsEnabled(bool is_enabled)
 {
 #ifdef DEBUG_FUNC
@@ -1781,6 +1911,8 @@ void MainWindow::SetTPShown(bool is_shown)
         ui->tblTimePlot->show();
         ui->lblTimePlotN->show();
         ui->edNumTPSamples->show();
+        ui->btnJumpToN->show();
+        ui->edJumpToN->show();
     }
     else
     {
@@ -1788,6 +1920,8 @@ void MainWindow::SetTPShown(bool is_shown)
         ui->tblTimePlot->hide();
         ui->lblTimePlotN->hide();
         ui->edNumTPSamples->hide();
+        ui->btnJumpToN->hide();
+        ui->edJumpToN->hide();
     }
 }
 void MainWindow::SetZPlotShown(bool is_shown)
@@ -1912,7 +2046,7 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
     draw_object->SetSpec("steps_per_sec", ui->spnStepsPerSec->value());
     switch (draw_type)
     {
-        case DrawBase::NULL_CLINE:
+        case DrawBase::NULLCLINE:
             draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
             draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
             draw_object->SetSpec("resolution", ui->spnVFResolution->value());
@@ -1932,6 +2066,12 @@ void MainWindow::UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type)
             draw_object->SetSpec("thresh_above", _eventViewer->IsThreshAbove());
             draw_object->SetSpec("num_samples", _numTPSamples);
             draw_object->SetSpec("time_offset", 0);
+            draw_object->SetOpaqueSpec("colors", &_tpColors);
+            break;
+        case DrawBase::USER_NULLCLINE:
+            draw_object->SetSpec("xidx", ui->cmbPlotX->currentIndex());
+            draw_object->SetSpec("yidx", ui->cmbPlotY->currentIndex());
+            draw_object->SetSpec("has_jacobian", _jacobianGui->IsFull());
             draw_object->SetOpaqueSpec("colors", &_tpColors);
             break;
         case DrawBase::VARIABLE_VIEW:

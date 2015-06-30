@@ -27,7 +27,6 @@ class ParserMgr
         ~ParserMgr();
 
         void AddExpression(const std::string& exprn);
-        void AssignVariable(int row, const std::string& text);
         void ClearExpressions();
         void InitData(); //Initializes the data variables to their appropriate initial values
         void InitializeFull();
@@ -37,6 +36,7 @@ class ParserMgr
         void ParserEvalAndConds(bool eval_input = true);
         void QuickEval(const std::string& exprn);
         void TempEval();
+        void TempEval(ds::PMODEL mi);
 
         void SetConditions();
         void SetData(ds::PMODEL mi, size_t idx, double val);
@@ -61,6 +61,7 @@ class ParserMgr
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
+            //  This is an array of pointers to pointers, not a pointer to an array of pointers.
         ModelMgr* const _modelMgr;
         std::mutex _mutex;
         mu::Parser _parser, _parserResult;

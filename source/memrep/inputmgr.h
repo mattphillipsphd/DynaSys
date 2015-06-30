@@ -13,12 +13,17 @@ class InputMgr
 
         ~InputMgr();
 
-        int AssignInput(double* data, const std::string& type_str);
+        int AssignInput(double* listener, const std::string& type_str, int idx = -1);
             //Assign the source of the data for the variables
         void ClearInputs();
         void InputEval();
             //To be called on every iteration of the model
         void JumpToSample(int n);
+        void RemoveListener(int idx, double* listener);
+
+        size_t NumInputs() const { return _inputs.size(); }
+        Input::TYPE Type(size_t i) const;
+//        double* Value(size_t i) const;
 
     private:
         InputMgr();
@@ -30,7 +35,7 @@ class InputMgr
 #endif
         static InputMgr* _instance;
 
-        int EmplaceInput(double* data);
+        int EmplaceInput(double* data, int idx);
 
         std::vector<Input> _inputs;
         ModelMgr* const _modelMgr;

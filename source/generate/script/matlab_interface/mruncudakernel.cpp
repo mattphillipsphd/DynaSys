@@ -142,7 +142,10 @@ void MRunCudaKernel::WriteDefsCall(std::ofstream& out) const
     if (name_defs.find_last_of('.') != std::string::npos)
         name_defs.erase(name_defs.find_last_of('.'));
     out <<
-           "[~, inputs, ~, ~, output_names, model_step] = " + name_defs + ";\n"
+           "xInfo = " + name_defs + ";\n"
+           "inputs = xInfo.inputs;\n"
+           "output_names = xInfo.output_names;\n"
+           "model_step = xInfo.tau;\n"
            "\n";
 }
 void MRunCudaKernel::WriteDefaultPars(std::ofstream& out) const

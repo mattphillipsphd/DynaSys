@@ -2,6 +2,7 @@
 #include "nullcline.h"
 #include "phaseplot.h"
 #include "timeplot.h"
+#include "usernullcline.h"
 #include "variableview.h"
 #include "vectorfield.h"
 
@@ -18,9 +19,9 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
     DrawBase* draw_object(nullptr);
     switch (draw_type)
     {
-        case NULL_CLINE:
+        case NULLCLINE:
             draw_object = new Nullcline(plot);
-            draw_object->_drawType = NULL_CLINE;
+            draw_object->_drawType = NULLCLINE;
             break;
         case SINGLE:
             draw_object = new PhasePlot(plot);
@@ -29,6 +30,10 @@ DrawBase* DrawBase::Create(DRAW_TYPE draw_type, DSPlot* plot)
         case TIME_PLOT:
             draw_object = new TimePlot(plot);
             draw_object->_drawType = TIME_PLOT;
+            break;
+        case USER_NULLCLINE:
+            draw_object = new UserNullcline(plot);
+            draw_object->_drawType = USER_NULLCLINE;
             break;
         case VARIABLE_VIEW:
             draw_object = new VariableView(plot);
@@ -138,7 +143,7 @@ void* DrawBase::NonConstOpaqueSpec(const std::string& key)
     {
         _log->AddExcept("DrawBase::NonConstOpaqueSpec: Bad key, " + key
                         + ", for draw type " + std::to_string(_drawType));
-        emit Error();
+        SendError();
         return nullptr;
     }
 }
@@ -164,7 +169,7 @@ const void* DrawBase::OpaqueSpec(const std::string& key) const
     {
         _log->AddExcept("DrawBase::OpaqueSpec: Bad key, " + key
                         + ", for draw type " + std::to_string(_drawType));
-        emit Error();
+        SendError();
         return nullptr;
     }
 }
@@ -182,7 +187,7 @@ const std::string& DrawBase::Spec(const std::string& key) const
     {
         _log->AddExcept("DrawBase::Spec: Bad key, " + key
                         + ", for draw type " + std::to_string(_drawType));
-        emit Error();
+        SendError();
         return EMPTY_STRING;
     }
 }
@@ -199,7 +204,7 @@ double DrawBase::Spec_tod(const std::string& key) const
     catch (std::exception&)
     {
         _log->AddExcept("DrawBase::Spec_tod: Bad value, " + Spec(key));
-        emit Error();
+        SendError();
         return 0;
     }
 }
@@ -212,7 +217,7 @@ int DrawBase::Spec_toi(const std::string& key) const
     catch (std::exception&)
     {
         _log->AddExcept("DrawBase::Spec_toi: Bad value, " + Spec(key));
-        emit Error();
+        SendError();
         return 0;
     }
 }
@@ -232,12 +237,13 @@ void DrawBase::IterCompleted(int num_iters) //slot
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     if ((_iterCt+=num_iters) >= _iterMax)
+//        _drawState = PAUSED;
         _drawState = STOPPED;
     _lastStep = std::chrono::system_clock::now();
 }
 
 DrawBase::DrawBase(DSPlot* plot)
-    : _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
+    : _inputMgr(InputMgr::Instance()), _log(Log::Instance()), _modelMgr(ModelMgr::Instance()),
       _data(nullptr), _deleteOnFinish(false), _guiTid(std::this_thread::get_id()),
       _iterCt(0), _iterMax(-1), _lastStep(std::chrono::system_clock::now()),
       _needRecompute(false), _plot(plot)
@@ -255,9 +261,9 @@ void DrawBase::ClearPlotItems()
 }
 void DrawBase::RecomputeIfNeeded()
 {
-#ifdef DEBUG_FUNC
-    ScopeTracker st("DrawBase::RecomputeIfNeeded", std::this_thread::get_id());
-#endif
+//#ifdef DEBUG_FUNC
+//    ScopeTracker st("DrawBase::RecomputeIfNeeded", std::this_thread::get_id());
+//#endif
     if (_needRecompute)
     {
         for (auto& it : _parserMgrs)
@@ -279,6 +285,15 @@ void DrawBase::SetData(void* data)
     _data = data;
 }
 
+void DrawBase::RemovePlotItem(const QwtPlotItem* item)
+{
+#ifdef QT_DEBUG
+    assert(std::this_thread::get_id()==_guiTid);
+#endif
+    auto it = std::remove(_plotItems.begin(), _plotItems.end(), item);
+    if (it != _plotItems.end())
+        _plotItems.erase(it);
+}
 void DrawBase::ReservePlotItems(size_t num)
 {
 #ifdef QT_DEBUG
@@ -313,7 +328,9 @@ void DrawBase::InitParserMgrs(size_t num)
     ScopeTracker st("DrawBase::InitParserMgrs", std::this_thread::get_id());
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
-    _parserMgrs.resize(num);
+    _parserMgrs.clear();
+    _parserMgrs = std::vector<ParserMgr>(num);
+//    _parserMgrs.resize(num);
     for (auto& it : _parserMgrs)
         it.InitializeFull();
 }
@@ -348,4 +365,12 @@ void DrawBase::DetachItems()
 #endif
     for (auto it : _plotItems)
         it->detach();
+}
+
+void DrawBase::SendError() const
+{
+    if (std::this_thread::get_id() == _guiTid)
+        throw std::runtime_error("DrawBase::SendError");
+    else
+        SendError();
 }

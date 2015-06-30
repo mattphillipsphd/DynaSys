@@ -12,16 +12,19 @@
 class SysFileIn
 {
     public:
+        static ModelMgr::ParVariant* ReadParVariant(std::ifstream& in);
+
         SysFileIn(const std::string& name);
 
         void Load();
         void Load(VecStr& vmodels);
 
     private:
-        std::vector<ParamModelBase*> ReadModels();
+        std::vector<ParamModelBase*> ReadModels(int num_models);
         double ReadModelStep();
         Notes* ReadNotes();
         int ReadNumModels();
+        std::vector<ModelMgr::ParVariant*> ReadParVariants();
         int ReadVersion();
 
         const std::string _name;

@@ -9,6 +9,8 @@ class MEXFile : public MatlabBase
         MEXFile(const std::string& name,
                 MatlabBase::FILE_TYPE file_type = MatlabBase::MEX);
 
+        virtual std::string ObjectiveFunc() const override;
+
     protected:
         virtual void MakeHFile() override {}
         virtual std::string Suffix() const override;

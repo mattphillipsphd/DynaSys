@@ -1,28 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <deque>
-#include <iostream>
-#include <memory>
-#include <random>
-#include <thread>
-#include <unordered_set>
-
-#include <QColor>
-#include <QDebug>
-#include <QFileDialog>
-#include <QFile>
-#include <QIcon>
-#include <QInputDialog>
-#include <QMainWindow>
-#include <QMessageBox>
-#include <QStringListModel>
-#include <QTimer>
-
 #include <qwt_scale_div.h>
 #include <qwt_plot.h>
 #include <qwt_plot_curve.h>
@@ -36,9 +14,12 @@
 #include "dspinboxdelegate.h"
 #include "eventviewer.h"
 #include "fastrungui.h"
+#include "jacobiangui.h"
 #include "loggui.h"
 #include "notesgui.h"
 #include "parameditor.h"
+#include "paramselector.h"
+#include "usernullclinegui.h"
 #include "../generate/script/cfileso.h"
 #include "../generate/script/cudakernel.h"
 #include "../generate/script/cudakernelwithmeasure.h"
@@ -119,11 +100,14 @@ class MainWindow : public QMainWindow
         void ExecutableFinished(int id, bool is_normal);
         void FastRunFinished();
         void LoadTempModel(void* models);
+        void NeedParserRecompute();
         void ParamEditorClosed();
         void ParserToLog();
         void Pause();
         void StartCompiled(int duration, int save_mod_n);
         void StartFastRun(int duration, int save_mod_n);
+        void StopSimulation();
+        void UpdateEquilibria(void* eq);
         void UpdateMousePos(QPointF pos);
         void UpdateTimePlot();
         void UpdateTPData();
@@ -158,8 +142,11 @@ class MainWindow : public QMainWindow
         void on_actionSave_Phase_Plot_triggered();
         void on_actionSave_Time_Plot_triggered();
         void on_actionSave_Vector_Field_triggered();
+        void on_actionSelect_Parameters_triggered();
         void on_actionSet_Init_to_Current_triggered();
         void on_actionSet_Input_Home_Dir_triggered();
+        void on_actionSet_Jacobian_triggered();
+        void on_actionSet_Nullclines_triggered();
 
         void on_btnAddCondition_clicked();
         void on_btnPulse_clicked();
@@ -236,6 +223,7 @@ class MainWindow : public QMainWindow
         void SetActionBtnsEnabled(bool is_enabled);
         void SetButtonsEnabled(bool is_enabled);
         void SetParamsEnabled(bool is_enabled);
+        void SetParVariants(); // ### Should be moved into its own class
         void SetSaveActionsEnabled(bool is_enabled);
         void SetTPShown(bool is_shown);
         void SetZPlotShown(bool is_shown);
@@ -251,14 +239,18 @@ class MainWindow : public QMainWindow
         void UpdateDOSpecs(DrawBase::DRAW_TYPE draw_type);
         void UpdateTimePlotTable();
 
-        AboutGui* const _aboutGui;
-        EventViewer* const _eventViewer;
-        FastRunGui* const _fastRunGui;
-        LogGui* const _logGui;
-        NotesGui* const _notesGui;
-        ParamEditor* const _paramEditor;
+        AboutGui* const         _aboutGui;
+        EventViewer* const      _eventViewer;
+        FastRunGui* const       _fastRunGui;
+        JacobianGui* const      _jacobianGui;
+        LogGui* const           _logGui;
+        NotesGui* const         _notesGui;
+        ParamEditor* const      _paramEditor;
+        ParamSelector* const    _paramSelector;
+        UserNullclineGui* const _userNullclineGui;
 
         DrawMgr* const _drawMgr;
+        std::vector<ds::Equilibrium*> _equilibria;
         std::string _fileName;
         std::vector<JobRecord> _jobs;
         Log* const _log;

@@ -85,7 +85,13 @@ SOURCES += main.cpp\
     generate/script/matlab_interface/mrunckwm.cpp \
     generate/script/matlab_interface/mrunmexwm.cpp \
     generate/script/mexfilewm.cpp \
-    gui/eventviewer.cpp
+    gui/eventviewer.cpp \
+    gui/usernullclinegui.cpp \
+    draw/usernullcline.cpp \
+    gui/paramselector.cpp \
+    models/nullclinemodel.cpp \
+    models/jacobianmodel.cpp \
+    gui/jacobiangui.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -148,16 +154,25 @@ HEADERS  += gui/mainwindow.h \
     generate/script/matlab_interface/mrunckwm.h \
     generate/script/matlab_interface/mrunmexwm.h \
     generate/script/mexfilewm.h \
-    gui/eventviewer.h
+    gui/eventviewer.h \
+    gui/usernullclinegui.h \
+    gui/paramselector.h \
+    draw/usernullcline.h \
+    models/nullclinemodel.h \
+    models/jacobianmodel.h \
+    gui/jacobiangui.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \
     forms/variablegui.ui \
     forms/parameditor.ui \
+    forms/paramselector.ui \
     forms/notesgui.ui \
     forms/loggui.ui \
     forms/fastrungui.ui \
-    forms/eventviewer.ui
+    forms/eventviewer.ui \
+    forms/usernullclinegui.ui \
+    forms/jacobiangui.ui
 
 win32 {
     QWT_DIR         = C:/Users/matt/Libraries/qwt-6.1.0

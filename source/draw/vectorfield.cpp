@@ -50,29 +50,50 @@ void VectorField::ComputeData()
         SetSpec("yinc", yinc);
         ArrowHead::SetConversions(xinc, yinc, xpix_inc, ypix_inc);
 
+        const double xminb = xmin - 10*xinc,
+                xmaxb = xmax + 10*xinc,
+                yminb = ymin - 10*yinc,
+                ymaxb = ymax + 10*yinc;
+
         try
         {
             std::lock_guard<std::mutex> lock( Mutex() );
             RecomputeIfNeeded();
             QPolygonF* data = new QPolygonF[_resolution*_resolution];
+            ParserMgr& parser_mgr = GetParserMgr(0);
+            const double* const dcurrent = parser_mgr.ConstData(ds::DIFF),
+                    * const vcurrent = parser_mgr.ConstData(ds::VAR);
+            const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
             for (size_t i=0; i<_resolution; ++i)
                 for (size_t j=0; j<_resolution; ++j)
                 {
-                    const int idx = i*_resolution+j;
-                    ParserMgr& parser_mgr = GetParserMgr(idx);
-                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
+//                    const int idx = i*_resolution+j;
+//                    ParserMgr& parser_mgr = GetParserMgr(idx);
                     const double x = i*xinc + xmin,
                                 y = j*yinc + ymin;
+                    for (int k=0; k<num_diffs; ++k)
+                        if (k==xidx)
+                            parser_mgr.SetData(ds::DIFF, k, x);
+                        else if (k==yidx)
+                            parser_mgr.SetData(ds::DIFF, k, y);
+                        else
+                            parser_mgr.SetData(ds::DIFF, k, dcurrent[k]);
+                    for (int k=0; k<num_vars; ++k)
+                        if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(k)) != Input::USER )
+                            parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
+                        //This is for input files and random numbers
 
-                    parser_mgr.SetData(ds::DIFF, xidx, x);
-                    parser_mgr.SetData(ds::DIFF, yidx, y);
+                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
                     QPolygonF& pts = data[i*_resolution+j];
                     pts = QPolygonF(_tailLength+1);
                     pts[0] = QPointF(x, y);
                     for (int k=1; k<=_tailLength; ++k)
                     {
                         parser_mgr.ParserEval(false);
-                        pts[k] = QPointF(diffs[xidx], diffs[yidx]);
+                        const double dx = std::min(xmaxb, std::max(xminb, diffs[xidx])),
+                                dy = std::min(ymaxb, std::max(yminb, diffs[yidx]));
+                        pts[k] = QPointF(dx, dy);
                     }
                 }
 
@@ -93,7 +114,7 @@ void VectorField::ComputeData()
         std::this_thread::sleep_for( std::chrono::milliseconds(RemainingSleepMs()) );
     }
 
-    if (DeleteOnFinish()) emit ReadyToDelete();
+    if (DrawState()==STOPPED && DeleteOnFinish()) emit ReadyToDelete();
 }
 
 void VectorField::Initialize()
@@ -162,8 +183,9 @@ void VectorField::InitParserMgrs()
     ScopeTracker st("VectorField::InitParserMgrs", std::this_thread::get_id());
 #endif
     _resolution = (size_t)Spec_toi("resolution");
-    FreezeNonUser();
-    DrawBase::InitParserMgrs(_resolution*_resolution);
+//    FreezeNonUser();
+    DrawBase::InitParserMgrs(1);
+//    DrawBase::InitParserMgrs(_resolution*_resolution);
 }
 
 void VectorField::ResetPlotItems()

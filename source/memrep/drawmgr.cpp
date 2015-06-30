@@ -21,7 +21,7 @@ void DrawMgr::AddObject(DrawBase* object)
 #endif
     std::lock_guard<std::mutex> lock(_mutex);
     _objects.push_back(object);
-    connect(object, SIGNAL(ReadyToDelete()), this, SLOT(Erase()));
+    connect(object, SIGNAL(ReadyToDelete()), this, SLOT(EraseObject()));
 }
 void DrawMgr::ClearObjects()
 {
@@ -42,7 +42,7 @@ void DrawMgr::MakePlotItems()
     {
         std::lock_guard<std::mutex> lock(_mutex);
         for (auto it : _objects)
-            if (it->DrawState() == DrawBase::DRAWING)
+//            if (it->DrawState() == DrawBase::DRAWING)
                 it->MakePlotItems();
     }
     catch (std::runtime_error& e)
@@ -95,6 +95,7 @@ void DrawMgr::Start()
     try
     {
         std::lock_guard<std::mutex> lock(_mutex);
+        InputMgr::Instance()->ClearInputs();
         for (auto it : _objects)
         {
             it->ClearPlotItems();
@@ -103,7 +104,7 @@ void DrawMgr::Start()
     }
     catch (std::exception& e)
     {
-        _log->AddExcept("DrawMgr::StartThread: " + std::string(e.what()));
+        _log->AddExcept("DrawMgr::Start: " + std::string(e.what()));
         emit Error();
         return;
     }
@@ -144,7 +145,7 @@ void DrawMgr::StopAndRemove(DrawBase::DRAW_TYPE draw_type)
         else
         {
             std::lock_guard<std::mutex> lock(_mutex);
-            std::remove(_objects.begin(), _objects.end(), obj);
+            _objects.erase( std::remove(_objects.begin(), _objects.end(), obj) );
         }
     }
 }
@@ -199,11 +200,12 @@ int DrawMgr::NumDrawObjects() const
     return _objects.size();
 }
 
-void DrawMgr::Erase() //slot
+void DrawMgr::EraseObject() //slot
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    QObject* dobj = sender();
-    _objects.erase( std::find(_objects.begin(), _objects.end(), dobj) );
+    DrawBase* dobj = dynamic_cast<DrawBase*>( sender() );
+//    assert(dobj);  //Don't have any strong safety guarantees so could be a dead object
+    _objects.erase( std::remove(_objects.begin(), _objects.end(), dobj) );
 }
 
 DrawMgr::DrawMgr() : _drawState(DrawBase::STOPPED), _log(Log::Instance())

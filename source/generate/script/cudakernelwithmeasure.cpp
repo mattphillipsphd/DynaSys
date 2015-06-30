@@ -7,7 +7,7 @@ CudaKernelWithMeasure::CudaKernelWithMeasure(const std::string& name, const std:
 {
 }
 
-std::string CudaKernelWithMeasure::ObjFunName() const
+std::string CudaKernelWithMeasure::ObjectiveFunc() const
 {
     std::string obj_fun = ds::StripPath(_objectiveFun);
     const size_t pos = obj_fun.find_last_of('.');
@@ -102,7 +102,7 @@ void CudaKernelWithMeasure::WriteMainEnd(std::ofstream& out)
     out <<
            "    double yhat[MAX_YHAT_LEN];\n"
            "    out_mat[idx] =  MeasureRMSE(target, mipars, mdpars, &mstate, yhat); //RMSE\n"
-           "    Delete" + ObjFunName() + "(&mstate);\n"
+           "    Delete" + ObjectiveFunc() + "(&mstate);\n"
            "}\n";
     out << "//End CudaKernelWithMeasure::WriteMainEnd\n";
 }
@@ -114,7 +114,7 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     out <<
            "    MState mstate;\n"
            "    mstate.idx = idx;\n"
-           "    Init" + ObjFunName() + "(&mstate, mipars, mdpars);\n";
+           "    Init" + ObjectiveFunc() + "(&mstate, mipars, mdpars);\n";
 
     out << "//End CudaKernelWithMeasure::WriteModelLoopBegin\n";
     out << "\n";
@@ -136,7 +136,7 @@ void CudaKernelWithMeasure::WriteSaveBlockEnd(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteSaveBlockEnd\n";
 
-    out << "            " + ObjFunName()
+    out << "            " + ObjectiveFunc()
            + "(i, out, mipars, mdpars, &mstate);\n";
     out << "//End CudaKernelWithMeasure::WriteSaveBlockEnd\n";
 }

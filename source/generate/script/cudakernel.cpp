@@ -78,6 +78,11 @@ std::string CudaKernel::FuncArgs(ds::PMODEL, size_t) const
     return STATE_ARR;
 }
 
+std::string CudaKernel::ObjectiveFunc() const
+{
+    return "";
+}
+
 std::string CudaKernel::Suffix() const
 {
     return "_c";

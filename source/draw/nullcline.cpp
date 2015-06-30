@@ -168,7 +168,7 @@ void Nullcline::MakePlotItems()
     if (_packets.empty()) return;
     while (_packets.size()>1)
     {
-        delete[] _packets.front();
+        delete _packets.front();
         _packets.pop_front();
     }
     Record* record = _packets.front();

@@ -10,7 +10,7 @@ class MEXFileWithMeasure : public MEXFile
 
         MEXFileWithMeasure(const std::string& name, const std::string& obj_fun);
 
-        std::string ObjFunName() const;
+        virtual std::string ObjectiveFunc() const override;
 
     protected:
         virtual void MakeHFile() override;

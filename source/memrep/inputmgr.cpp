@@ -13,7 +13,7 @@ InputMgr::~InputMgr()
     delete _instance;
 }
 
-int InputMgr::AssignInput(double* data, const std::string& type_str)
+int InputMgr::AssignInput(double* listener, const std::string& type_str, int idx)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("InputMgr::AssignInput", std::this_thread::get_id());
@@ -26,13 +26,14 @@ int InputMgr::AssignInput(double* data, const std::string& type_str)
         case Input::GAMMA_RAND:
         case Input::NORM_RAND:
         {
-            input_idx = EmplaceInput(data);
-            _inputs[input_idx].GenerateInput(type);
+            input_idx = EmplaceInput(listener, idx);
+            if (input_idx != -1)
+                _inputs[input_idx].GenerateInput(type);
             break;
         }
         case Input::INPUT_FILE:
         {
-            input_idx = EmplaceInput(data);
+            input_idx = EmplaceInput(listener, idx);
             std::string file_name = type_str;
             file_name.erase(
                 std::remove_if(file_name.begin(), file_name.end(), [&](std::string::value_type c)
@@ -40,8 +41,11 @@ int InputMgr::AssignInput(double* data, const std::string& type_str)
                     return c=='"';
                 }),
                     file_name.end());
-            _inputs[input_idx].LoadInput(file_name);
-            _stepCts[input_idx] = 0;
+            if (input_idx != -1)
+            {
+                _inputs[input_idx].LoadInput(file_name);
+                _stepCts[input_idx] = 0;
+            }
             break;
         }
         case Input::USER:
@@ -58,7 +62,7 @@ void InputMgr::ClearInputs()
 }
 void InputMgr::InputEval()
 {
-    const size_t num_inputs = _inputs.size();
+    const size_t num_inputs = _inputs.size( );
     for (size_t i=0; i<num_inputs; ++i)
     {
         Input& input = _inputs[i];
@@ -77,15 +81,48 @@ void InputMgr::JumpToSample(int n)
         _inputs[i].SeekTo(ct);
     }
 }
-
+void InputMgr::RemoveListener(int idx, double* listener)
+{
+    for (auto& it : _inputs)
+        if (it.Index() == idx)
+            it.RemoveListener(listener);
+}
+Input::TYPE InputMgr::Type(size_t i) const
+{
+    assert(i<_inputs.size());
+    return _inputs.at(i).Type();
+}
+//double* InputMgr::Value(size_t i) const
+//{
+//    assert(i<_inputs.size());
+//    return _inputs.at(i).Value();
+//}
 
 InputMgr::InputMgr() : _modelMgr(ModelMgr::Instance())
 {
 }
 
-int InputMgr::EmplaceInput(double* data)
+int InputMgr::EmplaceInput(double* data, int idx)
 {
-    _inputs.emplace_back(data);
-    _stepCts.push_back(0);
-    return (int)(_inputs.size() - 1);
+#ifdef DEBUG_FUNC
+    ScopeTracker st("InputMgr::EmplaceInput", std::this_thread::get_id());
+#endif
+    auto it = std::find_if(_inputs.begin(), _inputs.end(), [=](const Input& inp)
+    {
+        return inp.Index() == idx;
+    });
+    int out_idx;
+    if (it==_inputs.end())
+    {
+        _inputs.emplace_back( Input(data, idx) );
+        _stepCts.push_back(0);
+        out_idx = (int)(_inputs.size() - 1);
+    }
+    else
+    {
+        (*it).AddListener(data);
+        out_idx = -1;
+    }
+
+    return out_idx;
 }

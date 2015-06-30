@@ -1,5 +1,7 @@
 #include "modelmgr.h"
 
+const std::string ModelMgr::ParVariant::END_NOTES = "###End Notes###";
+
 ModelMgr* ModelMgr::_instance = nullptr;
 
 ModelMgr* ModelMgr::Instance()
@@ -11,6 +13,7 @@ ModelMgr* ModelMgr::Instance()
 ModelMgr::~ModelMgr()
 {
     ClearModels();
+    DeleteParVariants();
     delete _instance;
 }
 
@@ -62,6 +65,33 @@ void ModelMgr::ClearModels()
         delete it;
     _models = MakeModelVec();
 }
+void ModelMgr::ClearParameters(ds::PMODEL mi)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::ClearParameters", std::this_thread::get_id());
+#endif
+    const size_t num_rows = _models.at(mi)->NumPars();
+    _models[mi]->removeRows(0, num_rows, QModelIndex());
+}
+
+void ModelMgr::DeleteParVariant(size_t idx)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::DeleteParVariant", std::this_thread::get_id());
+#endif
+    assert(idx<_parVariants.size());
+    delete _parVariants[idx];
+    _parVariants.erase(_parVariants.begin() + idx);
+}
+void ModelMgr::InsertParVariant(size_t idx, ParVariant* pv)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::InsertParVariant", std::this_thread::get_id());
+#endif
+    assert(idx<=_parVariants.size());
+    auto it = _parVariants.begin() + idx;
+    _parVariants.insert(it, pv);
+}
 
 void ModelMgr::SetCondValue(size_t row, const VecStr& results)
 {
@@ -98,6 +128,24 @@ void ModelMgr::SetNotes(const std::string& text)
     notes->SetText(text);
     SetNotes(notes);
 }
+void ModelMgr::SetParVariants(const std::vector<ParVariant*>& par_variants)
+{
+    DeleteParVariants();
+    _parVariants = par_variants;
+}
+void ModelMgr::SetPVPar(size_t index, size_t pidx, const std::string& val)
+{
+    _parVariants[index]->pars[pidx].second = val;
+}
+void ModelMgr::SetPVInputFile(size_t index, size_t pidx, const std::string& input_file)
+{
+    _parVariants[index]->input_files[pidx].second = input_file;
+}
+void ModelMgr::SetPVNotes(size_t index, const std::string& notes)
+{
+    _parVariants[index]->notes = notes;
+}
+
 void ModelMgr::SetRange(ds::PMODEL mi, size_t idx, double min, double max)
 {
     SetMinimum(mi, idx, min);
@@ -116,7 +164,6 @@ void ModelMgr::SetView(QAbstractItemView* view, ds::PMODEL mi)
 {
     view->setModel(_models[mi]);
 }
-
 
 bool ModelMgr::AreModelsInitialized() const
 {
@@ -170,6 +217,11 @@ ConditionModel* ModelMgr::CondModel()
 const ConditionModel* ModelMgr::CondModel() const
 {
     return static_cast<ConditionModel*>(_models.at(ds::COND));
+}
+void ModelMgr::DeleteParVariants()
+{
+    for (auto it : _parVariants)
+        delete it;
 }
 std::vector<ParamModelBase*> ModelMgr::MakeModelVec() const
 {

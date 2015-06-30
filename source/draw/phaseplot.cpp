@@ -67,8 +67,8 @@ void PhasePlot::ComputeData()
     ParserMgr& parser_mgr = GetParserMgr(0);
     const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
             num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    const double* diffs = parser_mgr.ConstData(ds::DIFF),
-            * vars = parser_mgr.ConstData(ds::VAR);
+    const double* const diffs = parser_mgr.ConstData(ds::DIFF),
+            * const vars = parser_mgr.ConstData(ds::VAR);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
 
@@ -213,6 +213,7 @@ void PhasePlot::Initialize()
         _curve = new QwtPlotCurve();
         _curve->setPen( Qt::black, 1 );
         _curve->setRenderHint( QwtPlotItem::RenderAntialiased, true );
+        _curve->setZ(0.25);
         AddPlotItem(_curve);
     }
 
@@ -246,7 +247,7 @@ void PhasePlot::MakePlotItems()
 
         //Delete used packets
     Packet* packet = _packets.front();
-    while (packet->read_flag & Packet::TP_READ && packet->read_flag & Packet::PP_READ)
+    while ((packet->read_flag & Packet::TP_READ) && (packet->read_flag & Packet::PP_READ))
     {
         _packets.pop_front();
         if (_packets.empty()) break;

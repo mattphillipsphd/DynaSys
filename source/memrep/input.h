@@ -35,17 +35,20 @@ class Input
                                 NORM_RAND_STR,
                                 UNI_RAND_STR;
 
-        Input(double* const value);
+        explicit Input(double* value, int idx);
         Input(const Input& other);
         ~Input();
 
+        void AddListener(double* listener);
         void GenerateInput(TYPE type);
         void LoadInput(const std::string& file_name);
         void NextInput(int n = 1);
         double NextInputHalf() const;
+        void RemoveListener(double* listener);
         double SeeNextInput() const;
         void SeekTo(int ct);
 
+        int Index() const { return _index; }
         int SamplesPerUnitTime() const { return _samplesPerUnitTime; }
         TYPE Type() const { return _type; }
 
@@ -61,13 +64,15 @@ class Input
         void LoadBinInput(const std::string& file_name);
         void LoadTextInput(const std::string& file_name);
         void ResetInput();
+        void UpdateListeners();
 
         size_t _ct;
+        const int _index;
         double* _input;
         Log* const _log;
         int _samplesPerUnitTime;
         TYPE _type;
-        double* const _value;
+        std::vector<double*> _listeners;
 };
 
 #endif // INPUT_H

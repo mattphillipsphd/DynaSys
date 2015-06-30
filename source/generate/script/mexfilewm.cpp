@@ -7,7 +7,7 @@ MEXFileWithMeasure::MEXFileWithMeasure(const std::string& name, const std::strin
 {
 }
 
-std::string MEXFileWithMeasure::ObjFunName() const
+std::string MEXFileWithMeasure::ObjectiveFunc() const
 {
     std::string obj_fun = ds::StripPath(_objectiveFun);
     const size_t pos = obj_fun.find_last_of('.');
@@ -140,7 +140,7 @@ void MEXFileWithMeasure::WriteMainEnd(std::ofstream& out)
     out << "//Begin MEXFileWithMeasure::WriteMainEnd\n";
     out <<
            "    *rmse =  MeasureRMSE(target, ipars, dpars, &mstate, yhat); //RMSE\n"
-           "    Delete" + ObjFunName() + "(&mstate);\n"
+           "    Delete" + ObjectiveFunc() + "(&mstate);\n"
            "}\n";
     out << "//End MEXFileWithMeasure::WriteMainEnd\n";
 }
@@ -152,7 +152,7 @@ void MEXFileWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     out <<
            "    MState mstate;\n"
            "    mstate.idx = -1;\n"
-           "    Init" + ObjFunName() + "(&mstate, ipars, dpars);\n";
+           "    Init" + ObjectiveFunc() + "(&mstate, ipars, dpars);\n";
 
     out << "//End MEXFileWithMeasure::WriteModelLoopBegin\n";
     out << "\n";
@@ -181,7 +181,7 @@ void MEXFileWithMeasure::WriteSaveBlockEnd(std::ofstream& out)
 {
     out << "//Begin MEXFileWithMeasure::WriteSaveBlockEnd\n";
 
-    out << "            " + ObjFunName()
+    out << "            " + ObjectiveFunc()
            + "(i, out, ipars, dpars, &mstate);\n";
     out << "//End MEXFileWithMeasure::WriteSaveBlockEnd\n";
 }

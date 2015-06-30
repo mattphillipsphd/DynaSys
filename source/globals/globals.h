@@ -1,21 +1,44 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <algorithm>
+#include <assert.h>
+#include <atomic>
 #include <cctype>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <exception>
+#include <iostream>
 #include <map>
+#include <memory>
+#include <random>
 #include <string>
 #include <thread>
+#include <tuple>
+#include <unordered_set>
 #include <vector>
 
 #include <QColor>
+#include <QDateTime>
+#include <QDebug>
+#include <QFileDialog>
+#include <QFile>
+#include <QIcon>
+#include <QInputDialog>
 #include <QList>
+#include <QMainWindow>
+#include <QMessageBox>
 #include <QStringList>
+#include <QStringListModel>
+#include <QTimer>
 
 #ifdef QT_DEBUG
 #define DEBUG_FUNC
 #endif
 
+typedef std::pair<std::string, std::string> PairStr;
+typedef std::map<std::string, std::string> MapStr;
 typedef std::vector<std::string> VecStr;
 namespace ds
 {
@@ -43,11 +66,38 @@ namespace ds
         DIFF,
         INIT,
         COND,
+        NC,
+        JAC,
         NUM_MODELS //Nice trick from SO
     };
 
+    enum EQ_CAT
+    {
+        UNKNOWN = -1,
+        STABLE_NODE,
+        STABLE_FOCUS,
+        SADDLE,
+        UNSTABLE_NODE,
+        UNSTABLE_FOCUS
+    };
+    struct Equilibrium
+    {
+        Equilibrium(double x, double y, EQ_CAT ec = UNKNOWN)
+            : x(x), y(y), eq_cat(ec)
+        {}
+        Equilibrium() : eq_cat(UNKNOWN)
+        {}
+        Equilibrium(const Equilibrium& other) : x(other.x), y(other.y), eq_cat(other.eq_cat)
+        {}
+        double x, y;
+        EQ_CAT eq_cat;
+    };
+    std::string EqCatStr(EQ_CAT eq_cat);
+
     extern int thread_ct;
     extern std::map<std::thread::id, QColor> thread_map;
+
+    extern const std::string UNC_INFIX;
 
     void AddThread(std::thread::id tid);
 

@@ -18,6 +18,7 @@
 #include "../globals/log.h"
 #include "../globals/scopetracker.h"
 #include "../gui/dsplot.h"
+#include "../memrep/inputmgr.h"
 #include "../memrep/modelmgr.h"
 #include "../memrep/parsermgr.h"
 
@@ -34,9 +35,10 @@ class DrawBase : public QObject
     public:
         enum DRAW_TYPE
         {
-            NULL_CLINE,
+            NULLCLINE,
             SINGLE,
             TIME_PLOT,
+            USER_NULLCLINE,
             VARIABLE_VIEW,
             VECTOR_FIELD
         };
@@ -142,6 +144,7 @@ class DrawBase : public QObject
         void Flag3();
         void Flag_i(int);
         void Flag_d(double);
+        void Flag_pv(void*);
         void ReadyToDelete();
 
     protected slots:
@@ -159,6 +162,7 @@ class DrawBase : public QObject
         void InitParserMgrs(size_t num);
         std::mutex& Mutex() { return _mutex; }
         void RecomputeIfNeeded();
+        void RemovePlotItem(const QwtPlotItem* item);
         void ReservePlotItems(size_t num);
 
         void SetData(void* data);
@@ -173,12 +177,14 @@ class DrawBase : public QObject
         QwtPlotItem* PlotItem(size_t i) { return _plotItems[i]; }
         int RemainingSleepMs() const;
 
+        InputMgr* const _inputMgr;
         Log* const _log;
         ModelMgr* const _modelMgr;
 
     private:
         void DetachItems();
         void ResetIterCt() { _iterCt = 0; }
+        void SendError() const;
         void SetIterMax(long long int iter_max) { _iterMax = iter_max; }
 
         void* _data;

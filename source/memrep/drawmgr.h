@@ -44,7 +44,7 @@ class DrawMgr : public QObject
         void Error();
 
     private slots:
-        void Erase();
+        void EraseObject();
 
     private:
         DrawMgr();
@@ -60,7 +60,7 @@ class DrawMgr : public QObject
 
         static DrawMgr* _instance;
         
-        volatile DrawBase::DRAW_STATE _drawState;
+        volatile DrawBase::DRAW_STATE _drawState, _priorRestState;
         Log* const _log;
         mutable std::mutex _mutex;
         std::vector<DrawBase*> _objects;        

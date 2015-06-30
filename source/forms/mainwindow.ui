@@ -119,6 +119,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="lblEqCat">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer_4">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -619,6 +626,8 @@
     <addaction name="actionEvent_Viewer"/>
     <addaction name="actionParameters"/>
     <addaction name="actionNotes"/>
+    <addaction name="actionSet_Nullclines"/>
+    <addaction name="actionSet_Jacobian"/>
     <addaction name="actionSet_Init_to_Current"/>
     <addaction name="actionSet_Input_Home_Dir"/>
    </widget>
@@ -635,7 +644,14 @@
     <addaction name="actionCUDA_kernel_with_measure"/>
     <addaction name="actionAll_MEX_and_CUDA"/>
    </widget>
+   <widget class="QMenu" name="menuParameters">
+    <property name="title">
+     <string>Parameters</string>
+    </property>
+    <addaction name="actionSelect_Parameters"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuParameters"/>
    <addaction name="menuRun"/>
    <addaction name="menuEdit"/>
    <addaction name="menuHelp"/>
@@ -756,7 +772,7 @@
   </action>
   <action name="actionSet_Input_Home_Dir">
    <property name="text">
-    <string>Set Default Input Dir.</string>
+    <string>Set $HOME</string>
    </property>
   </action>
   <action name="actionCUDA_kernel_with_measure">
@@ -777,6 +793,21 @@
   <action name="actionEvent_Viewer">
    <property name="text">
     <string>Event Viewer</string>
+   </property>
+  </action>
+  <action name="actionSet_Nullclines">
+   <property name="text">
+    <string>Nullclines</string>
+   </property>
+  </action>
+  <action name="actionSet_Jacobian">
+   <property name="text">
+    <string>Jacobian</string>
+   </property>
+  </action>
+  <action name="actionSelect_Parameters">
+   <property name="text">
+    <string>Select</string>
    </property>
   </action>
  </widget>
