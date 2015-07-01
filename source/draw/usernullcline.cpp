@@ -15,6 +15,7 @@ UserNullcline::~UserNullcline()
 #ifdef DEBUG_FUNC
     ScopeTracker st("UserNullcline::~UserNullcline", std::this_thread::get_id());
 #endif
+    for (auto it : _packets) delete it;
 }
 
 void UserNullcline::ClearEquilibria()

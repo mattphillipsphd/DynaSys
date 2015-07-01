@@ -14,6 +14,7 @@ VectorField::~VectorField()
     ScopeTracker st("VectorField::~VectorField", std::this_thread::get_id());
 #endif
     if (Data()) delete[] static_cast<QPolygonF*>( Data() );
+    for (auto it : _packets) delete[] it;
 }
 
 void VectorField::ComputeData()

@@ -15,6 +15,7 @@ PhasePlot::~PhasePlot()
 #endif
     auto data = static_cast< std::tuple<std::deque<double>,DataVec,DataVec>* >( Data() );
     if (data) delete data;
+    for (auto it : _packets) delete it;
 }
 
 /*void* PhasePlot::DataCopy() const

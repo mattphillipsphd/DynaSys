@@ -145,6 +145,7 @@ void DrawMgr::StopAndRemove(DrawBase::DRAW_TYPE draw_type)
         else
         {
             std::lock_guard<std::mutex> lock(_mutex);
+            delete obj;
             _objects.erase( std::remove(_objects.begin(), _objects.end(), obj) );
         }
     }

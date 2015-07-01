@@ -10,6 +10,7 @@ class TimePlot : public DrawBase
 
     public:
         TimePlot(DSPlot* plot);
+        virtual ~TimePlot() override;
 
         virtual void SetNonConstOpaqueSpec(const std::string &key, void *value) override;
 

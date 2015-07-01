@@ -7,6 +7,11 @@ TimePlot::TimePlot(DSPlot* plot) : DrawBase(plot), _lastPt(0)
 #endif
 }
 
+TimePlot::~TimePlot()
+{
+    for (auto it : _packets) delete it;
+}
+
 void TimePlot::SetNonConstOpaqueSpec(const std::string &key, void *value)
 {
     if (key=="dv_data")
