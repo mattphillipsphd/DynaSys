@@ -45,6 +45,7 @@ class NumericModelBase : public ParamModelBase
 
         double Maximum(size_t idx) const;
         double Minimum(size_t idx) const;
+        virtual std::string ParamString(size_t i) const override;
         virtual std::string String() const override;
 
         virtual int columnCount(const QModelIndex &parent) const override;

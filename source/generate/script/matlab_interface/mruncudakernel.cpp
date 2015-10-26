@@ -130,6 +130,7 @@ void MRunCudaKernel::WriteCuCall(std::ofstream& out) const
            "    input_data(:,i) = fis(i).Data;\n"
            "    sput(i) = fis(i).Sput;\n"
            "end\n"
+           "%keyboard;\n"
            "data = gather( feval(k, ...\n"
            "    input_data, input_len, sput, ...\n"
            "    input_mat, num_inputs, num_tests, out_mat) );\n"

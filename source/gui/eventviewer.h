@@ -76,10 +76,12 @@ class EventViewer : public QWidget
         void ResetData();
 
         int _binWidth, _ct;
+        double _cv2;
         QwtPlotCurve* _sdfCurve;
         const std::vector<QColor> _colors;
         double _currentTime, _startTime;
         int _eventCounts[MAX_BINS];
+        std::vector<int> _evTimes;
         QTimer _evTimer, _updateTimer;
         std::mutex _mutex;
         int _numRows, _rowLength;

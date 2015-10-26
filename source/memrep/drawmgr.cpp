@@ -42,8 +42,7 @@ void DrawMgr::MakePlotItems()
     {
         std::lock_guard<std::mutex> lock(_mutex);
         for (auto it : _objects)
-//            if (it->DrawState() == DrawBase::DRAWING)
-                it->MakePlotItems();
+            it->MakePlotItems();
     }
     catch (std::runtime_error& e)
     {

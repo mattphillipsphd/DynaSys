@@ -7,7 +7,7 @@ const int EventViewer::MAX_BINS;
 
 EventViewer::EventViewer(QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::EventViewer), _ct(0), _colors(ds::TraceColors())
+    ui(new Ui::EventViewer), _ct(0), _cv2(-1.0), _colors(ds::TraceColors())
 {
     ui->setupUi(this);
 
@@ -87,6 +87,7 @@ void EventViewer::Event(int ev_time) //slot
     ScopeTracker st("EventViewer::Event", std::this_thread::get_id());
 #endif
     ++_ct;
+    _evTimes.push_back(ev_time);
 
     ++_eventCounts[ ev_time % _rowLength ];
     _numRows = (ev_time - _startTime) / _rowLength + 1;
@@ -166,16 +167,38 @@ void EventViewer::UpdateCount() //slot
     ui->qwtEventRate->replot();
 
     ui->lblNumRows->setText( ("# rows: " + std::to_string(_numRows)).c_str() );
+
+    //Update CV2, definition taken from Luthman et al. 2011
+    const int new_events = _evTimes.size(),
+            prevN = _ct - new_events;
+    if (new_events<3) return;
+    std::vector<double> ISIs, cvs;
+    for (int i=1; i<new_events; ++i)
+        ISIs.push_back( (double)(_evTimes.at(i) - _evTimes.at(i-1)) );
+    for (int i=1; i<ISIs.size(); ++i)
+    {
+        const double cv2_i = 2 * fabs(ISIs.at(i)-ISIs.at(i-1)) / (ISIs.at(i)+ISIs.at(i-1));
+        cvs.push_back(cv2_i);
+    }
+    const double cvs_size = cvs.size();
+    const double new_mean = std::accumulate(cvs.cbegin(), cvs.cend(), 0.0) / cvs_size;
+    _cv2 = (prevN*_cv2 + cvs_size*new_mean) / (_ct-2);
+    _evTimes.erase(_evTimes.begin(), _evTimes.begin()+cvs_size);
+
+    ui->lblCV2->setText( std::to_string(_cv2).c_str() );
 }
 
 void EventViewer::ResetAll()
 {
     ui->lblEventsPerSec->clear();
+    ui->lblCV2->clear();
     ResetData();
 }
 void EventViewer::ResetData()
 {
     _ct = 0;
+    _cv2 = -1.0;
+    _evTimes.clear();
     _startTime = _currentTime;
     memset(_eventCounts, 0, MAX_BINS);
     _numRows = 1;

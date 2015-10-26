@@ -41,10 +41,12 @@ class ModelMgr
         void AddCondResult(int row, const std::string& result);
         void AddParameter(ds::PMODEL mi, const std::string& key, const std::string& value = "");
         void CreateModels();
+        void ClearModel(ds::PMODEL mi);
         void ClearModels();
         void ClearParameters(ds::PMODEL mi);
         void DeleteParVariant(size_t idx);
         void InsertParVariant(size_t idx, ParVariant* pv);
+        void RemoveParameter(ds::PMODEL mi, const std::string& key);
 
         void SetCondValue(size_t row, const VecStr& results);
         void SetDiffMethod(DIFF_METHOD diff_method) { _diffMethod = diff_method; }
@@ -79,7 +81,7 @@ class ModelMgr
         double Minimum(ds::PMODEL mi, size_t idx) const;
         inline const ParamModelBase* Model(ds::PMODEL mi) const { return _models.at(mi); }
         inline double ModelStep() const { return _modelStep; }
-        int NumParVariants() const { return _parVariants.size(); }
+        int NumParVariants() const { return (int)_parVariants.size(); }
         double Range(ds::PMODEL mi, size_t idx) const;
         TPVTableModel* TPVModel() { return _tpvModel; }
         std::string Value(ds::PMODEL mi, size_t idx) const;

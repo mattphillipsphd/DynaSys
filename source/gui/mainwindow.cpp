@@ -358,7 +358,7 @@ void MainWindow::UpdateMousePos(QPointF pos) //slot
     ui->lblEqCat->clear();
     std::string eq_str("");
     for (const auto& it : _equilibria)
-        if (abs(pos.x() - it->x)<xwin && abs(pos.y() - it->y)<ywin)
+        if (fabs(pos.x() - it->x)<xwin && fabs(pos.y() - it->y)<ywin)
         {
             eq_str = ds::EqCatStr(it->eq_cat);
             break;
@@ -927,9 +927,36 @@ void MainWindow::on_btnRemoveDiff_clicked()
 #endif
     QModelIndexList rows = ui->tblDifferentials->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
+
+    for (int i=0; i<rows.size(); ++i)
+    {
+        int row = rows.at(i).row();
+        const std::string key = _modelMgr->Model(ds::DIFF)->ShortKey(row);
+        const std::string& ncbeg = key + "_for_",
+                        & nctail = "_for_d" + key,
+                        & jac_infix = "_" + key + "_";
+        if (_modelMgr->Model(ds::DIFF)->NumPars()==2)
+            _modelMgr->ClearModel(ds::NC);
+        else
+            for (int j=_modelMgr->Model(ds::NC)->NumPars()-1; j>=0; --j)
+            {
+                const std::string nckey = _modelMgr->Model(ds::NC)->Key(j);
+                if (nckey.find(ncbeg)==0 || nckey.find(nctail)!=std::string::npos)
+                    _modelMgr->RemoveParameter(ds::NC, nckey);
+            }
+
+        for (int j=_modelMgr->Model(ds::JAC)->NumPars()-1; j>=0; --j)
+        {
+            const std::string jackey = _modelMgr->Model(ds::JAC)->Key(j);
+            if (jackey.find(jac_infix)!=std::string::npos)
+                _modelMgr->RemoveParameter(ds::JAC, jackey);
+        }
+    }
+
     ui->tblDifferentials->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     ui->tblInitConds->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
+    ResetPhasePlotAxes();
 }
 void MainWindow::on_btnRemoveExpression_clicked()
 {
@@ -1619,8 +1646,8 @@ void MainWindow::Replot() //slot
                 DrawBase* tp = _drawMgr->GetObject(DrawBase::TIME_PLOT);
                 const int dv_start = tp->Spec_toi("dv_start"),
                         dv_end = tp->Spec_toi("dv_end"),
-                        y_tp_min = tp->Spec_toi("y_tp_min"),
-                        y_tp_max = tp->Spec_toi("y_tp_max"),
+                        y_tp_min = tp->Spec_tod("y_tp_min"),
+                        y_tp_max = tp->Spec_tod("y_tp_max"),
                         past_samps_ct = tp->Spec_toi("past_samps_ct"),
                         time_offset = tp->Spec_toi("time_offset");
                 ViewRect tp_lims( (past_samps_ct+dv_start)*_modelMgr->ModelStep()+time_offset,
@@ -1677,6 +1704,8 @@ void MainWindow::LoadModel(const std::string& file_name)
         ui->cboxVectorField->setChecked(false);
 
         _drawMgr->ClearObjects();
+        _modelMgr->ClearModel(ds::NC);
+        _modelMgr->ClearModel(ds::JAC);
 
         SysFileIn in(file_name);
         in.Load();
@@ -1746,10 +1775,6 @@ void MainWindow::ResetPhasePlotAxes()
     ScopeTracker st("MainWindow::ResetPhasePlotAxes", _tid);
 #endif
     QStringList xlist, ylist, zlist;
-
-    ui->cmbPlotX->clear();
-    ui->cmbPlotX->insertItems(0, xlist);
-    ui->cmbPlotX->setCurrentIndex(0);
 
     int yidx(0), zidx(0);
     switch (_plotMode)

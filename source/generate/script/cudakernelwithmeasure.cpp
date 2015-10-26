@@ -114,7 +114,7 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     out <<
            "    MState mstate;\n"
            "    mstate.idx = idx;\n"
-           "    Init" + ObjectiveFunc() + "(&mstate, mipars, mdpars);\n";
+           "    Init" + ObjectiveFunc() + "(&mstate, mipars, mdpars, target);\n";
 
     out << "//End CudaKernelWithMeasure::WriteModelLoopBegin\n";
     out << "\n";

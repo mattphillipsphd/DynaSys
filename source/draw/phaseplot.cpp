@@ -174,7 +174,7 @@ void PhasePlot::ComputeData()
         //A blowup will crash QwtPlot
         const double DMAX = std::numeric_limits<double>::max()/1e100;
         for (int i=0; i<num_diffs; ++i)
-            if (abs(diffs[i])>DMAX)
+            if (fabs(diffs[i])>DMAX)
                 throw std::runtime_error("PhasePlot::ComputeData: model exploded");
 
         if (_makePlots)
@@ -267,9 +267,10 @@ void PhasePlot::MakePlotItems()
     //Plot the current state vector
     const int xidx = Spec_toi("xidx"),
             yidx = Spec_toi("yidx");
-    const std::deque<double> diff_x = _diffPts.at(xidx),
-            diff_y = _diffPts.at(yidx);
-    _marker->setValue(diff_x.back(), _diffPts.at(yidx).back());
+    const std::deque<double>& diff_x = _diffPts.at(xidx),
+            & diff_y = _diffPts.at(yidx);
+    if (diff_x.empty()) return;
+    _marker->setValue(diff_x.back(), diff_y.back());
 
     //Plot the history (the curve)
     const int num_saved_pts = (int)diff_x.size();

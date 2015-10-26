@@ -79,7 +79,15 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
 
     ds::RemoveWhitespace(temp);
 
-    const std::string OPS = "<>?:!%&|~=+-*/";
+    size_t pos = temp.find("abs");
+    while (pos != std::string::npos)
+    {
+        if (pos==0 || !std::isalnum(pos-1))
+            temp.insert(pos, "f");
+        pos = temp.find("abs", pos+4);
+    }
+
+    const std::string OPS = "<>?:!%&|~=+-*/^";
     size_t posc = temp.find_first_of('^');
     while (posc != std::string::npos)
     {
@@ -89,7 +97,7 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
         int paren = 0;
         for (int i=(int)posc-1; i!=-1; --i)
         {
-            char c = temp.at(i);
+            const char c = temp.at(i);
             if (paren==0
                     && (OPS.find_first_of(c)!=std::string::npos || c=='('))
             {
@@ -104,6 +112,30 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
                 --paren;
                 if (paren==0)
                 {
+                    //Now have to look for the true beginning of term, if we have
+                    //e.g. abs(x-y)^2
+                    if (i>0)
+                    {
+                        int j=i-1;
+                        char c_j = temp.at(j);
+                        while (std::isspace(c_j))
+                        {
+                            --j;
+                            if (j<0) break;
+                            c_j = temp.at(j);
+                        }
+                        if (j>=0 && std::isalpha(c_j))
+                        {
+                            while (std::isalpha(c_j))
+                            {
+                                --j;
+                                if (j<0) break;
+                                c_j = temp.at(j);
+                            }
+                            i = j+1;
+                        }
+                    }
+
                     base = temp.substr(i,posc-i);
                     base_begin = i;
                     break;
@@ -116,7 +148,7 @@ std::string CFileBase::PreprocessExprn(const std::string& exprn) const
         paren = 0;
         for (size_t i=posc+1; i<len; ++i)
         {
-            char c = temp.at(i);
+            const char c = temp.at(i);
             if (paren==0
                     && (OPS.find_first_of(c)!=std::string::npos || c==')'))
             {

@@ -56,6 +56,14 @@ void ModelMgr::CreateModels()
     for (int i=0; i<ds::NUM_MODELS; ++i)
         _models[i] = ParamModelBase::Create((ds::PMODEL)i);
 }
+void ModelMgr::ClearModel(ds::PMODEL mi)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::ClearModel", std::this_thread::get_id());
+#endif
+    ParamModelBase* model = _models[mi];
+    while (model->rowCount()>0) model->removeRow(0);
+}
 void ModelMgr::ClearModels()
 {
 #ifdef DEBUG_FUNC
@@ -91,6 +99,15 @@ void ModelMgr::InsertParVariant(size_t idx, ParVariant* pv)
     assert(idx<=_parVariants.size());
     auto it = _parVariants.begin() + idx;
     _parVariants.insert(it, pv);
+}
+void ModelMgr::RemoveParameter(ds::PMODEL mi, const std::string& key)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::RemoveParameter", std::this_thread::get_id());
+#endif
+    ParamModelBase* model = _models[mi];
+    int row = model->KeyIndex(key);
+    model->removeRow(row);
 }
 
 void ModelMgr::SetCondValue(size_t row, const VecStr& results)

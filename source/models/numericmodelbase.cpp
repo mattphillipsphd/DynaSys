@@ -62,6 +62,12 @@ double NumericModelBase::Minimum(size_t idx) const
 {
     return data(createIndex((int)idx,MIN),Qt::DisplayRole).toDouble();
 }
+std::string NumericModelBase::ParamString(size_t i) const
+{
+    return Key(i) + "\t" + Value(i) + "\t"
+            + std::to_string( Minimum(i) ) + "\t"
+            + std::to_string( Maximum(i) ) + "\n";
+}
 std::string NumericModelBase::String() const
 {
     std::string str;

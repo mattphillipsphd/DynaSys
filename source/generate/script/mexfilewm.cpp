@@ -152,7 +152,7 @@ void MEXFileWithMeasure::WriteModelLoopBegin(std::ofstream& out)
     out <<
            "    MState mstate;\n"
            "    mstate.idx = -1;\n"
-           "    Init" + ObjectiveFunc() + "(&mstate, ipars, dpars);\n";
+           "    Init" + ObjectiveFunc() + "(&mstate, ipars, dpars, target);\n";
 
     out << "//End MEXFileWithMeasure::WriteModelLoopBegin\n";
     out << "\n";
