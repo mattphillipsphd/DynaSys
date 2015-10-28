@@ -7,6 +7,25 @@ CFileBase::CFileBase(const std::string& name, const std::string& ext)
 #ifdef DEBUG_FUNC
     ScopeTracker st("CFileBase::CFileBase", std::this_thread::get_id());
 #endif
+    std::string model_text;
+    const ParamModelBase* funcs = _modelMgr->Model(ds::FUNC);
+    const size_t num_funcs = funcs->NumPars();
+    for (size_t i=0; i<num_funcs; ++i)
+        model_text += funcs->Value(i) + "\n";
+    const ParamModelBase* state_vars = _modelMgr->Model(ds::STATE);
+    const size_t num_state_vars = state_vars->NumPars();
+    for (size_t i=0; i<num_state_vars; ++i)
+        model_text += state_vars->Value(i) + "\n";
+
+    const ParamModelBase* diffs = _modelMgr->Model(ds::DIFF);
+    const size_t num_diffs = diffs->NumPars();
+    _usesDiff = std::vector<bool>(num_diffs, false);
+    for (size_t i=0; i<num_diffs; ++i)
+    {
+        const std::string key = diffs->Key(i);
+        if (model_text.find(key) != std::string::npos)
+            _usesDiff[i] = true;
+    }
 }
 
 void CFileBase::Make()
@@ -20,31 +39,31 @@ void CFileBase::Make()
     WriteIncludes(out);
     WriteGlobalConst(out);
     WriteVarDecls(out);
-    WriteFuncs(out, ds::VAR);
-    WriteFuncs(out, ds::DIFF);
+    WriteFuncs(out, ds::FUNC);
+    WriteFuncs(out, ds::STATE);
 
     WriteExtraFuncs(out);
 
     //******************Write entry to main function******************
     WriteMainBegin(out);
 
-    //Initialize variables from arguments, e.g. from argv
+    //Initialize functions from arguments, e.g. from argv
     WriteInitArgs(out);
 
     //Load all input files
-    if (static_cast<const VariableModel*>(_modelMgr->Model(ds::VAR))->TypeCount(Input::INPUT_FILE)>0)
+    if (static_cast<const VariableModel*>(_modelMgr->Model(ds::FUNC))->TypeCount(Input::INPUT_FILE)>0)
         WriteLoadInput(out);
 
     //Write header information to output destination
     WriteOutputHeader(out);
 
-    //Initialize variables and differentials
+    //Initialize functions and state variables
     WriteInitVarsDiffs(out);
 
     //***********Begin main model loop
     WriteModelLoopBegin(out);
 
-        //  Execute variable and differential functions
+        //  Execute variable and state variable functions
         WriteExecVarsDiffs(out);
 
     //  *****Save data if we're at the right point
@@ -201,19 +220,21 @@ void CFileBase::WriteConditions(std::ofstream& out)
 void CFileBase::WriteExecVarsDiffs(std::ofstream& out)
 {
     out << "//Begin CFileBase::WriteExecVarsDiffs\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR),
+    const ParamModelBase* funcs = _modelMgr->Model(ds::FUNC),
+            * state_vars = _modelMgr->Model(ds::STATE),
             * diffs = _modelMgr->Model(ds::DIFF);
-    const size_t num_vars = variables->NumPars(),
+    const size_t num_vars = funcs->NumPars(),
+            num_statevars = state_vars->NumPars(),
             num_diffs = diffs->NumPars();
     for (size_t i=0; i<num_vars; ++i)
     {
-        if (variables->IsFreeze(i)) continue;
-        std::string value = variables->Value(i);
+        if (funcs->IsFreeze(i)) continue;
+        std::string value = funcs->Value(i);
         if (Input::Type(value)==Input::USER)
-            out << "        " + variables->ShortKey(i) + "_func(" + FuncArgs(ds::VAR, i) + ");\n";
+            out << "        " + funcs->ShortKey(i) + "_func(" + FuncArgs(ds::FUNC, i) + ");\n";
         else
         {
-            std::string var = variables->ShortKey(i),
+            std::string var = funcs->ShortKey(i),
                     inputv = "input_" + var,
                     sputv = "sput_" + var, //samples per unit time
                     samps_ct = "ct_" + var;
@@ -224,15 +245,31 @@ void CFileBase::WriteExecVarsDiffs(std::ofstream& out)
         }
     }
     for (size_t i=0; i<num_vars; ++i)
-        if (Input::Type(variables->Value(i))==Input::USER && !variables->IsFreeze(i))
-            out << "        " + variables->ShortKey(i) + " = " + variables->TempKey(i) + ";\n";
+        if (Input::Type(funcs->Value(i))==Input::USER && !funcs->IsFreeze(i))
+            out << "        " + funcs->ShortKey(i) + " = " + funcs->TempKey(i) + ";\n";
     out << "\n";
+
+    for (size_t i=0; i<num_statevars; ++i)
+        if (!state_vars->IsFreeze(i))
+            out << "        " + state_vars->ShortKey(i) + "_func(" + FuncArgs(ds::FUNC, i) + ");\n";
+    for (size_t i=0; i<num_statevars; ++i)
+        if (!state_vars->IsFreeze(i))
+            out << "        " + state_vars->ShortKey(i) + " = " + state_vars->TempKey(i) + ";\n";
+    out << "\n";
+
     for (size_t i=0; i<num_diffs; ++i)
-        if (!diffs->IsFreeze(i))
-            out << "        " + diffs->ShortKey(i) + "_func(" + FuncArgs(ds::VAR, i) + ");\n";
-    for (size_t i=0; i<num_diffs; ++i)
-        if (!diffs->IsFreeze(i))
-            out << "        " + diffs->ShortKey(i) + " = " + diffs->TempKey(i) + ";\n";
+        if (_usesDiff.at(i))
+        {
+            const std::string key = diffs->ShortKey(i),
+                    kidx = key + "_idx",
+                    karray = key + "_array",
+                    sv = key.substr(2);
+            out << "        " + karray + "[" + kidx + "] = " + sv + ";\n";
+            out << "        " + kidx + " = ++" + kidx + " % SPUT;\n";
+            out << "        " + key + " = " + sv + " - " + karray + "["
+                                + kidx + "];\n";
+        }
+
     out << "//End CFileBase::WriteExecVarsDiffs\n";
     out << "\n";
 }
@@ -260,31 +297,53 @@ void CFileBase::WriteGlobalConst(std::ofstream& out)
 {
     out << "//Begin CFileBase::WriteGlobalConst\n";
     out << "const int INPUT_SIZE = " << Input::INPUT_SIZE << ";\n";
+    out << "const int SPUT = " << (int)(1.0 / _modelMgr->ModelStep() + 0.5) << ";\n";
     out << "const double tau = " << _modelMgr->ModelStep() << ";\n";
     out << "//End CFileBase::WriteGlobalConst\n";
+    out << "\n";
+}
+
+void CFileBase::WriteIncludes(std::ofstream& out)
+{
+    out << "//Begin CFileBase::WriteIncludes";
+    out << "#include \"stdio.h\"" << ";\n";
+    out << "#include \"string.h\"" << ";\n";
+    out << "//End CFileBase::WriteIncludes";
     out << "\n";
 }
 
 void CFileBase::WriteInitVarsDiffs(std::ofstream& out)
 {
     out << "//Begin CFileBase::WriteInitVarsDiffs\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR),
+    const ParamModelBase* funcs = _modelMgr->Model(ds::FUNC),
+            * state_vars = _modelMgr->Model(ds::STATE),
             * diffs = _modelMgr->Model(ds::DIFF);
-    const size_t num_vars = variables->NumPars(),
+    const size_t num_vars = funcs->NumPars(),
+            num_statevars = state_vars->NumPars(),
             num_diffs = diffs->NumPars();
     for (size_t i=0; i<num_vars; ++i)
     {
-        std::string value = variables->Value(i);
-        if (Input::Type(value)==Input::USER || variables->IsFreeze(i))
-            out << "    " + variables->ShortKey(i) + " = 0;\n";
+        std::string value = funcs->Value(i);
+        if (Input::Type(value)==Input::USER || funcs->IsFreeze(i))
+            out << "    " + funcs->ShortKey(i) + " = 0;\n";
         else
         {
-            std::string inputv = "input_" + variables->ShortKey(i);
-            out << "    " + variables->ShortKey(i) + " = " + inputv + "[0];\n";
+            std::string inputv = "input_" + funcs->ShortKey(i);
+            out << "    " + funcs->ShortKey(i) + " = " + inputv + "[0];\n";
         }
     }
+
+    for (size_t i=0; i<num_statevars; ++i)
+        out << "    " + state_vars->ShortKey(i) + " = " + state_vars->ShortKey(i) + "0;\n";
+
     for (size_t i=0; i<num_diffs; ++i)
-        out << "    " + diffs->ShortKey(i) + " = " + diffs->ShortKey(i) + "0;\n";
+        if (_usesDiff.at(i))
+        {
+            out << "    double " + diffs->ShortKey(i) + "_array[SPUT];\n";
+            out << "    int " + diffs->ShortKey(i) + "_idx = 0;\n";
+            out << "    memset(" + diffs->ShortKey(i) + "_array, 0, SPUT*sizeof(double));\n";
+        }
+
     out << "//End CFileBase::WriteInitVarsDiffs\n";
     out << "\n";
 }
@@ -307,19 +366,19 @@ void CFileBase::WriteLoadInput(std::ofstream& out)
     out << "//Begin CFileBase::WriteLoadInput\n";
     out << "    size_t br;\n";
     out << "    int num_elts;\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR);
-    const size_t num_vars = variables->NumPars();
+    const ParamModelBase* funcs = _modelMgr->Model(ds::FUNC);
+    const size_t num_vars = funcs->NumPars();
     for (size_t i=0, ct=0; i<num_vars; ++i)
     {
-        if (variables->IsFreeze(i)) continue;
-        const std::string& value = variables->Value(i);
+        if (funcs->IsFreeze(i)) continue;
+        const std::string& value = funcs->Value(i);
         if (Input::Type(value) != Input::INPUT_FILE) continue;
         QFileInfo f( ds::StripQuotes(value).c_str() );
         const std::string value_abs = f.canonicalFilePath().toStdString();
         if (value_abs.empty())
             throw std::runtime_error("CFileBase::WriteLoadInput: Bad file name.");
 
-        const std::string var = variables->Key(i),
+        const std::string var = funcs->Key(i),
                 fpv = "fp_" + var,
                 inputv = "input_" + var,
                 sputv = "sput_" + var, //samples per step
@@ -356,8 +415,8 @@ void CFileBase::WriteSave(std::ofstream& out)
            "        {\n";
 
     WriteSaveBlockBegin(out);
-    WriteDataOut(out, ds::VAR);
-    WriteDataOut(out, ds::DIFF);
+    WriteDataOut(out, ds::FUNC);
+    WriteDataOut(out, ds::STATE);
     WriteSaveBlockEnd(out);
 
     out <<
@@ -380,24 +439,31 @@ void CFileBase::WriteVarDecls(std::ofstream& out)
         out << "double " + inputs->ShortKey(i) + ";\n";
     out << "\n";
 
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR);
-    const size_t num_vars = variables->NumPars();
+    const ParamModelBase* funcs = _modelMgr->Model(ds::FUNC);
+    const size_t num_vars = funcs->NumPars();
     for (size_t i=0; i<num_vars; ++i)
     {
-        out << "double " + variables->ShortKey(i) + ";\n";
-        if ( Input::Type(variables->Value(i)) == Input::USER && !variables->IsFreeze(i) )
-            out << "double " + variables->TempKey(i) + ";\n";
+        out << "double " + funcs->ShortKey(i) + ";\n";
+        if ( Input::Type(funcs->Value(i)) == Input::USER && !funcs->IsFreeze(i) )
+            out << "double " + funcs->TempKey(i) + ";\n";
+    }
+    out << "\n";
+
+    const ParamModelBase* state_vars = _modelMgr->Model(ds::STATE);
+    const size_t num_statevars = state_vars->NumPars();
+    for (size_t i=0; i<num_statevars; ++i)
+    {
+        out << "double " + state_vars->ShortKey(i) + ";\n";
+        if (!state_vars->IsFreeze(i))
+            out << "double " + state_vars->TempKey(i) + ";\n";
     }
     out << "\n";
 
     const ParamModelBase* diffs = _modelMgr->Model(ds::DIFF);
     const size_t num_diffs = diffs->NumPars();
     for (size_t i=0; i<num_diffs; ++i)
-    {
-        out << "double " + diffs->ShortKey(i) + ";\n";
-        if (!diffs->IsFreeze(i))
-            out << "double " + diffs->TempKey(i) + ";\n";
-    }
+        if (_usesDiff.at(i))
+            out << "double " + diffs->ShortKey(i) + ";\n";
     out << "//End CFileBase::WriteVarDecls\n";
     out << "\n";
 }

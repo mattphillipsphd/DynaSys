@@ -19,7 +19,7 @@ std::string JacobianModel::ParamString(size_t i) const
 {
     const int num_eqs = columnCount();
     std::string key = "grad("
-            + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(i) + ")";
+            + ModelMgr::Instance()->Model(ds::STATE)->ShortKey(i) + ")";
     std::string str;
     for (int j=0; j<num_eqs-1; ++j)
         str += key + "\t" + Value(i*num_eqs+j) + ",";
@@ -48,7 +48,7 @@ std::string JacobianModel::String() const
     for (size_t i=0; i<num_pars; ++i)
     {
         std::string key = "grad("
-                + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(i) + ")";
+                + ModelMgr::Instance()->Model(ds::STATE)->ShortKey(i) + ")";
         for (size_t j=0; j<num_pars-1; ++j)
             str += key + "\t" + Value(ct++) + ",";
         str += Value(ct++) + "\n";
@@ -91,15 +91,15 @@ QVariant JacobianModel::headerData(int section, Qt::Orientation orientation, int
 {
     if (role!=Qt::DisplayRole) return QVariant();
     QVariant header;
-    if (ModelMgr::Instance()->Model(ds::DIFF)->NumPars()==0) return header;
+    if (ModelMgr::Instance()->Model(ds::STATE)->NumPars()==0) return header;
     switch (orientation)
     {
         case Qt::Horizontal:
-            header = ("d" + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(section)).c_str();
+            header = ("d" + ModelMgr::Instance()->Model(ds::STATE)->ShortKey(section)).c_str();
             break;
         case Qt::Vertical:
             header = ("grad("
-                      + ModelMgr::Instance()->Model(ds::DIFF)->ShortKey(section) + ")").c_str();
+                      + ModelMgr::Instance()->Model(ds::STATE)->ShortKey(section) + ")").c_str();
             break;
     }
     return header;

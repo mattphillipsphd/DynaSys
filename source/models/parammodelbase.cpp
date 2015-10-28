@@ -5,6 +5,7 @@
 #include "../models/jacobianmodel.h"
 #include "../models/nullclinemodel.h"
 #include "../models/parammodel.h"
+#include "../models/statevarmodel.h"
 #include "../models/variablemodel.h"
 
 const std::string ParamModelBase::Param::DEFAULT_VAL = "0";
@@ -17,8 +18,11 @@ ParamModelBase* ParamModelBase::Create(ds::PMODEL mi)
         case ds::INP:
             model = new ParamModel(nullptr, ds::Model(mi));
             break;
-        case ds::VAR:
+        case ds::FUNC:
             model = new VariableModel(nullptr, ds::Model(mi));
+            break;
+        case ds::STATE:
+            model = new StateVarModel(nullptr, ds::Model(mi));
             break;
         case ds::DIFF:
             model = new DifferentialModel(nullptr, ds::Model(mi));
@@ -49,6 +53,29 @@ ParamModelBase::~ParamModelBase()
 {
     for (auto it : _parameters)
         delete it;
+}
+
+void ParamModelBase::AddParameter(const std::string& param, const std::string& value)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    int row = (int)_parameters.size();
+    QModelIndex row_index = createIndex(row, 0);
+    insertRows(row, 1, QModelIndex());
+    _parameters[row] = new Param(param, value);
+    emit dataChanged(row_index, row_index);
+    emit headerDataChanged(Qt::Vertical, row, row);
+}
+void ParamModelBase::SetFreeze(size_t i, bool is_freeze)
+{
+    setData( createIndex(i,FREEZE), is_freeze, Qt::CheckStateRole );
+}
+void ParamModelBase::SetValue(const std::string& param, const std::string& value)
+{
+    SetValue( KeyIndex(param), value );
+}
+void ParamModelBase::SetValue(size_t i, const std::string& value)
+{
+    setData( createIndex(i,VALUE), value.c_str(), Qt::EditRole );
 }
 
 std::string ParamModelBase::Expression(size_t i) const
@@ -87,6 +114,10 @@ VecStr ParamModelBase::Keys() const
     for (size_t i=0; i<num_pars; ++i)
         vs.push_back(Key(i));
     return vs;
+}
+std::string ParamModelBase::Name() const
+{
+    return ds::Model(_id);
 }
 std::string ParamModelBase::ParamString(size_t i) const
 {
@@ -150,33 +181,6 @@ VecStr ParamModelBase::Values() const
     for (size_t i=0; i<num_pars; ++i)
         vs[i] = Value(i);
     return vs;
-}
-
-void ParamModelBase::AddParameter(const std::string& param, const std::string& value)
-{
-    std::lock_guard<std::mutex> lock(_mutex);
-    int row = (int)_parameters.size();
-    QModelIndex row_index = createIndex(row, 0);
-    insertRows(row, 1, QModelIndex());
-    _parameters[row] = new Param(param, value);
-    emit dataChanged(row_index, row_index);
-    emit headerDataChanged(Qt::Vertical, row, row);
-}
-std::string ParamModelBase::Name() const
-{
-    return ds::Model(_id);
-}
-void ParamModelBase::SetFreeze(int i, bool is_freeze)
-{
-    setData( createIndex(i,FREEZE), is_freeze, Qt::CheckStateRole );
-}
-void ParamModelBase::SetValue(const std::string& param, const std::string& value)
-{
-    SetValue( KeyIndex(param), value );
-}
-void ParamModelBase::SetValue(int i, const std::string& value)
-{
-    setData( createIndex(i,VALUE), value.c_str(), Qt::EditRole );
 }
 
 int ParamModelBase::columnCount() const

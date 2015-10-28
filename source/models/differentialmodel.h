@@ -1,6 +1,7 @@
 #ifndef DIFFERENTIALMODEL_H
 #define DIFFERENTIALMODEL_H
 
+#include "../memrep/modelmgr.h"
 #include "numericmodelbase.h"
 
 class DifferentialModel : public NumericModelBase
@@ -9,18 +10,27 @@ class DifferentialModel : public NumericModelBase
 
     public:
         explicit DifferentialModel(QObject *parent, const std::string& name);
+        virtual ~DifferentialModel();
 
-        virtual bool DoEvaluate() const override { return true; }
+        virtual bool DoEvaluate() const override { return false; }
         virtual bool DoInitialize() const override { return false; }
-        virtual std::string ShortKey(size_t idx) const override;
-        virtual int ShortKeyIndex(const std::string& par_name) const override;
-        virtual std::string TempExpression(size_t idx) const override;
-        virtual std::string TempExprnForCFile(size_t idx) const override;
+        virtual void OpaqueInit(int N) override;
+
+        virtual const void* OpaqueData() const override;
+        //Push a new set of state values
+        void PushVals(const double* vals, size_t N);
+
+        const double* DiffVals() const { return _diffVals; }
+
+    signals:
+
+    public slots:
 
     private:
-        std::string ExprnInsert(const std::string& in, const std::string& exprn,
-                                const std::string& token) const;
-        std::string TempExpression(size_t idx, const std::string& model_step) const;
+        void CleanUp();
+
+        double* _diffVals;
+        VecDeq _stateVals;
 };
 
 #endif // DIFFERENTIALMODEL_H

@@ -56,9 +56,9 @@ class DrawBase : public QObject
         struct Packet
         {
             static const uchar PP_READ, TP_READ;
-            Packet(int num_samps, int num_diffs, int num_vars) : num_samples(num_samps),
+            Packet(int num_samps, int num_statevars, int num_vars) : num_samples(num_samps),
                 ip(new double[num_samps]),
-                  diffs(MakeDVec(num_diffs, num_samps)),
+                  diffs(MakeDVec(num_statevars, num_samps)),
                   vars(MakeDVec(num_vars, num_samps)),
                   read_flag(0)
             {}

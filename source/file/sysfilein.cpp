@@ -67,10 +67,10 @@ void SysFileIn::Load()
 
     _in.open(_name);
 
-    const int version = ReadVersion();
-    if (!version>=202) //New format for writing conditions
+    _fileVersion = ReadVersion();
+    if (!_fileVersion>=202) //New format for writing conditions
         throw std::runtime_error("SysFileIn::Load: Obsolete parameter file!");
-    const bool has_par_variants = version>=400;
+    const bool has_par_variants = _fileVersion>=400;
 
     //Model step
     const double model_step = ReadModelStep();
@@ -106,6 +106,7 @@ void SysFileIn::Load(VecStr& vmodels)
     ReadVersion();
     ReadModelStep();
     const int num_models = ReadNumModels();
+    _fileVersion = ds::VersionNum();
 
     std::vector<ParamModelBase*> models = ReadModels(num_models);
     for (auto it : models)
@@ -128,12 +129,18 @@ std::vector<ParamModelBase*> SysFileIn::ReadModels(int num_models)
 #endif
     std::string line;
     std::vector<ParamModelBase*> models(num_models);
+    const bool has_statevars = _fileVersion>=402;
     for (int i=0; i<num_models; ++i)
     {
         std::getline(_in, line);
         size_t tab = line.find_first_of('\t');
         std::string name = line.substr(0,tab),
                 num = line.substr(tab+1);
+        if (!has_statevars)
+        {
+            if (name=="Differentials") name = ds::Model(ds::STATE);
+            else if (name=="Variables") name = ds::Model(ds::FUNC);
+        }
         const int num_pars = std::stoi(num);
         ParamModelBase* model = ParamModelBase::Create( ds::Model(name) );
 
@@ -148,6 +155,24 @@ std::vector<ParamModelBase*> SysFileIn::ReadModels(int num_models)
         models[i] = model;
 
         std::getline(_in, line);
+    }
+
+    if (!has_statevars)
+    {
+        ParamModelBase* diffs = ParamModelBase::Create(ds::DIFF);
+        auto it = std::find_if(models.cbegin(), models.cend(),
+                               [](const ParamModelBase* model)
+        {
+            return model->Id()==ds::STATE;
+        });
+        const ParamModelBase* state_vars = *it;
+        const size_t num_statevars = state_vars->NumPars();
+        for (size_t i=0; i<num_statevars; ++i)
+        {
+            const std::string key = state_vars->ShortKey(i);
+            diffs->AddParameter("_d" + key, ParamModelBase::Param::DEFAULT_VAL);
+        }
+        models.push_back(diffs);
     }
     return models;
 }

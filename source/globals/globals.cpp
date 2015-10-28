@@ -8,7 +8,7 @@ const int ds::TABLEN = 4;
 const std::string ds::TEMP_FILE = ".temp.txt";
 const std::string ds::TEMP_DAT_FILE = ".temp.dsdat";
 const std::string ds::TEMP_MODEL_FILE = ".temp_model.txt";
-const std::string ds::VERSION_STR = "0.4.1";
+const std::string ds::VERSION_STR = "0.4.2";
 
 #ifndef Q_OS_WIN
 const std::vector<QColor> ds::THREAD_COLORS = {Qt::black, Qt::red, Qt::green, Qt::gray, Qt::blue };
@@ -63,7 +63,8 @@ std::string ds::Join(const VecStr& vec, const std::string& delim)
 ds::PMODEL ds::Model(const std::string& model)
 {
     if (model=="Inputs") return INP;
-    if (model=="Variables") return VAR;
+    if (model=="Functions") return FUNC;
+    if (model=="StateVars") return STATE;
     if (model=="Differentials") return DIFF;
     if (model=="InitialConds") return INIT;
     if (model=="Conditions") return COND;
@@ -77,8 +78,10 @@ std::string ds::Model(PMODEL mi)
     {
         case INP:
             return "Inputs";
-        case VAR:
-            return "Variables";
+        case FUNC:
+            return "Functions";
+        case STATE:
+            return "StateVars";
         case DIFF:
             return "Differentials";
         case INIT:

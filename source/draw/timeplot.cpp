@@ -34,9 +34,9 @@ void TimePlot::Initialize()
     ScopeTracker st("TimePlot::Initialize", std::this_thread::get_id());
 #endif
     _colors = *static_cast< const std::vector<QColor>* >( OpaqueSpec("colors") );
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    const int num_all_tplots = 1 + num_diffs + num_vars,
+    const int num_statevars = (int)_modelMgr->Model(ds::STATE)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::FUNC)->NumPars();
+    const int num_all_tplots = 1 + num_statevars + num_vars,
             num_colors = (int)_colors.size();
         // +1 for inner product.  The strategy is to attach all possible curves
         //but only the enabled ones have non-empty samples.
@@ -55,7 +55,7 @@ void TimePlot::Initialize()
         _packets.pop_front();
     }
     _ip.clear();
-    _diffPts = DataVec(num_diffs);
+    _diffPts = DataVec(num_statevars);
     _varPts = DataVec(num_vars);
     _eventPointCt = _lastPt = 0;
 
@@ -100,12 +100,12 @@ void TimePlot::MakePlotItems()
     while (!_packets.empty())
     {
         const Packet* packet = _packets.front();
-        const size_t num_diffs = packet->diffs.size(),
+        const size_t num_statevars = packet->diffs.size(),
                 num_vars = packet->vars.size(),
                 num_samples = packet->num_samples;
         for (size_t k=0; k<num_samples; ++k)
         {
-            for (size_t i=0; i<num_diffs; ++i)
+            for (size_t i=0; i<num_statevars; ++i)
                 _diffPts[i].push_back( packet->diffs.at(i)[k]);
             for (size_t i=0; i<num_vars; ++i)
                 _varPts[i].push_back( packet->vars.at(i)[k]);
@@ -116,14 +116,14 @@ void TimePlot::MakePlotItems()
     lock.unlock();
 
     //Shrink the buffers if need be, and record overshoot
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+    const int num_statevars = (int)_modelMgr->Model(ds::STATE)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::FUNC)->NumPars();
     int past_samps_ct = Spec_toi("past_samps_ct");
     const int max_size = std::min(MAX_BUF_SIZE, Spec_toi("num_samples"));
     const int overflow = (int)_diffPts.at(0).size() - max_size;
     if (overflow>0)
     {
-        for (int i=0; i<num_diffs; ++i)
+        for (int i=0; i<num_statevars; ++i)
             _diffPts[i].erase(_diffPts[i].begin(), _diffPts[i].begin()+overflow);
         for (int i=0; i<num_vars; ++i)
             _varPts[i].erase(_varPts[i].begin(), _varPts[i].begin()+overflow);
@@ -146,7 +146,7 @@ void TimePlot::MakePlotItems()
     const bool thresh_above = Spec_tob("thresh_above");
 
     TPVTableModel* tp_model = _modelMgr->TPVModel();
-    const int num_all_tplots = 1 + num_diffs + num_vars,
+    const int num_all_tplots = 1 + num_statevars + num_vars,
             step = std::max(1, num_tp_points / SamplesShown()),
             num_plotted_pts = num_tp_points/step + (int)(num_tp_points%step != 0) - 1;
         // -1 for the offset step
@@ -168,8 +168,8 @@ void TimePlot::MakePlotItems()
             {
                 double val;
                 if (i==0) val = _ip.at(k);
-                else if (i<=num_diffs) val = _diffPts.at(i-1).at(k);
-                else val = _varPts.at(i-num_diffs-1).at(k);
+                else if (i<=num_statevars) val = _diffPts.at(i-1).at(k);
+                else val = _varPts.at(i-num_statevars-1).at(k);
 
                 if ((!thresh_above && val>=event_threshold && last_val<event_threshold)
                         || (thresh_above && val<=event_threshold && last_val>=event_threshold))
@@ -196,7 +196,7 @@ void TimePlot::MakePlotItems()
                 points_tp[ct] = QPointF((past_samps_ct+k)*model_step+time_offset, _ip.at(k)*scale);
             curv->setSamples(points_tp);
         }
-        else if (i<=num_diffs) //A differential
+        else if (i<=num_statevars) //A differential
         {
             const int didx = i-1;
             QPolygonF points_tp(num_plotted_pts);
@@ -206,7 +206,7 @@ void TimePlot::MakePlotItems()
         }
         else //A variable
         {
-            const int vidx = i-num_diffs-1;
+            const int vidx = i-num_statevars-1;
             QPolygonF points_tp(num_plotted_pts);
             for (int k=dv_start+dv_step_off, ct=0; ct<num_plotted_pts; k+=step, ++ct)
                 points_tp[ct] = QPointF( (past_samps_ct+k)*model_step+time_offset, _varPts.at(vidx).at(k)*scale);

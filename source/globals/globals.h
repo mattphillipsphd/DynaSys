@@ -38,9 +38,10 @@
 #define DEBUG_FUNC
 #endif
 
-typedef std::pair<std::string, std::string> PairStr;
-typedef std::map<std::string, std::string> MapStr;
-typedef std::vector<std::string> VecStr;
+typedef std::pair<std::string, std::string>     PairStr;
+typedef std::map<std::string, std::string>      MapStr;
+typedef std::vector<std::string>                VecStr;
+typedef std::vector<std::deque<double>>         VecDeq;
 namespace ds
 {
     extern const double DEFAULT_MODEL_STEP;
@@ -63,7 +64,8 @@ namespace ds
     enum PMODEL
     {
         INP = 0,
-        VAR,
+        FUNC,
+        STATE,
         DIFF,
         INIT,
         COND,

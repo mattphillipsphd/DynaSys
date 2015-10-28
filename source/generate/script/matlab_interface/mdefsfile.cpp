@@ -13,13 +13,13 @@ void MDefsFile::Make(std::ofstream& out) const
     const NumericModelBase
             * inputs = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::INP)),
             * init_conds = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::INIT)),
-            * variables = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::VAR)),
-            * diffs = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::DIFF));
+            * variables = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::FUNC)),
+            * diffs = static_cast<const NumericModelBase*>(_modelMgr->Model(ds::STATE));
     const size_t num_inputs = inputs->NumPars(),
             num_ics = init_conds->NumPars(),
             num_columns = num_inputs+num_ics,
             num_vars = variables->NumPars(),
-            num_diffs = diffs->NumPars(),
+            num_statevars = diffs->NumPars(),
             num_input_files = static_cast<const VariableModel*>(variables)
                                 ->TypeCount(Input::INPUT_FILE);
 
@@ -99,11 +99,11 @@ void MDefsFile::Make(std::ofstream& out) const
     out << "\n";
 
     //The column names for the output matrix
-    out << "output_names = cell(" + std::to_string(num_vars+num_diffs) + ",1);\n";
+    out << "output_names = cell(" + std::to_string(num_vars+num_statevars) + ",1);\n";
     size_t out_ct = 1;
     for (size_t i=0; i<num_vars; ++i, ++out_ct)
         out << "output_names{" + std::to_string(out_ct) + "} = '" + variables->Key(i) + "';\n";
-    for (size_t i=0; i<num_diffs; ++i, ++out_ct)
+    for (size_t i=0; i<num_statevars; ++i, ++out_ct)
         out << "output_names{" + std::to_string(out_ct) + "} = '" + diffs->ShortKey(i) + "';\n";
     out << "xInfo.output_names = output_names;\n";
     out << "\n";

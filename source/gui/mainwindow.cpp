@@ -774,10 +774,10 @@ void MainWindow::on_actionSet_Init_to_Current_triggered()
     if (pp)
     {
         const ParserMgr& parser_mgr = pp->GetParserMgr(0);
-        const size_t num_pars = _modelMgr->Model(ds::DIFF)->NumPars();
+        const size_t num_pars = _modelMgr->Model(ds::STATE)->NumPars();
         for (size_t i=0; i<num_pars; ++i)
             _modelMgr->SetValue( ds::INIT, i,
-                                 std::to_string(parser_mgr.ConstData(ds::DIFF)[i]) );
+                                 std::to_string(parser_mgr.ConstData(ds::STATE)[i]) );
         ui->tblInitConds->update();
     }
 }
@@ -846,7 +846,8 @@ void MainWindow::on_btnAddDiff_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!diff.empty())
     {
-        _modelMgr->AddParameter(ds::DIFF, diff + "'", ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::STATE, diff + "'", ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::DIFF, "_d" + diff, ParamModelBase::Param::DEFAULT_VAL);
         _modelMgr->AddParameter(ds::INIT, diff + "(0)", ParamModelBase::Param::DEFAULT_VAL);
         UpdateTimePlotTable();
     }
@@ -890,7 +891,7 @@ void MainWindow::on_btnAddVariable_clicked()
                                                  QLineEdit::Normal).toStdString();
     if (!var.empty())
     {
-        _modelMgr->AddParameter(ds::VAR, var, ParamModelBase::Param::DEFAULT_VAL);
+        _modelMgr->AddParameter(ds::FUNC, var, ParamModelBase::Param::DEFAULT_VAL);
         UpdateTimePlotTable();
     }
 }
@@ -925,27 +926,27 @@ void MainWindow::on_btnRemoveDiff_clicked()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_btnRemoveDiff_clicked", _tid);
 #endif
-    QModelIndexList rows = ui->tblDifferentials->selectionModel()->selectedRows();
+    QModelIndexList rows = ui->tblStateVars->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
 
     for (int i=0; i<rows.size(); ++i)
     {
         int row = rows.at(i).row();
-        const std::string key = _modelMgr->Model(ds::DIFF)->ShortKey(row);
-        const std::string& ncbeg = key + "_for_",
-                        & nctail = "_for_d" + key,
-                        & jac_infix = "_" + key + "_";
-        if (_modelMgr->Model(ds::DIFF)->NumPars()==2)
+        const std::string key = _modelMgr->Model(ds::STATE)->ShortKey(row),
+                        ncbeg = key + "_for_",
+                        nctail = "_for_d" + key,
+                        jac_infix = "_" + key + "_";
+        if (_modelMgr->Model(ds::STATE)->NumPars()==2)
             _modelMgr->ClearModel(ds::NC);
         else
-            for (int j=_modelMgr->Model(ds::NC)->NumPars()-1; j>=0; --j)
+            for (size_t j=_modelMgr->Model(ds::NC)->NumPars()-1; j>=0; --j)
             {
                 const std::string nckey = _modelMgr->Model(ds::NC)->Key(j);
                 if (nckey.find(ncbeg)==0 || nckey.find(nctail)!=std::string::npos)
                     _modelMgr->RemoveParameter(ds::NC, nckey);
             }
 
-        for (int j=_modelMgr->Model(ds::JAC)->NumPars()-1; j>=0; --j)
+        for (size_t j=_modelMgr->Model(ds::JAC)->NumPars()-1; j>=0; --j)
         {
             const std::string jackey = _modelMgr->Model(ds::JAC)->Key(j);
             if (jackey.find(jac_infix)!=std::string::npos)
@@ -953,7 +954,8 @@ void MainWindow::on_btnRemoveDiff_clicked()
         }
     }
 
-    ui->tblDifferentials->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    ui->tblStateVars->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    _modelMgr->RemoveParameter(ds::DIFF, "_d" + _modelMgr->Model(ds::STATE)->Key(rows.at(0).row()));
     ui->tblInitConds->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
     ResetPhasePlotAxes();
@@ -987,9 +989,9 @@ void MainWindow::on_btnRemoveVariable_clicked()
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::on_btnRemoveVariable_clicked", _tid);
 #endif
-    QModelIndexList rows = ui->tblVariables->selectionModel()->selectedRows();
+    QModelIndexList rows = ui->tblFunctions->selectionModel()->selectedRows();
     if (rows.isEmpty()) return;
-    ui->tblVariables->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
+    ui->tblFunctions->model()->removeRows(rows.at(0).row(), rows.size(), QModelIndex());
     UpdateTimePlotTable();
 }
 void MainWindow::on_btnStart_clicked()
@@ -1438,11 +1440,14 @@ void MainWindow::InitDefaultModel()
     for (size_t i=0; i<_modelMgr->Model(ds::INP)->NumPars(); ++i)
         _modelMgr->SetRange(ds::INP, 0, -10, 10);
 
-    _modelMgr->AddParameter(ds::VAR, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
-    _modelMgr->AddParameter(ds::VAR, "r", "u*v");
+    _modelMgr->AddParameter(ds::FUNC, "noise", "normal rand"); //\"../../dcn_input_sync2.dsin\""); //Input::UNI_RAND_STR);
+    _modelMgr->AddParameter(ds::FUNC, "r", "u*v");
 
-    _modelMgr->AddParameter(ds::DIFF, "v'", "a*v + b*u + noise/10");
-    _modelMgr->AddParameter(ds::DIFF, "u'", "c*v + d*u");
+    _modelMgr->AddParameter(ds::STATE, "v'", "a*v + b*u + noise/10");
+    _modelMgr->AddParameter(ds::STATE, "u'", "c*v + d*u");
+
+    _modelMgr->AddParameter(ds::DIFF, "_dv", ParamModelBase::Param::DEFAULT_VAL);
+    _modelMgr->AddParameter(ds::DIFF, "_du", ParamModelBase::Param::DEFAULT_VAL);
 
     _modelMgr->AddParameter(ds::INIT, "v(0)", "1");
     _modelMgr->AddParameter(ds::INIT, "u(0)", "0");
@@ -1484,30 +1489,30 @@ void MainWindow::InitViews()
     ui->tblParameters->setColumnHidden(ParamModelBase::FREEZE,true);
     ui->tblParameters->horizontalHeader()->setStretchLastSection(true);
 
-    _modelMgr->SetView(ui->tblVariables, ds::VAR);
-    ui->tblVariables->setColumnHidden(NumericModelBase::MIN,true);
-    ui->tblVariables->setColumnHidden(NumericModelBase::MAX,true);
-    ui->tblVariables->setColumnWidth(ParamModelBase::FREEZE,25);
-    ui->tblVariables->horizontalHeader()->setStretchLastSection(true);
+    _modelMgr->SetView(ui->tblFunctions, ds::FUNC);
+    ui->tblFunctions->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblFunctions->setColumnHidden(NumericModelBase::MAX,true);
+    ui->tblFunctions->setColumnWidth(ParamModelBase::FREEZE,25);
+    ui->tblFunctions->horizontalHeader()->setStretchLastSection(true);
     CheckBoxDelegate* cbbd_v = new CheckBoxDelegate(std::vector<QColor>(), this);
     connect(cbbd_v, SIGNAL(MouseReleased()), this, SLOT(NeedParserRecompute()));
-    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
+    ui->tblFunctions->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_v);
     VecStr vstr;
     vstr.push_back(Input::INPUT_FILE_STR);
     vstr.push_back(Input::GAMMA_RAND_STR);
     vstr.push_back(Input::NORM_RAND_STR);
     vstr.push_back(Input::UNI_RAND_STR);
     ComboBoxDelegate* cmbd = new ComboBoxDelegate(vstr);
-    ui->tblVariables->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
+    ui->tblFunctions->setItemDelegateForColumn(ParamModelBase::VALUE, cmbd);
     connect(cmbd, SIGNAL(ComboBoxChanged(size_t)), this, SLOT(ComboBoxChanged(size_t)));
 
-    _modelMgr->SetView(ui->tblDifferentials, ds::DIFF);
-    ui->tblDifferentials->horizontalHeader()->setStretchLastSection(true);
-    ui->tblDifferentials->setColumnHidden(NumericModelBase::MIN,true);
-    ui->tblDifferentials->setColumnHidden(NumericModelBase::MAX,true);
-    ui->tblDifferentials->setColumnWidth(ParamModelBase::FREEZE,25);
+    _modelMgr->SetView(ui->tblStateVars, ds::STATE);
+    ui->tblStateVars->horizontalHeader()->setStretchLastSection(true);
+    ui->tblStateVars->setColumnHidden(NumericModelBase::MIN,true);
+    ui->tblStateVars->setColumnHidden(NumericModelBase::MAX,true);
+    ui->tblStateVars->setColumnWidth(ParamModelBase::FREEZE,25);
     CheckBoxDelegate* cbbd_d = new CheckBoxDelegate(std::vector<QColor>(), this);
-    ui->tblDifferentials->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
+    ui->tblStateVars->setItemDelegateForColumn(ParamModelBase::FREEZE, cbbd_d);
 
     _modelMgr->SetView(ui->tblInitConds, ds::INIT);
     ui->tblInitConds->setColumnHidden(ParamModelBase::FREEZE,true);
@@ -1534,7 +1539,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
 #endif
     try
     {
-        std::string text = _modelMgr->Value(ds::VAR, row);
+        std::string text = _modelMgr->Value(ds::FUNC, row);
         if (text==Input::INPUT_FILE_STR)
         {
             std::string file_name = QFileDialog::getOpenFileName(nullptr,
@@ -1551,7 +1556,7 @@ void MainWindow::ComboBoxChanged(size_t row) //slot
             }
             else
                 text = "0";
-            _modelMgr->SetValue(ds::VAR, (size_t)row, text);
+            _modelMgr->SetValue(ds::FUNC, (size_t)row, text);
         }
     }
     catch (std::exception& e)
@@ -1781,13 +1786,13 @@ void MainWindow::ResetPhasePlotAxes()
     {
         case SINGLE:
         case VECTOR_FIELD:
-            xlist = ylist = ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
-            yidx = _modelMgr->Model(ds::DIFF)->NumPars() > 1 ? 1 : 0;
+            xlist = ylist = ds::VecStrToQSList( _modelMgr->Model(ds::STATE)->ShortKeys() );
+            yidx = _modelMgr->Model(ds::STATE)->NumPars() > 1 ? 1 : 0;
             break;
         case VARIABLE_VIEW:
             xlist = ds::VecStrToQSList( _modelMgr->Model(ds::INP)->Keys() );
-            zlist = xlist += ds::VecStrToQSList( _modelMgr->Model(ds::DIFF)->ShortKeys() );
-            ylist = ds::VecStrToQSList( _modelMgr->Model(ds::VAR)->Keys() );
+            zlist = xlist += ds::VecStrToQSList( _modelMgr->Model(ds::STATE)->ShortKeys() );
+            ylist = ds::VecStrToQSList( _modelMgr->Model(ds::FUNC)->Keys() );
             yidx = 0;
             zidx = zlist.size()>1 ? 1 : 0;
             break;
@@ -1907,10 +1912,10 @@ void MainWindow::SetParamsEnabled(bool is_enabled)
 #ifdef DEBUG_FUNC
     ScopeTracker st("MainWindow::SetParamsEnabled", _tid);
 #endif
-    ui->tblDifferentials->setEnabled(is_enabled);
+    ui->tblStateVars->setEnabled(is_enabled);
     ui->tblInitConds->setEnabled(is_enabled);
     ui->tblParameters->setEnabled(is_enabled);
-    ui->tblVariables->setEnabled(is_enabled);
+    ui->tblFunctions->setEnabled(is_enabled);
     ui->lsConditions->setEnabled(is_enabled);
     ui->lsResults->setEnabled(is_enabled);
 }

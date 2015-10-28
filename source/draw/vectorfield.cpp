@@ -62,10 +62,10 @@ void VectorField::ComputeData()
             RecomputeIfNeeded();
             QPolygonF* data = new QPolygonF[_resolution*_resolution];
             ParserMgr& parser_mgr = GetParserMgr(0);
-            const double* const dcurrent = parser_mgr.ConstData(ds::DIFF),
-                    * const vcurrent = parser_mgr.ConstData(ds::VAR);
-            const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
+            const double* const dcurrent = parser_mgr.ConstData(ds::STATE),
+                    * const vcurrent = parser_mgr.ConstData(ds::FUNC);
+            const int num_statevars = (int)_modelMgr->Model(ds::STATE)->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::FUNC)->NumPars();
             for (size_t i=0; i<_resolution; ++i)
                 for (size_t j=0; j<_resolution; ++j)
                 {
@@ -73,19 +73,19 @@ void VectorField::ComputeData()
 //                    ParserMgr& parser_mgr = GetParserMgr(idx);
                     const double x = i*xinc + xmin,
                                 y = j*yinc + ymin;
-                    for (int k=0; k<num_diffs; ++k)
+                    for (int k=0; k<num_statevars; ++k)
                         if (k==xidx)
-                            parser_mgr.SetData(ds::DIFF, k, x);
+                            parser_mgr.SetData(ds::STATE, k, x);
                         else if (k==yidx)
-                            parser_mgr.SetData(ds::DIFF, k, y);
+                            parser_mgr.SetData(ds::STATE, k, y);
                         else
-                            parser_mgr.SetData(ds::DIFF, k, dcurrent[k]);
+                            parser_mgr.SetData(ds::STATE, k, dcurrent[k]);
                     for (int k=0; k<num_vars; ++k)
-                        if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(k)) != Input::USER )
-                            parser_mgr.SetData(ds::VAR, k, vcurrent[k]);
+                        if ( Input::Type(_modelMgr->Model(ds::FUNC)->Value(k)) != Input::USER )
+                            parser_mgr.SetData(ds::FUNC, k, vcurrent[k]);
                         //This is for input files and random numbers
 
-                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
+                    const double* diffs = parser_mgr.ConstData(ds::STATE);
                     QPolygonF& pts = data[i*_resolution+j];
                     pts = QPolygonF(_tailLength+1);
                     pts[0] = QPointF(x, y);

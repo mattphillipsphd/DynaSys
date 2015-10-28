@@ -29,9 +29,9 @@ void CFile::WriteIncludes(std::ofstream& out)
            "#include <cmath>\n"
            "#include <algorithm>\n"
 #else
+           "#include \"math.h\"\n"
            "#include \"stdio.h\"\n"
            "#include \"stdlib.h\"\n"
-           "#include \"math.h\"\n"
 #endif
            "\n";
 }
@@ -81,8 +81,8 @@ void CFile::WriteMainEnd(std::ofstream& out)
 void CFile::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin CFile::WriteOutputHeader\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR),
-            * diffs = _modelMgr->Model(ds::DIFF);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC),
+            * diffs = _modelMgr->Model(ds::STATE);
     out <<
            "    FILE* fp;\n"
            "    fp = fopen(argv[3], \"wb\");\n"
@@ -97,8 +97,8 @@ void CFile::WriteOutputHeader(std::ofstream& out)
            "    \n";
 
     out << "    int len;\n";
-    WriteVarsOut(out, ds::VAR);
-    WriteVarsOut(out, ds::DIFF);
+    WriteVarsOut(out, ds::FUNC);
+    WriteVarsOut(out, ds::STATE);
     out <<
            "    fwrite(&save_mod_n, sizeof(int), 1, fp);\n"
            "    \n"

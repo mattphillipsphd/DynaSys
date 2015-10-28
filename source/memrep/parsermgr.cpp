@@ -89,7 +89,7 @@ void ParserMgr::InitData()
         for (const auto& it : initializations)
             QuickEval(it);
 
-        const ParamModelBase* vars = _modelMgr->Model(ds::VAR);
+        const ParamModelBase* vars = _modelMgr->Model(ds::FUNC);
         const size_t num_vars = vars->NumPars();
         for (size_t i=0; i<num_vars; ++i)
             if ( Input::Type(vars->Value(i)) == Input::USER )
@@ -118,6 +118,8 @@ void ParserMgr::InitData()
                     data[k] = temp_data[k] = std::stod(value.c_str());
             }
         }
+
+        _modelMgr->OpaqueInit(ds::DIFF, _modelMgr->Model(ds::DIFF)->NumPars());
 
         switch (_modelMgr->DiffMethod())
         {
@@ -192,6 +194,7 @@ void ParserMgr::ParserEval(bool eval_input)
         std::lock_guard<std::mutex> lock(_mutex);
         _parser.Eval();
         TempEval();
+        UpdateDifferentials();
         if (eval_input) _inputMgr->InputEval();
     }
     catch (mu::ParserError& e)
@@ -329,12 +332,12 @@ void ParserMgr::SetExpressions()
             for (size_t k=0; k<num_pars; ++k)
                 if (model->IsFreeze(k))
                 {
-                    std::string freeze_val = (model->Id()==ds::DIFF)
+                    std::string freeze_val = (model->Id()==ds::STATE)
                             ? _modelMgr->Model(ds::INIT)->Value(k)
                             : "0";
                     AddExpression(model->TempKey(k) + " = " + freeze_val);
                 }
-            if (model->Id()==ds::VAR) // ### Really need separate parsers for both here
+            if (model->Id()==ds::FUNC) // ### Really need separate parsers for both here
                 for (size_t k=0; k<num_pars; ++k)
                     AddExpression(model->Key(k) + " = " + model->TempKey(k));
         }
@@ -439,3 +442,13 @@ double* ParserMgr::TempData(ds::PMODEL model)
     return _modelData[model].second;
 }
 
+#include "../models/differentialmodel.h"
+void ParserMgr::UpdateDifferentials()
+{
+    const double* data = _modelData[ds::STATE].first;
+    const size_t num_statevars = _modelMgr->Model(ds::STATE)->NumPars();
+    _modelMgr->UpdateDifferentials(data, num_statevars);
+
+    const ParamModelBase* diffs = _modelMgr->Model(ds::DIFF);
+    memcpy(_modelData[ds::DIFF].first, diffs->OpaqueData(), num_statevars*sizeof(double));
+}

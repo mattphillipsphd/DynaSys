@@ -84,7 +84,7 @@ void VariableView::ComputeData()
                         parser_mgr.SetData(zmi, zidx, zval);
                         parser_mgr.ParserEval(false);
                     }
-                    const double yval = parser_mgr.ConstData(ds::VAR)[yidx];
+                    const double yval = parser_mgr.ConstData(ds::FUNC)[yidx];
                     if (yval<ymin) ymin = yval;
                     if (yval>ymax) ymax = yval;
                     points[k][i] = QPointF(xval, yval);
@@ -159,7 +159,7 @@ VariableView::VSpec VariableView::MakeVSpec(size_t raw_idx, double num_divs)
     }
     else
     {
-        mi = ds::DIFF;
+        mi = ds::STATE;
         range_mi = ds::INIT;
         idx = raw_idx - num_inputs;
     }

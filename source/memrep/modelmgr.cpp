@@ -43,7 +43,7 @@ void ModelMgr::AddParameter(ds::PMODEL mi, const std::string& key, const std::st
 #ifdef DEBUG_FUNC
     ScopeTracker st("ModelMgr::AddParameter", std::this_thread::get_id());
 #endif
-    _models[mi]->AddParameter(key, value);
+    _models.at(mi)->AddParameter(key, value);
 }
 
 
@@ -61,7 +61,7 @@ void ModelMgr::ClearModel(ds::PMODEL mi)
 #ifdef DEBUG_FUNC
     ScopeTracker st("ModelMgr::ClearModel", std::this_thread::get_id());
 #endif
-    ParamModelBase* model = _models[mi];
+    ParamModelBase* model = _models.at(mi);
     while (model->rowCount()>0) model->removeRow(0);
 }
 void ModelMgr::ClearModels()
@@ -79,7 +79,7 @@ void ModelMgr::ClearParameters(ds::PMODEL mi)
     ScopeTracker st("ModelMgr::ClearParameters", std::this_thread::get_id());
 #endif
     const size_t num_rows = _models.at(mi)->NumPars();
-    _models[mi]->removeRows(0, num_rows, QModelIndex());
+    _models.at(mi)->removeRows(0, num_rows, QModelIndex());
 }
 
 void ModelMgr::DeleteParVariant(size_t idx)
@@ -100,15 +100,27 @@ void ModelMgr::InsertParVariant(size_t idx, ParVariant* pv)
     auto it = _parVariants.begin() + idx;
     _parVariants.insert(it, pv);
 }
+void ModelMgr::OpaqueInit(ds::PMODEL mi, size_t N)
+{
+#ifdef DEBUG_FUNC
+    ScopeTracker st("ModelMgr::OpaqueInit", std::this_thread::get_id());
+#endif
+    _models.at(mi)->OpaqueInit(N);
+}
 void ModelMgr::RemoveParameter(ds::PMODEL mi, const std::string& key)
 {
 #ifdef DEBUG_FUNC
     ScopeTracker st("ModelMgr::RemoveParameter", std::this_thread::get_id());
 #endif
-    ParamModelBase* model = _models[mi];
+    ParamModelBase* model = _models.at(mi);
     int row = model->KeyIndex(key);
     model->removeRow(row);
 }
+void ModelMgr::UpdateDifferentials(const double* vals, size_t N)
+{
+    static_cast<DifferentialModel*>(_models[ds::DIFF])->PushVals(vals, N);
+}
+
 
 void ModelMgr::SetCondValue(size_t row, const VecStr& results)
 {
@@ -119,20 +131,20 @@ void ModelMgr::SetCondValue(size_t row, const VecStr& results)
 }
 void ModelMgr::SetIsFreeze(ds::PMODEL mi, size_t idx, bool is_freeze)
 {
-    _models[mi]->SetFreeze(idx, is_freeze);
+    _models.at(mi)->SetFreeze(idx, is_freeze);
 }
 void ModelMgr::SetMaximum(ds::PMODEL mi, size_t idx, double val)
 {
-    dynamic_cast<NumericModelBase*>(_models[mi])->SetMaximum(idx, val);
+    dynamic_cast<NumericModelBase*>(_models.at(mi))->SetMaximum(idx, val);
 }
 void ModelMgr::SetMinimum(ds::PMODEL mi, size_t idx, double val)
 {
-    dynamic_cast<NumericModelBase*>(_models[mi])->SetMinimum(idx, val);
+    dynamic_cast<NumericModelBase*>(_models.at(mi))->SetMinimum(idx, val);
 }
 void ModelMgr::SetModel(ds::PMODEL mi, ParamModelBase* model)
 {
-    if (_models[mi]) delete _models[mi];
-    _models[mi] = model;
+    if (_models.at(mi)) delete _models.at(mi);
+    _models.at(mi) = model;
 }
 void ModelMgr::SetNotes(Notes* notes)
 {
@@ -175,11 +187,11 @@ void ModelMgr::SetTPVModel(TPVTableModel* tpv_model)
 }
 void ModelMgr::SetValue(ds::PMODEL mi, size_t idx, const std::string& value)
 {
-    _models[mi]->SetValue(idx, value);
+    _models.at(mi)->SetValue(idx, value);
 }
 void ModelMgr::SetView(QAbstractItemView* view, ds::PMODEL mi)
 {
-    view->setModel(_models[mi]);
+    view->setModel(_models.at(mi));
 }
 
 bool ModelMgr::AreModelsInitialized() const
@@ -193,8 +205,8 @@ VecStr ModelMgr::CondResults(size_t row) const
 VecStr ModelMgr::DiffVarList() const
 {
     VecStr vs,
-            dkeys = Model(ds::DIFF)->ShortKeys(),
-            vkeys = Model(ds::VAR)->Keys();
+            dkeys = Model(ds::STATE)->ShortKeys(),
+            vkeys = Model(ds::FUNC)->Keys();
     vs.push_back("IP");
     vs.insert(vs.end(), dkeys.cbegin(), dkeys.cend());
     vs.insert(vs.end(), vkeys.cbegin(), vkeys.cend());
@@ -202,7 +214,7 @@ VecStr ModelMgr::DiffVarList() const
 }
 bool ModelMgr::IsFreeze(ds::PMODEL mi, size_t idx) const
 {
-    return _models[mi]->IsFreeze(idx);
+    return _models.at(mi)->IsFreeze(idx);
 }
 double ModelMgr::Maximum(ds::PMODEL mi, size_t idx) const
 {
@@ -229,7 +241,7 @@ ModelMgr::ModelMgr() : _diffMethod(UNKNOWN), _log(Log::Instance()), _models(Make
 
 ConditionModel* ModelMgr::CondModel()
 {
-    return static_cast<ConditionModel*>(_models[ds::COND]);
+    return static_cast<ConditionModel*>(_models.at(ds::COND));
 }
 const ConditionModel* ModelMgr::CondModel() const
 {

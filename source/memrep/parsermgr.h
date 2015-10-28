@@ -54,6 +54,7 @@ class ParserMgr
         void DeepCopy(const ParserMgr& other);
         std::vector< std::pair<double*, double*> > MakeModelData();
         inline double* TempData(ds::PMODEL model);
+        void UpdateDifferentials();
 
         InputMgr* const _inputMgr;
         Log* const _log;
@@ -61,7 +62,6 @@ class ParserMgr
             //Model evaluation happens in a two-step process so that all variables and differentials
             //can be updated simultaneously; the third element is a temporary that is used for
             //this purpose.
-            //  This is an array of pointers to pointers, not a pointer to an array of pointers.
         ModelMgr* const _modelMgr;
         std::mutex _mutex;
         mu::Parser _parser, _parserResult;

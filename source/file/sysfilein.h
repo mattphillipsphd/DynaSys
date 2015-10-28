@@ -27,6 +27,7 @@ class SysFileIn
         std::vector<ModelMgr::ParVariant*> ReadParVariants();
         int ReadVersion();
 
+        int _fileVersion;
         const std::string _name;
         std::ifstream _in;
 };

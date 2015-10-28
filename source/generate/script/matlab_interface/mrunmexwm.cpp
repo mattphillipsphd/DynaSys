@@ -7,7 +7,7 @@ MRunMEXWM::MRunMEXWM(const std::string& name) : MRunMEX(name)
 void MRunMEXWM::Make(std::ofstream &out) const
 {
     const std::string num_input_files = std::to_string( static_cast<const VariableModel*>(
-                _modelMgr->Model(ds::VAR))->TypeCount(Input::INPUT_FILE) );
+                _modelMgr->Model(ds::FUNC))->TypeCount(Input::INPUT_FILE) );
 
     std::string name_run = ds::StripPath( NameRun() );
     name_run.erase(name_run.find_last_of('.'));

@@ -176,7 +176,7 @@ void CudaKernel::WriteInitArgs(std::ofstream& out)
 void CudaKernel::WriteLoadInput(std::ofstream& out)
 {
     out << "//Begin CudaKernel::WriteLoadInput\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC);
     const size_t num_vars = variables->NumPars();
     for (size_t i=0, ct=0; i<num_vars; ++i)
     {
@@ -214,9 +214,9 @@ void CudaKernel::WriteMainEnd(std::ofstream& out)
 void CudaKernel::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin CudaKernel::WriteOutputHeader\n";
-    const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
-                num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
-    std::string num_out = std::to_string(num_vars+num_diffs);
+    const size_t num_vars = _modelMgr->Model(ds::FUNC)->NumPars(),
+                num_statevars = _modelMgr->Model(ds::STATE)->NumPars();
+    std::string num_out = std::to_string(num_vars+num_statevars);
     out <<
            "    const int num_records = num_iters / save_mod_n;\n"
            "    int row_ct = 0;\n"
@@ -260,7 +260,7 @@ void CudaKernel::WriteVarDecls(std::ofstream& out)
     }
     out << "\n";
 
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC);
     const size_t num_vars = variables->NumPars();
     for (size_t i=0; i<num_vars; ++i)
     {
@@ -276,9 +276,9 @@ void CudaKernel::WriteVarDecls(std::ofstream& out)
     }
     out << "\n";
 
-    const ParamModelBase* diffs = _modelMgr->Model(ds::DIFF);
-    const size_t num_diffs = diffs->NumPars();
-    for (size_t i=0; i<num_diffs; ++i)
+    const ParamModelBase* diffs = _modelMgr->Model(ds::STATE);
+    const size_t num_statevars = diffs->NumPars();
+    for (size_t i=0; i<num_statevars; ++i)
     {
         out << "#define " + diffs->ShortKey(i) + IDX_SUF
                + " " + std::to_string(ct++) + "\n";

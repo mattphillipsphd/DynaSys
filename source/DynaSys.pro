@@ -91,7 +91,8 @@ SOURCES += main.cpp\
     gui/paramselector.cpp \
     models/nullclinemodel.cpp \
     models/jacobianmodel.cpp \
-    gui/jacobiangui.cpp
+    gui/jacobiangui.cpp \
+    models/statevarmodel.cpp
 
 HEADERS  += gui/mainwindow.h \
     models/parammodel.h \
@@ -160,7 +161,8 @@ HEADERS  += gui/mainwindow.h \
     draw/usernullcline.h \
     models/nullclinemodel.h \
     models/jacobianmodel.h \
-    gui/jacobiangui.h
+    gui/jacobiangui.h \
+    models/statevarmodel.h
 
 FORMS    += forms/mainwindow.ui \
     forms/aboutgui.ui \

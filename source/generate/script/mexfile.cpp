@@ -34,6 +34,8 @@ void MEXFile::WriteDataOut(std::ofstream& out, ds::PMODEL mi)
 }
 void MEXFile::WriteIncludes(std::ofstream& out)
 {
+    CFileBase::WriteIncludes(out);
+
     out << "//Begin MEXFile::WriteIncludes\n";
     out <<
            "#include \"math.h\"\n"
@@ -68,7 +70,7 @@ void MEXFile::WriteInitArgs(std::ofstream& out)
 void MEXFile::WriteLoadInput(std::ofstream& out)
 {
     out << "//Begin MEXFile::WriteLoadInput\n";
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC);
     const size_t num_inputs = _modelMgr->Model(ds::INP)->NumPars(),
             num_ics = _modelMgr->Model(ds::INIT)->NumPars(),
             num_vars = variables->NumPars();
@@ -110,9 +112,9 @@ void MEXFile::WriteMainEnd(std::ofstream& out)
 void MEXFile::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin MEXFile::WriteOutputHeader\n";
-    const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
-                num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
-    const std::string num_out = std::to_string(num_vars+num_diffs);
+    const size_t num_vars = _modelMgr->Model(ds::FUNC)->NumPars(),
+                num_statevars = _modelMgr->Model(ds::STATE)->NumPars();
+    const std::string num_out = std::to_string(num_vars+num_statevars);
     out <<
            "    const int num_fields = " + num_out + ",\n"
            "            num_records = num_iters / save_mod_n;\n"

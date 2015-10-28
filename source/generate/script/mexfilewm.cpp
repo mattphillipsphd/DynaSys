@@ -20,10 +20,10 @@ void MEXFileWithMeasure::MakeHFile()
     std::ofstream hout;
     hout.open(_hFileName);
 
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR),
-            * diffs = _modelMgr->Model(ds::DIFF);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC),
+            * diffs = _modelMgr->Model(ds::STATE);
     const size_t num_vars = variables->NumPars(),
-            num_diffs = diffs->NumPars();
+            num_statevars = diffs->NumPars();
 
     hout << "//Auto-generated with DynaSys " + ds::VERSION_STR + "\n\n";
 
@@ -34,7 +34,7 @@ void MEXFileWithMeasure::MakeHFile()
         std::transform(key.cbegin(), key.cend(), std::back_inserter(idx), ::toupper);
         hout << "#define " + idx + " " + std::to_string(i) + "\n";
     }
-    for (size_t i=0; i<num_diffs; ++i)
+    for (size_t i=0; i<num_statevars; ++i)
     {
         const std::string key = diffs->ShortKey(i) + "_OUTIDX_";
         std::string idx;
@@ -100,7 +100,7 @@ void MEXFileWithMeasure::WriteInitArgs(std::ofstream& out)
     const size_t num_inputs = _modelMgr->Model(ds::INP)->NumPars(),
             num_ics = _modelMgr->Model(ds::INIT)->NumPars(),
             num_input_files = static_cast<const VariableModel*>(
-                _modelMgr->Model(ds::VAR))->TypeCount(Input::INPUT_FILE);
+                _modelMgr->Model(ds::FUNC))->TypeCount(Input::INPUT_FILE);
     const size_t num_args = MFileBase::NUM_AUTO_ARGS + num_inputs + num_ics + 2*num_input_files;
 
     out <<
@@ -118,7 +118,7 @@ void MEXFileWithMeasure::WriteMainBegin(std::ofstream& out)
     const size_t num_inputs = _modelMgr->Model(ds::INP)->NumPars(),
             num_ics = _modelMgr->Model(ds::INIT)->NumPars(),
             num_input_files = static_cast<const VariableModel*>(
-                _modelMgr->Model(ds::VAR))->TypeCount(Input::INPUT_FILE);
+                _modelMgr->Model(ds::FUNC))->TypeCount(Input::INPUT_FILE);
     const std::string num_args = std::to_string(
                 MFileBase::NUM_AUTO_ARGS + num_inputs + 2*num_input_files + num_ics + NUM_MEASURE_ARGS
                 );
@@ -162,9 +162,9 @@ void MEXFileWithMeasure::WriteModelLoopBegin(std::ofstream& out)
 void MEXFileWithMeasure::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin MEXFileWithMeasure::WriteOutputHeader\n";
-    const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
-                num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
-    const std::string num_out = std::to_string(num_vars+num_diffs);
+    const size_t num_vars = _modelMgr->Model(ds::FUNC)->NumPars(),
+                num_statevars = _modelMgr->Model(ds::STATE)->NumPars();
+    const std::string num_out = std::to_string(num_vars+num_statevars);
     out <<
            "    const int num_fields = " + num_out + ",\n"
            "            num_records = num_iters / save_mod_n;\n"

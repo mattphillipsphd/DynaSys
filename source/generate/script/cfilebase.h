@@ -28,6 +28,7 @@ class CFileBase : public QObject
         std::string PreprocessExprn(const std::string& exprn) const;
         virtual void MakeHFile() = 0;
         virtual std::string Suffix() const = 0;
+        bool UsesDiff(size_t i) const { return _usesDiff.at(i); }
 
         void WriteConditions(std::ofstream& out);
         virtual void WriteDataOut(std::ofstream& out, ds::PMODEL mi) = 0;
@@ -35,7 +36,7 @@ class CFileBase : public QObject
         virtual void WriteExtraFuncs(std::ofstream&) {}
         virtual void WriteFuncs(std::ofstream& out, ds::PMODEL model);
         virtual void WriteGlobalConst(std::ofstream& out);
-        virtual void WriteIncludes(std::ofstream& out) = 0;
+        virtual void WriteIncludes(std::ofstream& out);
         virtual void WriteInitArgs(std::ofstream& out) = 0;
         virtual void WriteInitVarsDiffs(std::ofstream& out);
         virtual void WriteMainBegin(std::ofstream& out) = 0;
@@ -56,6 +57,7 @@ class CFileBase : public QObject
         std::string MakeName(const std::string& name) const;
 
         const std::string _nameBase, _nameExtension;
+        std::vector<bool> _usesDiff;
 };
 
 #endif // CFILEBASE_H

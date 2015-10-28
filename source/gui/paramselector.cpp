@@ -106,14 +106,14 @@ void ParamSelector::on_btnSet_clicked()
     for (int i=0; i<num_input_files; ++i)
     {
         std::string key = ui->tblInputFiles->verticalHeaderItem(i)->text().toStdString();
-        int idx = _modelMgr->Model(ds::VAR)->KeyIndex(key);
+        int idx = _modelMgr->Model(ds::FUNC)->KeyIndex(key);
         if (idx==-1)
         {
             _log->AddMesg("Warning: input file parameter " + key + " does not exist, not updated.");
             continue;
         }
         std::string value = ui->tblInputFiles->item(i,0)->text().toStdString();
-        _modelMgr->SetValue(ds::VAR, idx, value);
+        _modelMgr->SetValue(ds::FUNC, idx, value);
     }
 }
 
@@ -157,11 +157,11 @@ ModelMgr::ParVariant* ParamSelector::ReadPVFromGui(const std::string& title) con
         pv->pars.push_back( PairStr(key, val) );
     }
 
-    const size_t num_input_files = _modelMgr->Model(ds::VAR)->NumPars();
+    const size_t num_input_files = _modelMgr->Model(ds::FUNC)->NumPars();
     for (size_t j=0; j<num_input_files; ++j)
     {
-        std::string key = _modelMgr->Model(ds::VAR)->ShortKey(j),
-                val = _modelMgr->Model(ds::VAR)->Value(j);
+        std::string key = _modelMgr->Model(ds::FUNC)->ShortKey(j),
+                val = _modelMgr->Model(ds::FUNC)->Value(j);
         if (val.at(0) == '"')
             pv->input_files.push_back( PairStr(key, val) );
     }

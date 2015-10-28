@@ -66,10 +66,10 @@ void PhasePlot::ComputeData()
 #endif
     //Get all of the information from the parameter fields, introducing new variables as needed.
     ParserMgr& parser_mgr = GetParserMgr(0);
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars(),
-            num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-    const double* const diffs = parser_mgr.ConstData(ds::DIFF),
-            * const vars = parser_mgr.ConstData(ds::VAR);
+    const int num_statevars = (int)_modelMgr->Model(ds::STATE)->NumPars(),
+            num_vars = (int)_modelMgr->Model(ds::FUNC)->NumPars();
+    const double* const diffs = parser_mgr.ConstData(ds::STATE),
+            * const vars = parser_mgr.ConstData(ds::FUNC);
         //variables, differential equations, and initial conditions, all of which can invoke named
         //values
 
@@ -80,10 +80,10 @@ void PhasePlot::ComputeData()
     if (is_recording)
     {
         temp.open(QFile::WriteOnly | QFile::Text);
-        for (size_t i=0; i<(size_t)num_diffs; ++i)
-            output += _modelMgr->Model(ds::DIFF)->ShortKey(i) + "\t";
+        for (size_t i=0; i<(size_t)num_statevars; ++i)
+            output += _modelMgr->Model(ds::STATE)->ShortKey(i) + "\t";
         for (size_t i=0; i<(size_t)num_vars; ++i)
-            output += _modelMgr->Model(ds::VAR)->ShortKey(i) + "\t";
+            output += _modelMgr->Model(ds::FUNC)->ShortKey(i) + "\t";
         output += "\n";
         temp.write(output.c_str());
         temp.flush();
@@ -105,7 +105,7 @@ void PhasePlot::ComputeData()
                 : 100;
         if (num_steps==0) num_steps = 1;
         if (num_steps>MAX_BUF_SIZE) num_steps = MAX_BUF_SIZE;
-        Packet* packet = new Packet(num_steps, num_diffs, num_vars);
+        Packet* packet = new Packet(num_steps, num_statevars, num_vars);
         double* pack_ip = packet->ip;
         const std::vector<double*>& pack_diffs = packet->diffs,
                 pack_vars = packet->vars;
@@ -128,7 +128,7 @@ void PhasePlot::ComputeData()
 
                 //Record updated variables for 2d graph, inner product, and output file
                 double ip_k = 0;
-                for (int i=0; i<num_diffs; ++i)
+                for (int i=0; i<num_statevars; ++i)
                 {
                     double diffs_i = diffs[i];
                     pack_diffs[i][k] = diffs_i;
@@ -140,7 +140,7 @@ void PhasePlot::ComputeData()
 
                 if (is_recording)
                 {
-                    for (int i=0; i<num_diffs; ++i)
+                    for (int i=0; i<num_statevars; ++i)
                         output += std::to_string(diffs[i]) + "\t";
                     for (int i=0; i<num_vars; ++i)
                         output += std::to_string(vars[i]) + "\t";
@@ -173,7 +173,7 @@ void PhasePlot::ComputeData()
 
         //A blowup will crash QwtPlot
         const double DMAX = std::numeric_limits<double>::max()/1e100;
-        for (int i=0; i<num_diffs; ++i)
+        for (int i=0; i<num_statevars; ++i)
             if (fabs(diffs[i])>DMAX)
                 throw std::runtime_error("PhasePlot::ComputeData: model exploded");
 
@@ -191,7 +191,7 @@ void PhasePlot::ComputeData()
 
 void PhasePlot::Initialize()
 {
-    const int num_diffs = (int)_modelMgr->Model(ds::DIFF)->NumPars();
+    const int num_statevars = (int)_modelMgr->Model(ds::STATE)->NumPars();
     while (!_packets.empty())
     {
         delete _packets.front();
@@ -201,7 +201,7 @@ void PhasePlot::Initialize()
     _makePlots = Spec_tob("make_plots");
     if (_makePlots)
     {
-        _diffPts = DataVec(num_diffs);
+        _diffPts = DataVec(num_statevars);
 
         QwtSymbol *symbol = new QwtSymbol( QwtSymbol::Ellipse,
             QBrush( Qt::yellow ), QPen( Qt::red, 2 ), QSize( 8, 8 ) );
@@ -237,9 +237,9 @@ void PhasePlot::MakePlotItems()
     {
         if (!(it->read_flag & Packet::PP_READ))
         {
-            const size_t num_diffs = it->diffs.size(),
+            const size_t num_statevars = it->diffs.size(),
                     num_samples = it->num_samples;
-            for (size_t i=0; i<num_diffs; ++i)
+            for (size_t i=0; i<num_statevars; ++i)
                 for (size_t k=0; k<num_samples; ++k)
                     _diffPts[i].push_back( it->diffs.at(i)[k]);
             it->read_flag |= Packet::PP_READ;
@@ -258,10 +258,10 @@ void PhasePlot::MakePlotItems()
     //**********************
 
     //Shrink the buffer if need be
-    const int num_diffs = _diffPts.size(),
+    const int num_statevars = _diffPts.size(),
             xy_buf_over = (int)_diffPts.at(0).size() - MAX_BUF_SIZE;
     if (xy_buf_over>0)
-        for (int i=0; i<num_diffs; ++i)
+        for (int i=0; i<num_statevars; ++i)
             _diffPts[i].erase(_diffPts[i].begin(), _diffPts[i].begin()+xy_buf_over);
 
     //Plot the current state vector

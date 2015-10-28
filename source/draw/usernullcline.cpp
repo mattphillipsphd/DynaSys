@@ -60,45 +60,45 @@ void UserNullcline::ComputeData()
             RecomputeIfNeeded();
 
             ParserMgr& parser_mgr = GetParserMgr(0);
-            const ParamModelBase* const diff_model = _modelMgr->Model(ds::DIFF);
-            const int num_diffs = (int)diff_model->NumPars(),
-                    num_vars = (int)_modelMgr->Model(ds::VAR)->NumPars();
-            double* resets = new double[num_diffs],
-                    * dcurrent = new double[num_diffs],
+            const ParamModelBase* const diff_model = _modelMgr->Model(ds::STATE);
+            const int num_statevars = (int)diff_model->NumPars(),
+                    num_vars = (int)_modelMgr->Model(ds::FUNC)->NumPars();
+            double* resets = new double[num_statevars],
+                    * dcurrent = new double[num_statevars],
                     * vcurrent = new double[num_vars];
-            memcpy(resets, parser_mgr.ConstData(ds::INIT), sizeof(double)*num_diffs);
-            memcpy(dcurrent, parser_mgr.ConstData(ds::DIFF), sizeof(double)*num_diffs);
-            memcpy(vcurrent, parser_mgr.ConstData(ds::VAR), sizeof(double)*num_vars);
+            memcpy(resets, parser_mgr.ConstData(ds::INIT), sizeof(double)*num_statevars);
+            memcpy(dcurrent, parser_mgr.ConstData(ds::STATE), sizeof(double)*num_statevars);
+            memcpy(vcurrent, parser_mgr.ConstData(ds::FUNC), sizeof(double)*num_vars);
             for (int i=0; i<XRES; ++i)
             {
                 //Set up the model
                 const double xij = i*xinc + xmin;
-                for (int j=0; j<num_diffs; ++j)
+                for (int j=0; j<num_statevars; ++j)
                     if (j==xidx)
-                        parser_mgr.SetData(ds::DIFF, j, xij);
+                        parser_mgr.SetData(ds::STATE, j, xij);
                     else if (j==yidx) //Shouldn't matter at all what this gets set to
-                        parser_mgr.SetData(ds::DIFF, j, resets[j]);
+                        parser_mgr.SetData(ds::STATE, j, resets[j]);
                     else
-                        parser_mgr.SetData(ds::DIFF, j, dcurrent[j]);
+                        parser_mgr.SetData(ds::STATE, j, dcurrent[j]);
                 for (int j=0; j<num_vars; ++j)
-                    if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) != Input::USER )
-                        parser_mgr.SetData(ds::VAR, j, vcurrent[j]);
+                    if ( Input::Type(_modelMgr->Model(ds::FUNC)->Value(j)) != Input::USER )
+                        parser_mgr.SetData(ds::FUNC, j, vcurrent[j]);
                     //This is for input files and random numbers
 
                 //Evaluate the model--the user variables (which may depend on state variables
                 //and possibly appear in the nullcline statements), and the nullclines
                 for (int j=0; j<num_vars; ++j)
-                    if (_modelMgr->IsFreeze(ds::VAR,j))
+                    if (_modelMgr->IsFreeze(ds::FUNC,j))
                     {
-                        std::string temp_key = _modelMgr->Model(ds::VAR)->TempKey(j);
+                        std::string temp_key = _modelMgr->Model(ds::FUNC)->TempKey(j);
                         parser_mgr.QuickEval(temp_key + " = 0.0");
                     }
-                    else if ( Input::Type(_modelMgr->Model(ds::VAR)->Value(j)) == Input::USER )
+                    else if ( Input::Type(_modelMgr->Model(ds::FUNC)->Value(j)) == Input::USER )
                     {
-                        std::string var = _modelMgr->Model(ds::VAR)->TempExpression(j);
+                        std::string var = _modelMgr->Model(ds::FUNC)->TempExpression(j);
                         parser_mgr.QuickEval(var);
                     }
-                parser_mgr.TempEval(ds::VAR);
+                parser_mgr.TempEval(ds::FUNC);
                 for (int j=0; j<num_ncs; ++j)
                 {
                     std::string nullcline = _modelMgr->Model(ds::NC)->Expression(j);
@@ -136,15 +136,15 @@ void UserNullcline::ComputeData()
                         num_jacs = _modelMgr->Model(ds::JAC)->NumPars();
                 for (size_t i=0; i<num_eqs; ++i)
                 {
-                    parser_mgr.SetData(ds::DIFF, xidx, record->equilibria.at(i).x);
-                    parser_mgr.SetData(ds::DIFF, yidx, record->equilibria.at(i).y);
+                    parser_mgr.SetData(ds::STATE, xidx, record->equilibria.at(i).x);
+                    parser_mgr.SetData(ds::STATE, yidx, record->equilibria.at(i).y);
                     for (size_t j=0; j<num_jacs; ++j)
                     {
                         std::string jac_ij = _modelMgr->Model(ds::JAC)->Expression(j);
                         parser_mgr.QuickEval(jac_ij);
                     }
 
-                    record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_diffs);
+                    record->equilibria[i].eq_cat = EquilibriumCat(jacob_vec, num_statevars);
                 }
             }
 
@@ -191,7 +191,7 @@ void UserNullcline::Initialize()
     const size_t num_ncs = _modelMgr->Model(ds::NC)->NumPars();
     for (size_t i=0; i<num_ncs; ++i)
     {
-        size_t eq_idx = _modelMgr->Model(ds::DIFF)->ShortKeyIndex( EquationVar(i) );
+        size_t eq_idx = _modelMgr->Model(ds::STATE)->ShortKeyIndex( EquationVar(i) );
         QwtPlotCurve* curv = new QwtPlotCurve();
         curv->setPen( _colors.at((eq_idx+1)%num_colors), 1 ); //+1 for IP which isn't used here
         curv->setRenderHint( QwtPlotItem::RenderAntialiased, true );
@@ -235,7 +235,7 @@ void UserNullcline::MakePlotItems()
         ClearEquilibria();
     for (int i=0; i<num_ncs; ++i)
     {
-        size_t yidx_i = _modelMgr->Model(ds::DIFF)->ShortKeyIndex( DependentVar( (size_t)i ) );
+        size_t yidx_i = _modelMgr->Model(ds::STATE)->ShortKeyIndex( DependentVar( (size_t)i ) );
         if (yidx_i != yidx) continue;
         QwtPlotCurve* curv = static_cast<QwtPlotCurve*>( PlotItem(i) );
         QPolygonF nullcline(XRES);

@@ -51,6 +51,12 @@ class ParamModelBase : public QAbstractTableModel
 #endif
         virtual ~ParamModelBase();
 
+        virtual void AddParameter(const std::string& param, const std::string& value = "");
+        virtual void OpaqueInit(int) {}
+        void SetFreeze(size_t i, bool is_freeze);
+        void SetValue(const std::string& param, const std::string& value);
+        void SetValue(size_t i, const std::string& value);
+
         virtual bool DoEvaluate() const = 0; //Whether the parameter expression
             //gets evaluated by the parser (on each cycle)
         virtual bool DoInitialize() const = 0; //Whether the model values
@@ -66,6 +72,7 @@ class ParamModelBase : public QAbstractTableModel
         VecStr Keys() const;
         std::string Name() const;
         size_t NumPars() const { return _parameters.size(); }
+        virtual const void* OpaqueData() const { return nullptr; }
         virtual std::string ParamString(size_t i) const;
         virtual void ProcessParamFileLine(const std::string& key, std::string rem) = 0;
         virtual void SaveString(std::ofstream& out) const;
@@ -80,11 +87,6 @@ class ParamModelBase : public QAbstractTableModel
         const std::string& Value(const std::string& key) const;
         const std::string& Value(size_t i) const;
         VecStr Values() const;
-
-        virtual void AddParameter(const std::string& param, const std::string& value = "");
-        void SetFreeze(int i, bool is_freeze);
-        void SetValue(const std::string& param, const std::string& value);
-        void SetValue(int i, const std::string& value);
 
         int columnCount() const;
         virtual int columnCount(const QModelIndex &parent) const override = 0;
@@ -105,6 +107,10 @@ class ParamModelBase : public QAbstractTableModel
 
 
     private:
+#ifndef __GNUG__
+        ParamModelBase(const ParamModelBase&);
+        ParamModelBase& operator=(const ParamModelBase&);
+#endif
         const ds::PMODEL _id;
         mutable std::mutex _mutex;
         std::vector<Param*> _parameters;

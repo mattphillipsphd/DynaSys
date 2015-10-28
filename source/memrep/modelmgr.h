@@ -7,6 +7,7 @@
 #include "../globals/globals.h"
 #include "../globals/scopetracker.h"
 #include "../models/conditionmodel.h"
+#include "../models/differentialmodel.h"
 #include "../models/numericmodelbase.h"
 #include "../models/tpvtablemodel.h"
 
@@ -46,7 +47,9 @@ class ModelMgr
         void ClearParameters(ds::PMODEL mi);
         void DeleteParVariant(size_t idx);
         void InsertParVariant(size_t idx, ParVariant* pv);
+        void OpaqueInit(ds::PMODEL mi, size_t N);
         void RemoveParameter(ds::PMODEL mi, const std::string& key);
+        void UpdateDifferentials(const double* vals, size_t N);
 
         void SetCondValue(size_t row, const VecStr& results);
         void SetDiffMethod(DIFF_METHOD diff_method) { _diffMethod = diff_method; }

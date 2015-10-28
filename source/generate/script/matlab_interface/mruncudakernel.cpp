@@ -95,7 +95,7 @@ void MRunCudaKernel::WriteArgCheck(std::ofstream& out) const
 {
     const std::string num_inputs = std::to_string( _modelMgr->Model(ds::INP)->NumPars() ),
             num_input_files = std::to_string( static_cast<const VariableModel*>(
-                _modelMgr->Model(ds::VAR))->TypeCount(Input::INPUT_FILE) );
+                _modelMgr->Model(ds::FUNC))->TypeCount(Input::INPUT_FILE) );
     out <<
             "if ~isempty(par_mat) && size(par_mat,2)~=" + num_inputs + "\n"
             "    error('Incorrect number of parameters');\n"

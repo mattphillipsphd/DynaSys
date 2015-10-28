@@ -78,8 +78,8 @@ void CFileSO::WriteMainEnd(std::ofstream& out)
 void CFileSO::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin CFileSO::WriteOutputHeader\n";
-    const size_t num_fields = _modelMgr->Model(ds::VAR)->NumPars()
-            + _modelMgr->Model(ds::DIFF)->NumPars();
+    const size_t num_fields = _modelMgr->Model(ds::FUNC)->NumPars()
+            + _modelMgr->Model(ds::STATE)->NumPars();
     out <<
            "    const int num_fields = " + std::to_string(num_fields) + ",\n"
            "            num_records = num_iters / save_mod_n;\n"

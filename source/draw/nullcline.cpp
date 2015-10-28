@@ -65,10 +65,10 @@ void Nullcline::ComputeData()
                     const int idx = i*resolution+j;
 
                     ParserMgr& parser_mgr = GetParserMgr(idx);
-                    const double* diffs = parser_mgr.ConstData(ds::DIFF);
+                    const double* diffs = parser_mgr.ConstData(ds::STATE);
 
-                    parser_mgr.SetData(ds::DIFF, xidx, xij);
-                    parser_mgr.SetData(ds::DIFF, yidx, yij);
+                    parser_mgr.SetData(ds::STATE, xidx, xij);
+                    parser_mgr.SetData(ds::STATE, yidx, yij);
                     parser_mgr.ParserEval(false);
                     xdiff[idx] = diffs[xidx] - xij;
                     ydiff[idx] = diffs[yidx] - yij;

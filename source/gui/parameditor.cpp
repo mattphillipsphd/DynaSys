@@ -165,7 +165,7 @@ void ParamEditor::UpdateEditors()
     {
         int mi = i-1;
         std::string text = _models.at(mi);
-        if ((ds::PMODEL)(mi)==ds::VAR || (ds::PMODEL)(mi)==ds::DIFF)
+        if ((ds::PMODEL)(mi)==ds::FUNC || (ds::PMODEL)(mi)==ds::STATE)
         {
             std::stringstream ss(text);
             std::string line, text_temp;

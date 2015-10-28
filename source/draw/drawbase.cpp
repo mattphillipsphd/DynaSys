@@ -336,11 +336,11 @@ void DrawBase::InitParserMgrs(size_t num)
 }
 void DrawBase::FreezeNonUser()
 {
-    const ParamModelBase* vars = _modelMgr->Model(ds::VAR);
+    const ParamModelBase* vars = _modelMgr->Model(ds::FUNC);
     const size_t num_vars = vars->NumPars();
     for (size_t i=0; i<num_vars; ++i)
         if ( Input::Type(vars->Value(i)) != Input::USER )
-            _modelMgr->SetIsFreeze(ds::VAR, i, true);
+            _modelMgr->SetIsFreeze(ds::FUNC, i, true);
 }
 bool DrawBase::NeedNewStep()
 {

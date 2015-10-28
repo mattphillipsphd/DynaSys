@@ -20,10 +20,10 @@ void CudaKernelWithMeasure::MakeHFile()
     std::ofstream hout;
     hout.open(_hFileName);
 
-    const ParamModelBase* variables = _modelMgr->Model(ds::VAR),
-            * diffs = _modelMgr->Model(ds::DIFF);
+    const ParamModelBase* variables = _modelMgr->Model(ds::FUNC),
+            * diffs = _modelMgr->Model(ds::STATE);
     const size_t num_vars = variables->NumPars(),
-            num_diffs = diffs->NumPars();
+            num_statevars = diffs->NumPars();
 
     hout << "//Auto-generated with DynaSys " + ds::VERSION_STR + "\n\n";
 
@@ -34,7 +34,7 @@ void CudaKernelWithMeasure::MakeHFile()
         std::transform(key.cbegin(), key.cend(), std::back_inserter(idx), ::toupper);
         hout << "#define " + idx + " " + std::to_string(i) + "\n";
     }
-    for (size_t i=0; i<num_diffs; ++i)
+    for (size_t i=0; i<num_statevars; ++i)
     {
         const std::string key = diffs->ShortKey(i) + "_OUTIDX_";
         std::string idx;
@@ -124,9 +124,9 @@ void CudaKernelWithMeasure::WriteModelLoopBegin(std::ofstream& out)
 void CudaKernelWithMeasure::WriteOutputHeader(std::ofstream& out)
 {
     out << "//Begin CudaKernelWithMeasure::WriteOutputHeader\n";
-    const size_t num_vars = _modelMgr->Model(ds::VAR)->NumPars(),
-                num_diffs = _modelMgr->Model(ds::DIFF)->NumPars();
-    const std::string num_out = std::to_string(num_vars+num_diffs);
+    const size_t num_vars = _modelMgr->Model(ds::FUNC)->NumPars(),
+                num_statevars = _modelMgr->Model(ds::STATE)->NumPars();
+    const std::string num_out = std::to_string(num_vars+num_statevars);
     out << "    double out[" + num_out + "];\n";
     out << "//End CudaKernelWithMeasure::WriteOutputHeader\n";
     out << "\n";
